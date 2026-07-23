@@ -1,0 +1,21 @@
+[package]
+name = "crc-framework-rs"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Rust-powered Python bindings for the Climate Risk Commons Framework"
+authors = ["Riskthinking.AI"]
+license = "AGPL-3.0-or-later"
+readme = "README.md"
+
+[workspace]
+members = ["crates/core"]
+
+[lib]
+name = "_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+crc-framework-core = { path = "crates/core" }
+h3o = "=0.9.3"
+pyo3 = { version = "0.27", features = ["extension-module"] }

@@ -1,0 +1,46 @@
+[build-system]
+requires = ["maturin>=1.4,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "crc-framework"
+description = "Rust computation core and Python bindings for the Climate Risk Commons Framework"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = ["numpy>=1.23"]
+authors = [{ name = "Riskthinking.AI" }]
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+keywords = [
+    "climate-risk",
+    "probability-distributions",
+    "risk-metrics",
+    "rust",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Typing :: Typed",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+test = ["mypy", "pytest"]
+
+[tool.maturin]
+module-name = "crc_framework._core"
+python-source = "python"
+features = ["pyo3/extension-module"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["python/crc_framework", "tests/typing_smoke.py"]
+mypy_path = "python"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

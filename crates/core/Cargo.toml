@@ -1,0 +1,13 @@
+[package]
+name = "crc-framework-core"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Core distribution and climate-risk algorithms for CRC Framework"
+authors = ["Riskthinking.AI"]
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+h3o = "=0.9.3"
+phf = { version = "0.14.0", features = ["macros"] }
+rand = "0.9"
