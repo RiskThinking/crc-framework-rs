@@ -10,7 +10,7 @@ ArrayLike = Union[float, Sequence[float], npt.NDArray[np.float64]]
 
 @runtime_checkable
 class Distribution(Protocol):
-    """A continuous or interpolated distribution sampled by CDF probability."""
+    """A distribution evaluated and sampled by canonical CDF probability."""
 
     def pdf(self, x: ArrayLike) -> Union[float, npt.NDArray[np.float64]]: ...
 

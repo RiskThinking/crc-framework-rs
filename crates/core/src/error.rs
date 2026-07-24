@@ -7,6 +7,10 @@ pub enum CrcError {
     InvalidInput(String),
     Unsupported(String),
     MissingParameter(String),
+    ConvergenceFailed {
+        family: String,
+        iterations: usize,
+    },
     OutOfSupport {
         probability: f64,
         minimum: f64,
@@ -25,6 +29,10 @@ impl Display for CrcError {
             Self::InvalidInput(message) => write!(f, "invalid input: {message}"),
             Self::Unsupported(message) => write!(f, "unsupported operation: {message}"),
             Self::MissingParameter(message) => write!(f, "missing parameter: {message}"),
+            Self::ConvergenceFailed { family, iterations } => write!(
+                f,
+                "{family} fitting did not converge after {iterations} iterations"
+            ),
             Self::OutOfSupport {
                 probability,
                 minimum,

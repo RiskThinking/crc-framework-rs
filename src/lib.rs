@@ -2,8 +2,10 @@ use std::{collections::HashMap, sync::Arc};
 
 use crc_framework_core::{
     BinaryOutcome, Distribution, DistributionFamily, EmpiricalDistribution, FittedDistribution,
-    ImpactContext, ImpactRegistry, Interpolation, ScenarioMetadata, TabulatedDistribution, Tail,
-    Transform, compute_risk, compute_spanning_set, generate_microscores,
+    HurdleDistribution, ImpactContext, ImpactRegistry, Interpolation, ScenarioMetadata,
+    TabulatedDistribution, Tail, Transform, compute_risk, compute_spanning_set,
+    fit_hurdle_quantiles as core_fit_hurdle_quantiles, fit_quantiles as core_fit_quantiles,
+    generate_microscores,
 };
 use pyo3::{
     exceptions::PyValueError,
@@ -84,6 +86,64 @@ struct PyFitResult {
     r_squared: f64,
 }
 
+#[pyclass(name = "NativeQuantileFitResult", frozen)]
+#[derive(Clone)]
+struct PyQuantileFitResult {
+    #[pyo3(get)]
+    distribution: PyDistribution,
+    #[pyo3(get)]
+    rmse: f64,
+    #[pyo3(get)]
+    normalized_rmse: f64,
+    #[pyo3(get)]
+    weighted_r_squared: f64,
+    #[pyo3(get)]
+    maximum_absolute_residual: f64,
+    #[pyo3(get)]
+    point_count: usize,
+    #[pyo3(get)]
+    converged: bool,
+    #[pyo3(get)]
+    iterations: usize,
+    #[pyo3(get)]
+    evaluations: usize,
+}
+
+#[pyclass(name = "NativeHurdleQuantileFitResult", frozen)]
+#[derive(Clone)]
+struct PyHurdleQuantileFitResult {
+    #[pyo3(get)]
+    distribution: PyDistribution,
+    #[pyo3(get)]
+    base_distribution: PyDistribution,
+    #[pyo3(get)]
+    atom_location: f64,
+    #[pyo3(get)]
+    atom_probability: f64,
+    #[pyo3(get)]
+    tail_rmse: f64,
+    #[pyo3(get)]
+    tail_normalized_rmse: f64,
+    #[pyo3(get)]
+    tail_weighted_r_squared: f64,
+    #[pyo3(get)]
+    tail_maximum_absolute_residual: f64,
+    #[pyo3(get)]
+    tail_point_count: usize,
+    #[pyo3(get)]
+    converged: bool,
+    #[pyo3(get)]
+    iterations: usize,
+    #[pyo3(get)]
+    evaluations: usize,
+    #[pyo3(get)]
+    atom_probability_lower_bound: f64,
+    #[pyo3(get)]
+    atom_probability_upper_bound: f64,
+    #[pyo3(get)]
+    atom_point_count: usize,
+}
+
 fn fitted_py(distribution: FittedDistribution) -> PyDistribution {
     PyDistribution {
         family: Some(distribution.family.name().to_owned()),
@@ -94,6 +154,27 @@ fn fitted_py(distribution: FittedDistribution) -> PyDistribution {
     }
 }
 
+fn fitted_from_py(distribution: &PyDistribution) -> PyResult<FittedDistribution> {
+    let family_name = distribution
+        .family
+        .as_deref()
+        .ok_or_else(|| PyValueError::new_err("base distribution must be parametric"))?;
+    let family = DistributionFamily::from_name(family_name).ok_or_else(|| {
+        PyValueError::new_err(format!("unknown distribution family {family_name}"))
+    })?;
+    FittedDistribution::from_parameters(
+        family,
+        distribution.shape,
+        distribution
+            .location
+            .ok_or_else(|| PyValueError::new_err("base distribution is missing location"))?,
+        distribution
+            .scale
+            .ok_or_else(|| PyValueError::new_err("base distribution is missing scale"))?,
+    )
+    .map_err(py_error)
+}
+
 fn fit_result_py(result: crc_framework_core::FitResult) -> PyFitResult {
     PyFitResult {
         distribution: fitted_py(result.distribution),
@@ -101,6 +182,56 @@ fn fit_result_py(result: crc_framework_core::FitResult) -> PyFitResult {
         ks_pvalue: result.diagnostics.ks_pvalue,
         rmse: result.diagnostics.rmse,
         r_squared: result.diagnostics.r_squared,
+    }
+}
+
+fn quantile_fit_result_py(result: crc_framework_core::QuantileFitResult) -> PyQuantileFitResult {
+    PyQuantileFitResult {
+        distribution: fitted_py(result.distribution),
+        rmse: result.diagnostics.rmse,
+        normalized_rmse: result.diagnostics.normalized_rmse,
+        weighted_r_squared: result.diagnostics.weighted_r_squared,
+        maximum_absolute_residual: result.diagnostics.maximum_absolute_residual,
+        point_count: result.diagnostics.point_count,
+        converged: result.diagnostics.converged,
+        iterations: result.diagnostics.iterations,
+        evaluations: result.diagnostics.evaluations,
+    }
+}
+
+fn hurdle_py(distribution: HurdleDistribution) -> PyDistribution {
+    PyDistribution {
+        inner: Arc::new(distribution),
+        family: None,
+        shape: None,
+        location: None,
+        scale: None,
+    }
+}
+
+fn hurdle_quantile_fit_result_py(
+    result: crc_framework_core::HurdleQuantileFitResult,
+) -> PyHurdleQuantileFitResult {
+    let atom_location = result.distribution.atom_location();
+    let atom_probability = result.distribution.atom_probability();
+    let base = result.distribution.base().clone();
+    let tail = result.diagnostics.tail;
+    PyHurdleQuantileFitResult {
+        distribution: hurdle_py(result.distribution),
+        base_distribution: fitted_py(base),
+        atom_location,
+        atom_probability,
+        tail_rmse: tail.rmse,
+        tail_normalized_rmse: tail.normalized_rmse,
+        tail_weighted_r_squared: tail.weighted_r_squared,
+        tail_maximum_absolute_residual: tail.maximum_absolute_residual,
+        tail_point_count: tail.point_count,
+        converged: tail.converged,
+        iterations: tail.iterations,
+        evaluations: tail.evaluations,
+        atom_probability_lower_bound: result.diagnostics.atom_probability_lower_bound,
+        atom_probability_upper_bound: result.diagnostics.atom_probability_upper_bound,
+        atom_point_count: result.diagnostics.atom_point_count,
     }
 }
 
@@ -198,6 +329,19 @@ fn fitted_distribution(
 }
 
 #[pyfunction]
+#[pyo3(signature = (base, atom_probability, atom_location=0.0))]
+fn hurdle_distribution(
+    base: PyRef<'_, PyDistribution>,
+    atom_probability: f64,
+    atom_location: f64,
+) -> PyResult<PyDistribution> {
+    let base = fitted_from_py(&base)?;
+    HurdleDistribution::new(atom_location, atom_probability, base)
+        .map(hurdle_py)
+        .map_err(py_error)
+}
+
+#[pyfunction]
 #[pyo3(signature = (samples, family=None))]
 fn fit(samples: Vec<f64>, family: Option<&str>) -> PyResult<PyFitResult> {
     let family = family
@@ -216,6 +360,52 @@ fn fit_candidates(samples: Vec<f64>) -> PyResult<Vec<PyFitResult>> {
     crc_framework_core::distribution::fit_all(&samples)
         .map(|results| results.into_iter().map(fit_result_py).collect())
         .map_err(py_error)
+}
+
+#[pyfunction]
+#[pyo3(signature = (probabilities, values, family, weights=None))]
+fn fit_quantiles(
+    probabilities: Vec<f64>,
+    values: Vec<f64>,
+    family: &str,
+    weights: Option<Vec<f64>>,
+) -> PyResult<PyQuantileFitResult> {
+    let family = DistributionFamily::from_name(family)
+        .ok_or_else(|| PyValueError::new_err(format!("unknown distribution family {family}")))?;
+    core_fit_quantiles(&probabilities, &values, weights.as_deref(), family)
+        .map(quantile_fit_result_py)
+        .map_err(py_error)
+}
+
+#[pyfunction]
+#[pyo3(signature = (
+    probabilities,
+    values,
+    family,
+    atom_probability,
+    atom_location=0.0,
+    weights=None
+))]
+fn fit_hurdle_quantiles(
+    probabilities: Vec<f64>,
+    values: Vec<f64>,
+    family: &str,
+    atom_probability: f64,
+    atom_location: f64,
+    weights: Option<Vec<f64>>,
+) -> PyResult<PyHurdleQuantileFitResult> {
+    let family = DistributionFamily::from_name(family)
+        .ok_or_else(|| PyValueError::new_err(format!("unknown distribution family {family}")))?;
+    core_fit_hurdle_quantiles(
+        &probabilities,
+        &values,
+        weights.as_deref(),
+        family,
+        atom_location,
+        atom_probability,
+    )
+    .map(hurdle_quantile_fit_result_py)
+    .map_err(py_error)
 }
 
 #[pyfunction]
@@ -636,6 +826,8 @@ fn risk_factors() -> Vec<(i32, &'static str)> {
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDistribution>()?;
     m.add_class::<PyFitResult>()?;
+    m.add_class::<PyQuantileFitResult>()?;
+    m.add_class::<PyHurdleQuantileFitResult>()?;
     m.add_class::<PyMicroscore>()?;
     m.add_class::<PyMicroscoreSuite>()?;
     m.add_class::<PyBinaryOutcome>()?;
@@ -647,8 +839,11 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(tabulated_distribution, m)?)?;
     m.add_function(wrap_pyfunction!(return_period_distribution, m)?)?;
     m.add_function(wrap_pyfunction!(fitted_distribution, m)?)?;
+    m.add_function(wrap_pyfunction!(hurdle_distribution, m)?)?;
     m.add_function(wrap_pyfunction!(fit, m)?)?;
     m.add_function(wrap_pyfunction!(fit_candidates, m)?)?;
+    m.add_function(wrap_pyfunction!(fit_quantiles, m)?)?;
+    m.add_function(wrap_pyfunction!(fit_hurdle_quantiles, m)?)?;
     m.add_function(wrap_pyfunction!(diagnostic_metrics, m)?)?;
     m.add_function(wrap_pyfunction!(apply_impact, m)?)?;
     m.add_function(wrap_pyfunction!(microscores, m)?)?;

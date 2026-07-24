@@ -205,6 +205,379 @@ pub fn fit_distribution(kind: DistributionKind, data: &[f64]) -> Option<FittedDi
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct QuantileOptimization {
+    pub shape: Option<f64>,
+    pub loc: f64,
+    pub scale: f64,
+    pub converged: bool,
+    pub iterations: usize,
+    pub evaluations: usize,
+}
+
+#[derive(Debug, Clone)]
+struct SimplexResult {
+    parameters: Vec<f64>,
+    objective: f64,
+    converged: bool,
+    iterations: usize,
+    evaluations: usize,
+}
+
+pub(crate) fn fit_quantile_points(
+    kind: DistributionKind,
+    probabilities: &[f64],
+    values: &[f64],
+    weights: &[f64],
+    value_scale: f64,
+    truncation_atom: Option<f64>,
+) -> Option<QuantileOptimization> {
+    let starts = quantile_starts(kind, probabilities, values, weights);
+    let parameter_count = if matches!(kind, DistributionKind::GumbelR | DistributionKind::GumbelL) {
+        2
+    } else {
+        3
+    };
+    let value_range = values.iter().copied().fold(f64::NEG_INFINITY, f64::max)
+        - values.iter().copied().fold(f64::INFINITY, f64::min);
+    let mut best: Option<SimplexResult> = None;
+
+    for start in starts {
+        let mut steps = vec![0.0; parameter_count];
+        if parameter_count == 2 {
+            steps[0] = 0.1 * value_range.max(value_scale);
+            steps[1] = 0.1 * start[1].abs().max(value_scale);
+        } else {
+            steps[0] = match kind {
+                DistributionKind::WeibullMin | DistributionKind::WeibullMax => {
+                    0.15 * start[0].abs().max(1.0)
+                }
+                DistributionKind::SkewNorm => 0.5,
+                _ => 0.15,
+            };
+            steps[1] = 0.1 * value_range.max(value_scale);
+            steps[2] = 0.1 * start[2].abs().max(value_scale);
+        }
+        let result = quantile_nelder_mead(
+            start,
+            steps,
+            |parameters| {
+                quantile_objective(
+                    kind,
+                    parameters,
+                    probabilities,
+                    values,
+                    weights,
+                    value_scale,
+                    truncation_atom,
+                )
+            },
+            |parameters| constrain_quantile_parameters(kind, parameters),
+            2_000,
+            1.0e-8 * value_scale.max(1.0),
+            1.0e-12,
+        );
+        if result.objective.is_finite()
+            && best.as_ref().is_none_or(|candidate| {
+                (result.converged && !candidate.converged)
+                    || (result.converged == candidate.converged
+                        && result.objective < candidate.objective)
+            })
+        {
+            best = Some(result);
+        }
+    }
+
+    let best = best?;
+    let (shape, loc, scale) = if parameter_count == 2 {
+        (None, best.parameters[0], best.parameters[1])
+    } else {
+        (
+            Some(best.parameters[0]),
+            best.parameters[1],
+            best.parameters[2],
+        )
+    };
+    Some(QuantileOptimization {
+        shape,
+        loc,
+        scale,
+        converged: best.converged,
+        iterations: best.iterations,
+        evaluations: best.evaluations,
+    })
+}
+
+fn quantile_starts(
+    kind: DistributionKind,
+    probabilities: &[f64],
+    values: &[f64],
+    weights: &[f64],
+) -> Vec<Vec<f64>> {
+    let shapes: &[f64] = match kind {
+        DistributionKind::GenExtreme => &[-0.5, -0.15, 0.0, 0.15, 0.5],
+        DistributionKind::WeibullMin | DistributionKind::WeibullMax => &[0.7, 1.0, 2.0, 4.0],
+        DistributionKind::SkewNorm => &[-5.0, -1.0, 0.0, 1.0, 5.0],
+        DistributionKind::GenPareto => &[-0.5, -0.15, 0.0, 0.15, 0.5],
+        DistributionKind::GumbelR | DistributionKind::GumbelL => &[0.0],
+    };
+    let mut starts = Vec::new();
+    for &shape in shapes {
+        let standardized: Option<Vec<f64>> = probabilities
+            .iter()
+            .map(|&probability| standardized_quantile(kind, shape, probability))
+            .collect();
+        let Some(standardized) = standardized else {
+            continue;
+        };
+        if let Some((loc, scale)) = weighted_location_scale(&standardized, values, weights) {
+            if matches!(kind, DistributionKind::GumbelR | DistributionKind::GumbelL) {
+                starts.push(vec![loc, scale]);
+            } else {
+                starts.push(vec![shape, loc, scale]);
+            }
+        }
+    }
+    starts
+}
+
+fn standardized_quantile(kind: DistributionKind, shape: f64, probability: f64) -> Option<f64> {
+    let distribution = FittedDistribution::from_kind_and_params(
+        kind,
+        (!matches!(kind, DistributionKind::GumbelR | DistributionKind::GumbelL)).then_some(shape),
+        0.0,
+        1.0,
+    )?;
+    let value = distribution.ppf(probability);
+    value.is_finite().then_some(value)
+}
+
+fn weighted_location_scale(
+    standardized: &[f64],
+    values: &[f64],
+    weights: &[f64],
+) -> Option<(f64, f64)> {
+    let weight_sum = weights.iter().sum::<f64>();
+    let z_mean = standardized
+        .iter()
+        .zip(weights)
+        .map(|(value, weight)| value * weight)
+        .sum::<f64>()
+        / weight_sum;
+    let x_mean = values
+        .iter()
+        .zip(weights)
+        .map(|(value, weight)| value * weight)
+        .sum::<f64>()
+        / weight_sum;
+    let covariance = standardized
+        .iter()
+        .zip(values)
+        .zip(weights)
+        .map(|((z, x), weight)| weight * (z - z_mean) * (x - x_mean))
+        .sum::<f64>();
+    let variance = standardized
+        .iter()
+        .zip(weights)
+        .map(|(z, weight)| weight * (z - z_mean).powi(2))
+        .sum::<f64>();
+    let scale = covariance / variance;
+    let loc = x_mean - scale * z_mean;
+    (loc.is_finite() && scale.is_finite() && scale > 0.0).then_some((loc, scale))
+}
+
+fn constrain_quantile_parameters(kind: DistributionKind, parameters: &mut [f64]) {
+    let scale_index = parameters.len() - 1;
+    parameters[scale_index] = parameters[scale_index].clamp(1.0e-12, 1.0e12);
+    if parameters.len() == 3 {
+        parameters[0] = match kind {
+            DistributionKind::WeibullMin | DistributionKind::WeibullMax => {
+                parameters[0].clamp(0.05, 50.0)
+            }
+            DistributionKind::SkewNorm => parameters[0].clamp(-50.0, 50.0),
+            DistributionKind::GenExtreme | DistributionKind::GenPareto => {
+                parameters[0].clamp(-2.0, 2.0)
+            }
+            DistributionKind::GumbelR | DistributionKind::GumbelL => parameters[0],
+        };
+    }
+}
+
+fn quantile_objective(
+    kind: DistributionKind,
+    parameters: &[f64],
+    probabilities: &[f64],
+    values: &[f64],
+    weights: &[f64],
+    value_scale: f64,
+    truncation_atom: Option<f64>,
+) -> f64 {
+    let (shape, loc, scale) = if parameters.len() == 2 {
+        (None, parameters[0], parameters[1])
+    } else {
+        (Some(parameters[0]), parameters[1], parameters[2])
+    };
+    let Some(distribution) = FittedDistribution::from_kind_and_params(kind, shape, loc, scale)
+    else {
+        return f64::INFINITY;
+    };
+    let tail_start = truncation_atom.map(|atom| distribution.cdf(atom));
+    if tail_start.is_some_and(|cdf| !cdf.is_finite() || 1.0 - cdf <= 1.0e-12) {
+        return f64::INFINITY;
+    }
+    let weight_sum = weights.iter().sum::<f64>();
+    let mut loss = 0.0;
+    for ((&probability, &value), &weight) in probabilities.iter().zip(values).zip(weights) {
+        if weight == 0.0 {
+            continue;
+        }
+        let base_probability = tail_start.map_or(probability, |cdf| {
+            (cdf + probability * (1.0 - cdf)).min(1.0 - 1.0e-15)
+        });
+        let fitted = distribution.ppf(base_probability);
+        if !fitted.is_finite() {
+            return f64::INFINITY;
+        }
+        loss += weight * ((fitted - value) / value_scale).powi(2);
+    }
+    loss / weight_sum
+}
+
+fn quantile_nelder_mead<F, C>(
+    mut start: Vec<f64>,
+    steps: Vec<f64>,
+    objective: F,
+    constrain: C,
+    max_iterations: usize,
+    parameter_tolerance: f64,
+    objective_tolerance: f64,
+) -> SimplexResult
+where
+    F: Fn(&[f64]) -> f64,
+    C: Fn(&mut [f64]),
+{
+    constrain(&mut start);
+    let dimensions = start.len();
+    let mut simplex = Vec::with_capacity(dimensions + 1);
+    simplex.push(start.clone());
+    for dimension in 0..dimensions {
+        let mut point = start.clone();
+        point[dimension] += steps[dimension].max(1.0e-8);
+        constrain(&mut point);
+        simplex.push(point);
+    }
+    let mut values: Vec<f64> = simplex.iter().map(|point| objective(point)).collect();
+    let mut evaluations = values.len();
+
+    for iteration in 0..max_iterations {
+        let mut order: Vec<usize> = (0..simplex.len()).collect();
+        order.sort_by(|&left, &right| values[left].total_cmp(&values[right]));
+        let best = order[0];
+        let worst = order[dimensions];
+        let second_worst = order[dimensions - 1];
+        let parameter_spread = order[1..]
+            .iter()
+            .flat_map(|&index| {
+                simplex[index]
+                    .iter()
+                    .zip(&simplex[best])
+                    .map(|(left, right)| (left - right).abs())
+            })
+            .fold(0.0_f64, f64::max);
+        let objective_spread = order[1..]
+            .iter()
+            .map(|&index| (values[index] - values[best]).abs())
+            .fold(0.0_f64, f64::max);
+        if parameter_spread <= parameter_tolerance && objective_spread <= objective_tolerance {
+            return SimplexResult {
+                parameters: simplex[best].clone(),
+                objective: values[best],
+                converged: values[best].is_finite(),
+                iterations: iteration,
+                evaluations,
+            };
+        }
+
+        let mut centroid = vec![0.0; dimensions];
+        for &index in &order[..dimensions] {
+            for (dimension, value) in centroid.iter_mut().enumerate() {
+                *value += simplex[index][dimension] / dimensions as f64;
+            }
+        }
+        let trial = |factor: f64, reference: &[f64]| {
+            centroid
+                .iter()
+                .zip(reference)
+                .map(|(center, point)| center + factor * (center - point))
+                .collect::<Vec<_>>()
+        };
+        let mut reflected = trial(1.0, &simplex[worst]);
+        constrain(&mut reflected);
+        let reflected_value = objective(&reflected);
+        evaluations += 1;
+
+        if reflected_value < values[best] {
+            let mut expanded: Vec<f64> = centroid
+                .iter()
+                .zip(&reflected)
+                .map(|(center, point)| center + 2.0 * (point - center))
+                .collect();
+            constrain(&mut expanded);
+            let expanded_value = objective(&expanded);
+            evaluations += 1;
+            if expanded_value < reflected_value {
+                simplex[worst] = expanded;
+                values[worst] = expanded_value;
+            } else {
+                simplex[worst] = reflected;
+                values[worst] = reflected_value;
+            }
+        } else if reflected_value < values[second_worst] {
+            simplex[worst] = reflected;
+            values[worst] = reflected_value;
+        } else {
+            let outside = reflected_value < values[worst];
+            let reference = if outside { &reflected } else { &simplex[worst] };
+            let mut contracted: Vec<f64> = centroid
+                .iter()
+                .zip(reference)
+                .map(|(center, point)| center + 0.5 * (point - center))
+                .collect();
+            constrain(&mut contracted);
+            let contracted_value = objective(&contracted);
+            evaluations += 1;
+            if contracted_value < values[worst].min(reflected_value) {
+                simplex[worst] = contracted;
+                values[worst] = contracted_value;
+            } else {
+                let best_point = simplex[best].clone();
+                for &index in &order[1..] {
+                    for (value, best_value) in simplex[index].iter_mut().zip(&best_point) {
+                        *value = best_value + 0.5 * (*value - best_value);
+                    }
+                    constrain(&mut simplex[index]);
+                    values[index] = objective(&simplex[index]);
+                    evaluations += 1;
+                }
+            }
+        }
+    }
+
+    let best = values
+        .iter()
+        .enumerate()
+        .min_by(|left, right| left.1.total_cmp(right.1))
+        .map(|(index, _)| index)
+        .unwrap_or(0);
+    SimplexResult {
+        parameters: simplex[best].clone(),
+        objective: values[best],
+        converged: false,
+        iterations: max_iterations,
+        evaluations,
+    }
+}
+
 // Utility math helpers
 
 fn euler_mascheroni() -> f64 {

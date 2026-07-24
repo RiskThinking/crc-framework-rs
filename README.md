@@ -67,6 +67,8 @@ Choose a distribution according to the form of the available data:
 - `EmpiricalDistribution` for raw observations.
 - `TabulatedDistribution` for explicit probability/value pairs.
 - `FittedDistribution` for a known parametric family and its parameters.
+- `HurdleDistribution` for a point mass followed by a truncated parametric
+  tail.
 
 `TabulatedDistribution` does not extrapolate by default. Querying outside its
 declared probability range raises an error unless `extrapolate=True` is set.
@@ -84,11 +86,47 @@ Fitting is always explicit. Metrics sample the distribution supplied by the
 caller and never silently substitute a fitted curve. This makes the modelling
 choice auditable.
 
-`fit_distribution` selects among the supported families using the
+`fit_distribution` accepts raw observations or an `EmpiricalDistribution` and
+selects among the supported families using the
 Kolmogorov–Smirnov p-value. The supported families are `genextreme`,
 `weibull_min`, `weibull_max`, `skewnorm`, `gumbel_r`, `gumbel_l`, and
 `genpareto`. The returned `FitResult` includes KS, RMSE, and R-squared
-diagnostics.
+diagnostics. Passing a tabulated or fitted distribution is an error: those
+values are not independent observations.
+
+Use `fit_quantiles` for probability/value knots. It minimizes weighted
+value-space differences between the supplied values and the selected family's
+PPF, requires an explicit family, and reports residual diagnostics rather than
+KS statistics:
+
+```python
+from crc_framework import TabulatedDistribution, fit_quantiles
+
+curve = TabulatedDistribution.from_return_periods(
+    [5, 10, 25, 50, 100],
+    [0.2, 0.6, 1.1, 1.5, 1.9],
+    tail="upper",
+)
+fit = fit_quantiles(curve, family="gumbel_r")
+```
+
+For a known point mass, use `fit_hurdle_quantiles` and supply its probability;
+the framework does not infer an exact mass from sparse zero-valued knots:
+
+```python
+from crc_framework import fit_hurdle_quantiles
+
+fit = fit_hurdle_quantiles(
+    curve,
+    family="gumbel_r",
+    atom_probability=0.5,
+    atom_location=0.0,
+)
+```
+
+`TabulatedDistribution` remains the lossless interpolation of the supplied
+knots. Parametric and hurdle fits are lossy, so systems that require source
+reconstruction must persist the original probability/value pairs separately.
 
 ## Create microscores from flood exposure
 
@@ -227,7 +265,8 @@ continent and intersecting ISO3 country codes.
 The package exports the following primary interfaces:
 
 - Distributions: `EmpiricalDistribution`, `TabulatedDistribution`,
-  `FittedDistribution`, `fit_distribution`, `fit_all`, and `quality_metrics`.
+  `FittedDistribution`, `HurdleDistribution`, `fit_distribution`,
+  `fit_quantiles`, `fit_hurdle_quantiles`, `fit_all`, and `quality_metrics`.
 - Transforms: `impacts`, `ImpactRegistry`, `LinearImpact`, `SigmoidImpact`,
   `PiecewiseLinearImpact`, and `CallableTransform`.
 - Metrics: `generate_microscores`, `compute_spanning_set`, and `compute_risk`.

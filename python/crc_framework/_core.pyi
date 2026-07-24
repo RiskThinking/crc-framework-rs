@@ -18,6 +18,34 @@ class NativeFitResult:
     rmse: float
     r_squared: float
 
+class NativeQuantileFitResult:
+    distribution: NativeDistribution
+    rmse: float
+    normalized_rmse: float
+    weighted_r_squared: float
+    maximum_absolute_residual: float
+    point_count: int
+    converged: bool
+    iterations: int
+    evaluations: int
+
+class NativeHurdleQuantileFitResult:
+    distribution: NativeDistribution
+    base_distribution: NativeDistribution
+    atom_location: float
+    atom_probability: float
+    tail_rmse: float
+    tail_normalized_rmse: float
+    tail_weighted_r_squared: float
+    tail_maximum_absolute_residual: float
+    tail_point_count: int
+    converged: bool
+    iterations: int
+    evaluations: int
+    atom_probability_lower_bound: float
+    atom_probability_upper_bound: float
+    atom_point_count: int
+
 class NativeMicroscore:
     probability: float
     exposure: float
@@ -88,8 +116,27 @@ def return_period_distribution(
 def fitted_distribution(
     family: str, location: float, scale: float, shape: Optional[float] = ...
 ) -> NativeDistribution: ...
+def hurdle_distribution(
+    base: NativeDistribution,
+    atom_probability: float,
+    atom_location: float = ...,
+) -> NativeDistribution: ...
 def fit(samples: Sequence[float], family: Optional[str] = ...) -> NativeFitResult: ...
 def fit_candidates(samples: Sequence[float]) -> List[NativeFitResult]: ...
+def fit_quantiles(
+    probabilities: Sequence[float],
+    values: Sequence[float],
+    family: str,
+    weights: Optional[Sequence[float]] = ...,
+) -> NativeQuantileFitResult: ...
+def fit_hurdle_quantiles(
+    probabilities: Sequence[float],
+    values: Sequence[float],
+    family: str,
+    atom_probability: float,
+    atom_location: float = ...,
+    weights: Optional[Sequence[float]] = ...,
+) -> NativeHurdleQuantileFitResult: ...
 def diagnostic_metrics(
     samples: Sequence[float], distribution: NativeDistribution
 ) -> Dict[str, float]: ...

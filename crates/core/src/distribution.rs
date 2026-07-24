@@ -488,6 +488,104 @@ impl Distribution for FittedDistribution {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct HurdleDistribution {
+    atom_location: f64,
+    atom_probability: f64,
+    base: FittedDistribution,
+    base_cdf_at_atom: f64,
+}
+
+impl HurdleDistribution {
+    pub fn new(
+        atom_location: f64,
+        atom_probability: f64,
+        base: FittedDistribution,
+    ) -> Result<Self> {
+        if !atom_location.is_finite() {
+            return Err(CrcError::InvalidInput(
+                "hurdle atom location must be finite".into(),
+            ));
+        }
+        if !atom_probability.is_finite() || atom_probability <= 0.0 || atom_probability >= 1.0 {
+            return Err(CrcError::InvalidInput(
+                "hurdle atom probability must be strictly between zero and one".into(),
+            ));
+        }
+        let base_cdf_at_atom = base.cdf(atom_location);
+        if !base_cdf_at_atom.is_finite() || 1.0 - base_cdf_at_atom <= EPS {
+            return Err(CrcError::InvalidInput(
+                "hurdle base distribution must have positive probability above the atom".into(),
+            ));
+        }
+        Ok(Self {
+            atom_location,
+            atom_probability,
+            base,
+            base_cdf_at_atom,
+        })
+    }
+
+    pub fn atom_location(&self) -> f64 {
+        self.atom_location
+    }
+
+    pub fn atom_probability(&self) -> f64 {
+        self.atom_probability
+    }
+
+    pub fn base(&self) -> &FittedDistribution {
+        &self.base
+    }
+
+    pub fn point_mass(&self, x: f64) -> f64 {
+        if x == self.atom_location {
+            self.atom_probability
+        } else {
+            0.0
+        }
+    }
+}
+
+impl Distribution for HurdleDistribution {
+    fn pdf(&self, x: f64) -> f64 {
+        if x <= self.atom_location {
+            0.0
+        } else {
+            (1.0 - self.atom_probability) * self.base.pdf(x) / (1.0 - self.base_cdf_at_atom)
+        }
+    }
+
+    fn cdf(&self, x: f64) -> f64 {
+        if x < self.atom_location {
+            0.0
+        } else if x == self.atom_location {
+            self.atom_probability
+        } else {
+            (self.atom_probability
+                + (1.0 - self.atom_probability) * (self.base.cdf(x) - self.base_cdf_at_atom)
+                    / (1.0 - self.base_cdf_at_atom))
+                .clamp(self.atom_probability, 1.0)
+        }
+    }
+
+    fn ppf(&self, q: f64) -> Result<f64> {
+        validate_probability(q)?;
+        if q <= self.atom_probability {
+            return Ok(self.atom_location);
+        }
+        if q >= 1.0 {
+            return Err(CrcError::InvalidInput(
+                "hurdle ppf requires probability below one".into(),
+            ));
+        }
+        let conditional_probability = (q - self.atom_probability) / (1.0 - self.atom_probability);
+        let base_probability =
+            self.base_cdf_at_atom + conditional_probability * (1.0 - self.base_cdf_at_atom);
+        self.base.ppf(base_probability.min(1.0 - EPS))
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct DiagnosticMetrics {
     pub ks_statistic: f64,
@@ -500,6 +598,39 @@ pub struct DiagnosticMetrics {
 pub struct FitResult {
     pub distribution: FittedDistribution,
     pub diagnostics: DiagnosticMetrics,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct QuantileFitDiagnostics {
+    pub rmse: f64,
+    pub normalized_rmse: f64,
+    pub weighted_r_squared: f64,
+    pub maximum_absolute_residual: f64,
+    pub point_count: usize,
+    pub converged: bool,
+    pub iterations: usize,
+    pub evaluations: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct QuantileFitResult {
+    pub distribution: FittedDistribution,
+    pub diagnostics: QuantileFitDiagnostics,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct HurdleQuantileFitDiagnostics {
+    pub tail: QuantileFitDiagnostics,
+    pub atom_probability_lower_bound: f64,
+    pub atom_probability_upper_bound: f64,
+    pub atom_point_count: usize,
+    pub tail_point_count: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct HurdleQuantileFitResult {
+    pub distribution: HurdleDistribution,
+    pub diagnostics: HurdleQuantileFitDiagnostics,
 }
 
 pub fn fit_distribution(samples: &[f64], family: Option<DistributionFamily>) -> Result<FitResult> {
@@ -515,6 +646,149 @@ pub fn fit_distribution(samples: &[f64], family: Option<DistributionFamily>) -> 
                 .total_cmp(&right.diagnostics.ks_pvalue)
         })
         .ok_or_else(|| CrcError::Unsupported("no candidate distribution could be fitted".into()))
+}
+
+pub fn fit_quantiles(
+    probabilities: &[f64],
+    values: &[f64],
+    weights: Option<&[f64]>,
+    family: DistributionFamily,
+) -> Result<QuantileFitResult> {
+    let weights = validate_quantile_points(probabilities, values, weights)?;
+    fit_quantile_points_internal(probabilities, values, &weights, family, None)
+}
+
+pub fn fit_hurdle_quantiles(
+    probabilities: &[f64],
+    values: &[f64],
+    weights: Option<&[f64]>,
+    family: DistributionFamily,
+    atom_location: f64,
+    atom_probability: f64,
+) -> Result<HurdleQuantileFitResult> {
+    let weights = validate_quantile_points(probabilities, values, weights)?;
+    if !atom_location.is_finite()
+        || values
+            .iter()
+            .any(|value| *value < atom_location || !value.is_finite())
+    {
+        return Err(CrcError::InvalidInput(
+            "hurdle quantile values must be finite and at or above the atom".into(),
+        ));
+    }
+    if !atom_probability.is_finite() || atom_probability <= 0.0 || atom_probability >= 1.0 {
+        return Err(CrcError::InvalidInput(
+            "hurdle atom probability must be strictly between zero and one".into(),
+        ));
+    }
+
+    let atom_indices: Vec<usize> = values
+        .iter()
+        .enumerate()
+        .filter_map(|(index, value)| (*value == atom_location).then_some(index))
+        .collect();
+    let tail_indices: Vec<usize> = values
+        .iter()
+        .enumerate()
+        .filter_map(|(index, value)| (*value > atom_location).then_some(index))
+        .collect();
+    let lower_bound = atom_indices
+        .iter()
+        .map(|&index| probabilities[index])
+        .fold(0.0, f64::max);
+    let upper_bound = tail_indices
+        .iter()
+        .map(|&index| probabilities[index])
+        .fold(1.0, f64::min);
+    if atom_probability < lower_bound || atom_probability >= upper_bound {
+        return Err(CrcError::InvalidInput(format!(
+            "atom probability must be in [{lower_bound}, {upper_bound}) for the supplied knots"
+        )));
+    }
+
+    let tail_probabilities: Vec<f64> = tail_indices
+        .iter()
+        .map(|&index| (probabilities[index] - atom_probability) / (1.0 - atom_probability))
+        .collect();
+    let tail_values: Vec<f64> = tail_indices.iter().map(|&index| values[index]).collect();
+    let tail_weights: Vec<f64> = tail_indices.iter().map(|&index| weights[index]).collect();
+    let tail_weights =
+        validate_quantile_points(&tail_probabilities, &tail_values, Some(&tail_weights))?;
+    let tail_result = fit_quantile_points_internal(
+        &tail_probabilities,
+        &tail_values,
+        &tail_weights,
+        family,
+        Some(atom_location),
+    )?;
+    let distribution =
+        HurdleDistribution::new(atom_location, atom_probability, tail_result.distribution)?;
+    Ok(HurdleQuantileFitResult {
+        distribution,
+        diagnostics: HurdleQuantileFitDiagnostics {
+            tail: tail_result.diagnostics,
+            atom_probability_lower_bound: lower_bound,
+            atom_probability_upper_bound: upper_bound,
+            atom_point_count: atom_indices.len(),
+            tail_point_count: tail_indices.len(),
+        },
+    })
+}
+
+fn fit_quantile_points_internal(
+    probabilities: &[f64],
+    values: &[f64],
+    weights: &[f64],
+    family: DistributionFamily,
+    truncation_atom: Option<f64>,
+) -> Result<QuantileFitResult> {
+    let conditioning_scale = robust_value_scale(values, weights);
+    let kind = reference_curve_fitting::DistributionKind::from_name(family.name())
+        .expect("public and reference family names are synchronized");
+    let optimized = reference_curve_fitting::fit_quantile_points(
+        kind,
+        probabilities,
+        values,
+        weights,
+        conditioning_scale,
+        truncation_atom,
+    )
+    .ok_or_else(|| CrcError::Unsupported(format!("{} could not be fitted", family.name())))?;
+    if !optimized.converged {
+        return Err(CrcError::ConvergenceFailed {
+            family: family.name().into(),
+            iterations: optimized.iterations,
+        });
+    }
+    let distribution = FittedDistribution::from_parameters(
+        family,
+        optimized.shape,
+        optimized.loc,
+        optimized.scale,
+    )?;
+    let fitted_values = probabilities
+        .iter()
+        .map(|&probability| {
+            if let Some(atom) = truncation_atom {
+                let atom_cdf = distribution.cdf(atom);
+                let base_probability = (atom_cdf + probability * (1.0 - atom_cdf)).min(1.0 - EPS);
+                distribution.ppf(base_probability)
+            } else {
+                distribution.ppf(probability)
+            }
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let diagnostics = quantile_diagnostics(
+        values,
+        &fitted_values,
+        weights,
+        optimized.iterations,
+        optimized.evaluations,
+    );
+    Ok(QuantileFitResult {
+        distribution,
+        diagnostics,
+    })
 }
 
 pub fn fit_all(samples: &[f64]) -> Result<Vec<FitResult>> {
@@ -636,6 +910,157 @@ fn validate_samples(samples: &[f64]) -> Result<()> {
     Ok(())
 }
 
+fn validate_quantile_points(
+    probabilities: &[f64],
+    values: &[f64],
+    weights: Option<&[f64]>,
+) -> Result<Vec<f64>> {
+    if probabilities.len() != values.len() || probabilities.len() < 4 {
+        return Err(CrcError::InvalidInput(
+            "probabilities and values must have the same length of at least four".into(),
+        ));
+    }
+    if probabilities
+        .iter()
+        .any(|value| !value.is_finite() || *value <= 0.0 || *value >= 1.0)
+    {
+        return Err(CrcError::InvalidInput(
+            "fit probabilities must be finite and strictly between zero and one".into(),
+        ));
+    }
+    if probabilities.windows(2).any(|pair| pair[0] >= pair[1]) {
+        return Err(CrcError::InvalidInput(
+            "fit probabilities must be strictly increasing".into(),
+        ));
+    }
+    if values.iter().any(|value| !value.is_finite())
+        || values.windows(2).any(|pair| pair[0] > pair[1])
+    {
+        return Err(CrcError::InvalidInput(
+            "quantile values must be finite and non-decreasing".into(),
+        ));
+    }
+    let weights = weights.map_or_else(|| vec![1.0; values.len()], <[f64]>::to_vec);
+    if weights.len() != values.len()
+        || weights
+            .iter()
+            .any(|weight| !weight.is_finite() || *weight < 0.0)
+    {
+        return Err(CrcError::InvalidInput(
+            "weights must match the knots and be finite and non-negative".into(),
+        ));
+    }
+    let positive: Vec<usize> = weights
+        .iter()
+        .enumerate()
+        .filter_map(|(index, weight)| (*weight > 0.0).then_some(index))
+        .collect();
+    if positive.len() < 4 {
+        return Err(CrcError::InvalidInput(
+            "quantile fitting requires at least four positive-weight knots".into(),
+        ));
+    }
+    let minimum = positive
+        .iter()
+        .map(|&index| values[index])
+        .fold(f64::INFINITY, f64::min);
+    let maximum = positive
+        .iter()
+        .map(|&index| values[index])
+        .fold(f64::NEG_INFINITY, f64::max);
+    if maximum - minimum <= EPS * maximum.abs().max(minimum.abs()).max(1.0) {
+        return Err(CrcError::InvalidInput(
+            "positive-weight quantile values must have non-zero range".into(),
+        ));
+    }
+    Ok(weights)
+}
+
+fn robust_value_scale(values: &[f64], weights: &[f64]) -> f64 {
+    let median = weighted_median(
+        values
+            .iter()
+            .copied()
+            .zip(weights.iter().copied())
+            .collect(),
+    );
+    let mad = weighted_median(
+        values
+            .iter()
+            .map(|value| (value - median).abs())
+            .zip(weights.iter().copied())
+            .collect(),
+    );
+    let range = values.last().expect("validated") - values[0];
+    (1.4826 * mad).max(range * 1.0e-3).max(EPS)
+}
+
+fn weighted_median(mut points: Vec<(f64, f64)>) -> f64 {
+    points.sort_by(|left, right| left.0.total_cmp(&right.0));
+    let half = points.iter().map(|point| point.1).sum::<f64>() * 0.5;
+    let mut cumulative = 0.0;
+    for (value, weight) in points {
+        cumulative += weight;
+        if cumulative >= half {
+            return value;
+        }
+    }
+    unreachable!("validated positive total weight")
+}
+
+fn quantile_diagnostics(
+    observed: &[f64],
+    fitted: &[f64],
+    weights: &[f64],
+    iterations: usize,
+    evaluations: usize,
+) -> QuantileFitDiagnostics {
+    let weight_sum = weights.iter().sum::<f64>();
+    let weighted_mean = observed
+        .iter()
+        .zip(weights)
+        .map(|(value, weight)| value * weight)
+        .sum::<f64>()
+        / weight_sum;
+    let weighted_squared_error = observed
+        .iter()
+        .zip(fitted)
+        .zip(weights)
+        .map(|((observed, fitted), weight)| weight * (fitted - observed).powi(2))
+        .sum::<f64>();
+    let weighted_total = observed
+        .iter()
+        .zip(weights)
+        .map(|(value, weight)| weight * (value - weighted_mean).powi(2))
+        .sum::<f64>();
+    let rmse = (weighted_squared_error / weight_sum).sqrt();
+    let positive_weight_minimum = observed
+        .iter()
+        .zip(weights)
+        .filter_map(|(value, weight)| (*weight > 0.0).then_some(*value))
+        .fold(f64::INFINITY, f64::min);
+    let positive_weight_maximum = observed
+        .iter()
+        .zip(weights)
+        .filter_map(|(value, weight)| (*weight > 0.0).then_some(*value))
+        .fold(f64::NEG_INFINITY, f64::max);
+    let range = positive_weight_maximum - positive_weight_minimum;
+    QuantileFitDiagnostics {
+        rmse,
+        normalized_rmse: rmse / range,
+        weighted_r_squared: 1.0 - weighted_squared_error / weighted_total,
+        maximum_absolute_residual: observed
+            .iter()
+            .zip(fitted)
+            .map(|(observed, fitted)| (fitted - observed).abs())
+            .fold(0.0, f64::max),
+        point_count: observed.len(),
+        converged: true,
+        iterations,
+        evaluations,
+    }
+}
+
 fn inverse_by_bisection(distribution: &dyn Distribution, q: f64) -> f64 {
     let mut lower = -1.0;
     let mut upper = 1.0;
@@ -750,5 +1175,143 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn quantile_fitting_recovers_supported_family_quantiles() {
+        let cases = [
+            (DistributionFamily::GenExtreme, Some(0.2), 1.0, 2.0),
+            (DistributionFamily::WeibullMin, Some(1.8), -0.5, 1.5),
+            (DistributionFamily::WeibullMax, Some(2.2), 4.0, 1.2),
+            (DistributionFamily::SkewNormal, Some(2.0), 0.5, 1.3),
+            (DistributionFamily::GumbelRight, None, 1.0, 0.8),
+            (DistributionFamily::GumbelLeft, None, 1.0, 0.8),
+            (DistributionFamily::GenPareto, Some(0.15), -0.2, 1.1),
+        ];
+        let probabilities = [0.1, 0.25, 0.5, 0.7, 0.85, 0.95, 0.99];
+        for (family, shape, location, scale) in cases {
+            let source =
+                FittedDistribution::from_parameters(family, shape, location, scale).unwrap();
+            let values = source.quantiles(&probabilities).unwrap();
+            let result = fit_quantiles(&probabilities, &values, None, family).unwrap();
+            assert!(
+                result.diagnostics.normalized_rmse < 1.0e-4,
+                "{} normalized RMSE was {}",
+                family.name(),
+                result.diagnostics.normalized_rmse
+            );
+            assert!(result.diagnostics.converged);
+            assert!((result.distribution.location - location).abs() < 2.0e-3);
+            assert!((result.distribution.scale - scale).abs() < 2.0e-3);
+            if let (Some(actual), Some(expected)) = (result.distribution.shape, shape) {
+                assert!(
+                    (actual - expected).abs() < 2.0e-2,
+                    "{} shape was {actual}, expected {expected}",
+                    family.name()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn quantile_fitting_honors_non_uniform_weights() {
+        let source =
+            FittedDistribution::from_parameters(DistributionFamily::GumbelRight, None, 1.0, 0.8)
+                .unwrap();
+        let probabilities = [0.1, 0.25, 0.5, 0.7, 0.85, 0.95];
+        let mut values = source.quantiles(&probabilities).unwrap();
+        values[0] -= 0.8;
+        let weights = [0.01, 1.0, 1.0, 1.0, 1.0, 1.0];
+        let result = fit_quantiles(
+            &probabilities,
+            &values,
+            Some(&weights),
+            DistributionFamily::GumbelRight,
+        )
+        .unwrap();
+        assert!((result.distribution.location - 1.0).abs() < 0.02);
+        assert!((result.distribution.scale - 0.8).abs() < 0.02);
+        assert_eq!(result.diagnostics.point_count, probabilities.len());
+    }
+
+    #[test]
+    fn quantile_fitting_validates_effective_weights() {
+        let probabilities = [0.1, 0.2, 0.3, 0.4];
+        let values = [0.0, 1.0, 2.0, 3.0];
+        let weights = [1.0, 0.0, 0.0, 0.0];
+        assert!(matches!(
+            fit_quantiles(
+                &probabilities,
+                &values,
+                Some(&weights),
+                DistributionFamily::GumbelRight
+            ),
+            Err(CrcError::InvalidInput(_))
+        ));
+    }
+
+    #[test]
+    fn sample_mle_gumbel_regression_is_unchanged() {
+        let result = fit_distribution(
+            &[0.0, 0.2, 0.7, 1.1, 1.9, 2.4, 3.2, 4.8],
+            Some(DistributionFamily::GumbelRight),
+        )
+        .unwrap();
+        assert!((result.distribution.location - 1.077_032_290_250_686_6).abs() < 1.0e-12);
+        assert!((result.distribution.scale - 1.173_589_689_864_434_2).abs() < 1.0e-12);
+        assert!((result.diagnostics.ks_statistic - 0.128_920_449_165_263_24).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn hurdle_distribution_normalizes_a_full_support_base() {
+        let base =
+            FittedDistribution::from_parameters(DistributionFamily::GumbelRight, None, 0.5, 1.2)
+                .unwrap();
+        let hurdle = HurdleDistribution::new(0.0, 0.4, base).unwrap();
+        assert_eq!(hurdle.ppf(0.4).unwrap(), 0.0);
+        assert_eq!(hurdle.cdf(0.0), 0.4);
+        assert_eq!(hurdle.point_mass(0.0), 0.4);
+        for probability in [0.5, 0.75, 0.95] {
+            let value = hurdle.ppf(probability).unwrap();
+            assert!((hurdle.cdf(value) - probability).abs() < 1.0e-10);
+            assert!(value > 0.0);
+        }
+        let upper = hurdle.ppf(0.999_999).unwrap();
+        let steps = 10_000;
+        let width = upper / steps as f64;
+        let continuous_mass = (0..steps)
+            .map(|index| hurdle.pdf((index as f64 + 0.5) * width) * width)
+            .sum::<f64>();
+        assert!((continuous_mass - 0.6).abs() < 2.0e-3);
+        let samples = hurdle.sample(5_000, Some(42)).unwrap();
+        let atom_fraction =
+            samples.iter().filter(|value| **value == 0.0).count() as f64 / samples.len() as f64;
+        assert!((atom_fraction - 0.4).abs() < 0.03);
+        let statistics = crate::metrics::calculate_statistics(&hurdle).unwrap();
+        assert_eq!(statistics.minimum, 0.0);
+        assert!(statistics.mean > 0.0);
+    }
+
+    #[test]
+    fn hurdle_quantile_fitting_uses_supplied_atom_probability() {
+        let base =
+            FittedDistribution::from_parameters(DistributionFamily::GumbelRight, None, 0.5, 1.2)
+                .unwrap();
+        let source = HurdleDistribution::new(0.0, 0.5, base).unwrap();
+        let probabilities = [0.2, 0.5, 0.65, 0.75, 0.85, 0.93, 0.98];
+        let values = source.quantiles(&probabilities).unwrap();
+        let result = fit_hurdle_quantiles(
+            &probabilities,
+            &values,
+            None,
+            DistributionFamily::GumbelRight,
+            0.0,
+            0.5,
+        )
+        .unwrap();
+        assert_eq!(result.distribution.ppf(0.5).unwrap(), 0.0);
+        assert!(result.diagnostics.tail.normalized_rmse < 1.0e-4);
+        assert_eq!(result.diagnostics.atom_probability_lower_bound, 0.5);
+        assert_eq!(result.diagnostics.atom_probability_upper_bound, 0.65);
     }
 }

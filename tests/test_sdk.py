@@ -6,6 +6,8 @@ from crc_framework import (
     BinaryOutcome,
     EmpiricalDistribution,
     FitConstraints,
+    FittedDistribution,
+    HurdleDistribution,
     RiskFactor,
     ScenarioMetadata,
     TabulatedDistribution,
@@ -13,6 +15,8 @@ from crc_framework import (
     compute_risk,
     compute_spanning_set,
     fit_distribution,
+    fit_hurdle_quantiles,
+    fit_quantiles,
     generate_microscores,
     impacts,
     lookup_continent,
@@ -46,6 +50,73 @@ class DistributionTests(unittest.TestCase):
             constraints=FitConstraints(probability=0.99, maximum_value=100.0),
         )
         self.assertLessEqual(constrained.distribution.ppf(0.99), 100.0)
+
+    def test_quantile_fit_accepts_arrays_and_tabulated_distribution(self):
+        source = FittedDistribution.from_parameters(
+            "gumbel_r", location=1.25, scale=0.7
+        )
+        probabilities = [0.1, 0.25, 0.5, 0.75, 0.9, 0.99]
+        values = source.quantiles(probabilities)
+
+        arrays = fit_quantiles(probabilities, values.tolist(), "gumbel_r")
+        tabulated = fit_quantiles(
+            TabulatedDistribution(probabilities, values), family="gumbel_r"
+        )
+
+        self.assertLess(arrays.diagnostics.normalized_rmse, 1.0e-6)
+        self.assertAlmostEqual(
+            arrays.diagnostics.rmse, tabulated.diagnostics.rmse, places=10
+        )
+        np.testing.assert_allclose(
+            arrays.distribution.quantiles(probabilities), values, atol=1.0e-5
+        )
+
+    def test_sample_fit_rejects_probability_knots(self):
+        tabulated = TabulatedDistribution(
+            [0.1, 0.3, 0.6, 0.9], [0.0, 1.0, 2.0, 3.0]
+        )
+        with self.assertRaisesRegex(ValueError, "fit_quantiles"):
+            fit_distribution(tabulated)  # type: ignore[arg-type]
+
+    def test_hurdle_constructor_preserves_atom_and_truncated_tail(self):
+        base = FittedDistribution.from_parameters(
+            "gumbel_r", location=0.5, scale=1.2
+        )
+        hurdle = HurdleDistribution(base, atom_probability=0.4)
+        self.assertEqual(hurdle.ppf(0.4), 0.0)
+        self.assertEqual(hurdle.point_mass(0.0), 0.4)
+        self.assertEqual(hurdle.pdf(0.0), 0.0)
+        for probability in [0.5, 0.75, 0.95]:
+            self.assertAlmostEqual(
+                hurdle.cdf(hurdle.ppf(probability)), probability, places=9
+            )
+
+    def test_wri_hurdle_fit_uses_original_probabilities(self):
+        periods = [2.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0]
+        levels = [
+            0.0,
+            0.1595597267150879,
+            0.5769345760345459,
+            1.0778119564056396,
+            1.4315228462219238,
+            1.7589995861053467,
+            2.1495182514190674,
+            2.4226200580596924,
+            2.6714894771575928,
+        ]
+        source = TabulatedDistribution.from_return_periods(
+            periods, levels, tail="upper"
+        )
+        result = fit_hurdle_quantiles(
+            source,
+            family="gumbel_r",
+            atom_probability=0.5,
+        )
+        fitted = result.distribution.quantiles(source.probabilities)
+        self.assertEqual(fitted[0], 0.0)
+        self.assertLess(result.diagnostics.tail.rmse, 0.11)
+        self.assertLess(np.max(np.abs(fitted[1:] - source.values[1:])), 0.25)
+        self.assertEqual(result.diagnostics.atom_probability_lower_bound, 0.5)
 
 
 class PipelineTests(unittest.TestCase):
