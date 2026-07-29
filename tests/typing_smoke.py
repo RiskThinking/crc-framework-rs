@@ -1,5 +1,7 @@
 from crc_framework import (
+    CallableImpact,
     EmpiricalDistribution,
+    ImpactFunction,
     TabulatedDistribution,
     RiskFactor,
     ScenarioMetadata,
@@ -17,6 +19,9 @@ impact = impacts.for_factor(
     RiskFactor.FWI,
     context=TransformContext(),
 )(fitted)
+point_impact: ImpactFunction = CallableImpact(lambda values: values / 2.0)
+event_impact = point_impact.evaluate([0.5, 1.0])
+reveal_type(event_impact)
 suite = generate_microscores(
     fitted,
     impact=impact,

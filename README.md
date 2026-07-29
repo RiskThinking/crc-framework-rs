@@ -189,28 +189,47 @@ Pass `family="auto"` (the default) to select a family, a family name to fit a
 specific family, or use `fit_all` to inspect every candidate. Use
 `quality_metrics` to calculate diagnostics for a selected fitted distribution.
 
-## Use custom impact transforms
+## Evaluate impacts
+
+Impact functions expose two deliberately distinct operations:
+
+- `impact.evaluate(values, context=...)` evaluates event-aligned exposure
+  values. Input shape and order are preserved, including for decreasing or
+  non-monotonic callables. This is the appropriate operation when return
+  periods continue to identify the source hazard events.
+- `impact(distribution, probabilities=..., context=...)` transforms an
+  exposure distribution into an impact distribution. Decreasing built-in
+  transforms reorder the resulting quantiles so the output remains a valid
+  distribution for risk metrics.
 
 The built-in `LinearImpact`, `SigmoidImpact`, and `PiecewiseLinearImpact`
-transforms convert exposure quantiles to an impact distribution. A
-`CallableTransform` adapts a vectorized NumPy callable when the response model
-is specific to an application.
+support both operations. `CallableImpact` adapts a vectorized NumPy callable
+for point evaluation, while the backward-compatible `CallableTransform` also
+supports distribution transformation.
 
 ```python
-from crc_framework import LinearImpact, generate_microscores
+import numpy as np
 
-impact = LinearImpact(slope=0.25, maximum=1.0)(exposure)
+from crc_framework import CallableImpact, LinearImpact, generate_microscores
+
+impact_function = LinearImpact(slope=0.25, maximum=1.0)
+event_impacts = impact_function.evaluate(np.array([0.5, 2.0]))
+impact = impact_function(exposure)
 suite = generate_microscores(
     exposure,
     impact=impact,
     probabilities=[0.95, 0.99],
 )
+
+custom = CallableImpact(lambda values: np.clip(values / 2.0, 0.0, 1.0))
+custom_event_impacts = custom.evaluate(np.array([0.5, 2.0]))
 ```
 
 `impacts.for_factor(...)` selects a registry-backed climate transform. Supply a
 `TransformContext` with the relevant geography, building type, and historical
 values; pass `overrides` when an application needs to replace transform
-parameters.
+parameters. Registry-backed impacts support the same point and distribution
+interfaces, with point evaluation delegated directly to the native registry.
 
 ## Aggregate factor outcomes
 
@@ -267,8 +286,9 @@ The package exports the following primary interfaces:
 - Distributions: `EmpiricalDistribution`, `TabulatedDistribution`,
   `FittedDistribution`, `HurdleDistribution`, `fit_distribution`,
   `fit_quantiles`, `fit_hurdle_quantiles`, `fit_all`, and `quality_metrics`.
-- Transforms: `impacts`, `ImpactRegistry`, `LinearImpact`, `SigmoidImpact`,
-  `PiecewiseLinearImpact`, and `CallableTransform`.
+- Transforms: `impacts`, `ImpactRegistry`, `ImpactFunction`, `ClimateImpact`,
+  `LinearImpact`, `SigmoidImpact`, `PiecewiseLinearImpact`, `CallableImpact`,
+  and `CallableTransform`.
 - Metrics: `generate_microscores`, `compute_spanning_set`, and `compute_risk`.
 - Models and constants: `ScenarioMetadata`, `TransformContext`, `RiskFactor`,
   `Pathway`, `RISK_FACTORS`, `PATHWAYS`, and `HORIZONS`.

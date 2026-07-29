@@ -32,7 +32,10 @@ from .metrics import (
 from .models import Geography, ScenarioMetadata, TransformContext
 from .spatial import lookup_continent, lookup_geography, lookup_ipcc_region
 from .transforms import (
+    CallableImpact,
     CallableTransform,
+    ClimateImpact,
+    ImpactFunction,
     ImpactRegistry,
     LinearImpact,
     PiecewiseLinearImpact,
@@ -42,7 +45,9 @@ from .transforms import (
 
 __all__ = [
     "BinaryOutcome",
+    "CallableImpact",
     "CallableTransform",
+    "ClimateImpact",
     "Distribution",
     "EmpiricalDistribution",
     "FitDiagnostics",
@@ -54,6 +59,7 @@ __all__ = [
     "HurdleQuantileFitResult",
     "Geography",
     "HORIZONS",
+    "ImpactFunction",
     "ImpactRegistry",
     "LinearImpact",
     "Microscore",

@@ -271,6 +271,26 @@ impl Transform for BuiltinImpact {
 pub struct ImpactRegistry;
 
 impl ImpactRegistry {
+    pub fn evaluate(
+        context: &ImpactContext,
+        overrides: &HashMap<String, f64>,
+        values: &[f64],
+    ) -> Result<Vec<f64>> {
+        if values.iter().any(|value| !value.is_finite()) {
+            return Err(CrcError::InvalidInput(
+                "impact exposure values must be finite".into(),
+            ));
+        }
+        let transform = Self::resolve(context, overrides)?;
+        let impacts = transform.transform_values(values);
+        if impacts.iter().any(|value| !value.is_finite()) {
+            return Err(CrcError::InvalidInput(
+                "impact evaluation produced non-finite values".into(),
+            ));
+        }
+        Ok(impacts)
+    }
+
     pub fn resolve(
         context: &ImpactContext,
         overrides: &HashMap<String, f64>,
@@ -516,5 +536,55 @@ mod tests {
             ImpactRegistry::resolve(&context, &HashMap::from([("maximum_damage".into(), 0.4)]))
                 .unwrap();
         assert!(transform.transform_value(100.0) <= 0.4);
+    }
+
+    #[test]
+    fn registry_evaluation_preserves_event_order() {
+        let context = ImpactContext {
+            factor: "fwi".into(),
+            ..Default::default()
+        };
+        let values = [50.0, 10.0, 35.0];
+        let impacts = ImpactRegistry::evaluate(&context, &HashMap::new(), &values).unwrap();
+
+        assert_eq!(impacts.len(), values.len());
+        assert!(impacts[0] > impacts[2]);
+        assert!(impacts[2] > impacts[1]);
+    }
+
+    #[test]
+    fn registry_evaluation_rejects_non_finite_values() {
+        let context = ImpactContext {
+            factor: "fwi".into(),
+            ..Default::default()
+        };
+        let error = ImpactRegistry::evaluate(&context, &HashMap::new(), &[f64::NAN]).unwrap_err();
+
+        assert!(error.to_string().contains("must be finite"));
+    }
+
+    #[test]
+    fn decreasing_transform_reverses_only_distribution_values() {
+        let transform = LinearImpact {
+            slope: -1.0,
+            intercept: 10.0,
+            minimum: None,
+            maximum: None,
+        };
+        let event_values = transform.transform_values(&[1.0, 2.0, 3.0]);
+        assert_eq!(event_values, vec![9.0, 8.0, 7.0]);
+
+        let exposure = TabulatedDistribution::new(
+            vec![0.1, 0.5, 0.9],
+            vec![1.0, 2.0, 3.0],
+            Interpolation::LinearProbability,
+            false,
+        )
+        .unwrap();
+        let impact = transform.apply(&exposure, &[0.1, 0.5, 0.9]).unwrap();
+        assert_eq!(
+            impact.quantiles(&[0.1, 0.5, 0.9]).unwrap(),
+            vec![7.0, 8.0, 9.0]
+        );
     }
 }

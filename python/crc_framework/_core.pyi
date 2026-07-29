@@ -140,6 +140,16 @@ def fit_hurdle_quantiles(
 def diagnostic_metrics(
     samples: Sequence[float], distribution: NativeDistribution
 ) -> Dict[str, float]: ...
+def evaluate_impact(
+    values: Sequence[float],
+    factor: str,
+    cell: Optional[int] = ...,
+    country: Optional[str] = ...,
+    continent: Optional[str] = ...,
+    building_type: Optional[str] = ...,
+    historic_mean: Optional[float] = ...,
+    overrides: Optional[Dict[str, float]] = ...,
+) -> List[float]: ...
 def apply_impact(
     distribution: NativeDistribution,
     probabilities: Sequence[float],

@@ -3,13 +3,14 @@ from __future__ import annotations
 from typing import Mapping, Optional, Sequence, Union
 
 import numpy as np
+import numpy.typing as npt
 
 from crc_framework import _core
 from crc_framework.constants import RiskFactor
 from crc_framework.distributions import Distribution, TabulatedDistribution
 from crc_framework.models import TransformContext
 
-from .base import probability_grid
+from .base import ImpactResult, ImpactValues, evaluate_values, probability_grid
 
 
 class ClimateImpact:
@@ -22,6 +23,31 @@ class ClimateImpact:
         self.factor = factor.value if isinstance(factor, RiskFactor) else factor
         self.context = context
         self.overrides = dict(overrides or {})
+
+    def evaluate(
+        self,
+        values: ImpactValues,
+        *,
+        context: Optional[TransformContext] = None,
+    ) -> ImpactResult:
+        active = context or self.context
+
+        def transform(
+            exposure: npt.NDArray[np.float64],
+        ) -> npt.NDArray[np.float64]:
+            impact = _core.evaluate_impact(
+                exposure.reshape(-1).tolist(),
+                self.factor,
+                active.cell,
+                active.country,
+                active.continent,
+                active.building_type,
+                active.historic_mean,
+                self.overrides,
+            )
+            return np.asarray(impact, dtype=np.float64).reshape(exposure.shape)
+
+        return evaluate_values(transform, values)
 
     def __call__(
         self,

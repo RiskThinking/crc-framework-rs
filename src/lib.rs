@@ -427,6 +427,39 @@ fn diagnostic_metrics(
 
 #[pyfunction]
 #[pyo3(signature = (
+    values,
+    factor,
+    cell=None,
+    country=None,
+    continent=None,
+    building_type=None,
+    historic_mean=None,
+    overrides=None
+))]
+#[allow(clippy::too_many_arguments)]
+fn evaluate_impact(
+    values: Vec<f64>,
+    factor: String,
+    cell: Option<u64>,
+    country: Option<String>,
+    continent: Option<String>,
+    building_type: Option<String>,
+    historic_mean: Option<f64>,
+    overrides: Option<HashMap<String, f64>>,
+) -> PyResult<Vec<f64>> {
+    let context = ImpactContext {
+        factor,
+        cell,
+        country,
+        continent,
+        building_type,
+        historic_mean,
+    };
+    ImpactRegistry::evaluate(&context, &overrides.unwrap_or_default(), &values).map_err(py_error)
+}
+
+#[pyfunction]
+#[pyo3(signature = (
     distribution,
     probabilities,
     factor,
@@ -845,6 +878,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(fit_quantiles, m)?)?;
     m.add_function(wrap_pyfunction!(fit_hurdle_quantiles, m)?)?;
     m.add_function(wrap_pyfunction!(diagnostic_metrics, m)?)?;
+    m.add_function(wrap_pyfunction!(evaluate_impact, m)?)?;
     m.add_function(wrap_pyfunction!(apply_impact, m)?)?;
     m.add_function(wrap_pyfunction!(microscores, m)?)?;
     m.add_function(wrap_pyfunction!(spanning_set, m)?)?;
