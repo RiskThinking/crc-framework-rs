@@ -1,0 +1,139 @@
+name: Package release
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+permissions:
+  contents: write
+  id-token: write
+jobs:
+
+  linux:
+    runs-on: ubuntu-22.04
+    env:
+      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+    strategy:
+      matrix:
+        target: [x86_64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+        with:
+          target: ${{ matrix.target }}
+          args: >-
+            --release 
+            --out dist 
+            --compatibility manylinux_2_28
+            --interpreter python3.11 python3.12 python3.13 python3.14 python3.14t
+          sccache: "true"
+          manylinux: auto
+          container: "2_28"
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-linux-${{ matrix.target }}
+          path: dist
+
+  macos:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target: [x86_64, aarch64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: |
+            3.11
+            3.12
+            3.13
+            3.13t
+            3.14
+            3.14t
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+        with:
+          target: ${{ matrix.target }}
+          args: >-
+            --release 
+            --out dist 
+            --find-interpreter
+          sccache: "true"
+          container: "off"
+          rust-toolchain: nightly-2026-01-27
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-mac-${{ matrix.target }}
+          path: dist
+
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+        with:
+          command: sdist
+          args: --out dist
+          rust-toolchain: nightly-2026-01-27
+      - name: Upload sdist
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-dist
+          path: dist
+
+  deploy:
+    name: Release
+    environment: production
+    runs-on: ubuntu-latest
+    needs: [linux, macos, sdist]
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download
+        id: download
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          path: dist
+          merge-multiple: true
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          draft: false
+          prerelease: false
+          files: ${{ steps.download.outputs.download-path }}/*
+
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
