@@ -10,8 +10,8 @@ pub mod transform;
 pub use distribution::{
     DiagnosticMetrics, Distribution, DistributionFamily, EmpiricalDistribution, FitResult,
     FittedDistribution, HurdleDistribution, HurdleQuantileFitDiagnostics, HurdleQuantileFitResult,
-    Interpolation, QuantileFitDiagnostics, QuantileFitResult, TabulatedDistribution, Tail,
-    fit_hurdle_quantiles, fit_quantiles,
+    Interpolation, PointMassDistribution, QuantileFitDiagnostics, QuantileFitResult,
+    TabulatedDistribution, Tail, fit_hurdle_quantiles, fit_quantiles,
 };
 pub use error::{CrcError, Result};
 pub use metrics::{

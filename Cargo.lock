@@ -49,7 +49,7 @@ dependencies = [
 
 [[package]]
 name = "crc-framework-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "h3o",
  "phf",
@@ -58,7 +58,7 @@ dependencies = [
 
 [[package]]
 name = "crc-framework-rs"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "crc-framework-core",
  "h3o",

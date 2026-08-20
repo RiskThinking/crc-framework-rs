@@ -2,8 +2,8 @@ use std::{collections::HashMap, sync::Arc};
 
 use crc_framework_core::{
     BinaryOutcome, Distribution, DistributionFamily, EmpiricalDistribution, FittedDistribution,
-    HurdleDistribution, ImpactContext, ImpactRegistry, Interpolation, ScenarioMetadata,
-    TabulatedDistribution, Tail, Transform, compute_risk, compute_spanning_set,
+    HurdleDistribution, ImpactContext, ImpactRegistry, Interpolation, PointMassDistribution,
+    ScenarioMetadata, TabulatedDistribution, Tail, Transform, compute_risk, compute_spanning_set,
     fit_hurdle_quantiles as core_fit_hurdle_quantiles, fit_quantiles as core_fit_quantiles,
     generate_microscores,
 };
@@ -246,6 +246,18 @@ fn empirical_distribution(samples: Vec<f64>) -> PyResult<PyDistribution> {
     })
 }
 
+#[pyfunction]
+fn point_mass_distribution(location: f64) -> PyResult<PyDistribution> {
+    let distribution = PointMassDistribution::new(location).map_err(py_error)?;
+    Ok(PyDistribution {
+        inner: Arc::new(distribution),
+        family: None,
+        shape: None,
+        location: Some(location),
+        scale: None,
+    })
+}
+
 fn interpolation(value: &str) -> PyResult<Interpolation> {
     match value {
         "linear_probability" => Ok(Interpolation::LinearProbability),
@@ -365,6 +377,7 @@ fn fit_candidates(samples: Vec<f64>) -> PyResult<Vec<PyFitResult>> {
 #[pyfunction]
 #[pyo3(signature = (probabilities, values, family, weights=None))]
 fn fit_quantiles(
+    py: Python<'_>,
     probabilities: Vec<f64>,
     values: Vec<f64>,
     family: &str,
@@ -372,7 +385,7 @@ fn fit_quantiles(
 ) -> PyResult<PyQuantileFitResult> {
     let family = DistributionFamily::from_name(family)
         .ok_or_else(|| PyValueError::new_err(format!("unknown distribution family {family}")))?;
-    core_fit_quantiles(&probabilities, &values, weights.as_deref(), family)
+    py.detach(move || core_fit_quantiles(&probabilities, &values, weights.as_deref(), family))
         .map(quantile_fit_result_py)
         .map_err(py_error)
 }
@@ -387,6 +400,7 @@ fn fit_quantiles(
     weights=None
 ))]
 fn fit_hurdle_quantiles(
+    py: Python<'_>,
     probabilities: Vec<f64>,
     values: Vec<f64>,
     family: &str,
@@ -396,14 +410,16 @@ fn fit_hurdle_quantiles(
 ) -> PyResult<PyHurdleQuantileFitResult> {
     let family = DistributionFamily::from_name(family)
         .ok_or_else(|| PyValueError::new_err(format!("unknown distribution family {family}")))?;
-    core_fit_hurdle_quantiles(
-        &probabilities,
-        &values,
-        weights.as_deref(),
-        family,
-        atom_location,
-        atom_probability,
-    )
+    py.detach(move || {
+        core_fit_hurdle_quantiles(
+            &probabilities,
+            &values,
+            weights.as_deref(),
+            family,
+            atom_location,
+            atom_probability,
+        )
+    })
     .map(hurdle_quantile_fit_result_py)
     .map_err(py_error)
 }
@@ -869,6 +885,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyRiskLevel>()?;
     m.add_class::<PyRiskResult>()?;
     m.add_function(wrap_pyfunction!(empirical_distribution, m)?)?;
+    m.add_function(wrap_pyfunction!(point_mass_distribution, m)?)?;
     m.add_function(wrap_pyfunction!(tabulated_distribution, m)?)?;
     m.add_function(wrap_pyfunction!(return_period_distribution, m)?)?;
     m.add_function(wrap_pyfunction!(fitted_distribution, m)?)?;

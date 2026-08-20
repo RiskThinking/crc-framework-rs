@@ -1,13 +1,13 @@
 import unittest
 
 import numpy as np
-
 from crc_framework import (
     BinaryOutcome,
     EmpiricalDistribution,
     FitConstraints,
     FittedDistribution,
     HurdleDistribution,
+    PointMassDistribution,
     RiskFactor,
     ScenarioMetadata,
     TabulatedDistribution,
@@ -27,6 +27,18 @@ from crc_framework import (
 
 
 class DistributionTests(unittest.TestCase):
+    def test_point_mass_is_exact_at_every_probability(self):
+        distribution = PointMassDistribution(0.0)
+
+        np.testing.assert_array_equal(
+            distribution.quantiles([0.0, 0.5, 0.999, 1.0]),
+            np.zeros(4),
+        )
+        self.assertEqual(distribution.cdf(-0.1), 0.0)
+        self.assertEqual(distribution.cdf(0.0), 1.0)
+        self.assertEqual(distribution.point_mass(0.0), 1.0)
+        np.testing.assert_array_equal(distribution.sample(3), np.zeros(3))
+
     def test_return_period_input_uses_canonical_probability(self):
         distribution = TabulatedDistribution.from_return_periods(
             [10, 100, 1000],
@@ -44,7 +56,9 @@ class DistributionTests(unittest.TestCase):
         self.assertEqual(result.distribution.quantiles([0.1, 0.5, 0.9]).shape, (3,))
         self.assertEqual(result.distribution.sample(4, seed=42).shape, (4,))
         diagnostics = quality_metrics(source, result.distribution)
-        self.assertAlmostEqual(diagnostics.ks_statistic, result.diagnostics.ks_statistic)
+        self.assertAlmostEqual(
+            diagnostics.ks_statistic, result.diagnostics.ks_statistic
+        )
         constrained = fit_distribution(
             source,
             constraints=FitConstraints(probability=0.99, maximum_value=100.0),
@@ -72,16 +86,12 @@ class DistributionTests(unittest.TestCase):
         )
 
     def test_sample_fit_rejects_probability_knots(self):
-        tabulated = TabulatedDistribution(
-            [0.1, 0.3, 0.6, 0.9], [0.0, 1.0, 2.0, 3.0]
-        )
+        tabulated = TabulatedDistribution([0.1, 0.3, 0.6, 0.9], [0.0, 1.0, 2.0, 3.0])
         with self.assertRaisesRegex(ValueError, "fit_quantiles"):
             fit_distribution(tabulated)  # type: ignore[arg-type]
 
     def test_hurdle_constructor_preserves_atom_and_truncated_tail(self):
-        base = FittedDistribution.from_parameters(
-            "gumbel_r", location=0.5, scale=1.2
-        )
+        base = FittedDistribution.from_parameters("gumbel_r", location=0.5, scale=1.2)
         hurdle = HurdleDistribution(base, atom_probability=0.4)
         self.assertEqual(hurdle.ppf(0.4), 0.0)
         self.assertEqual(hurdle.point_mass(0.0), 0.4)
@@ -158,9 +168,7 @@ class PipelineTests(unittest.TestCase):
 class SpatialAndConstantTests(unittest.TestCase):
     def test_reference_spatial_tables_are_exposed_without_silent_defaults(self):
         self.assertEqual(lookup_continent(594475228122316799), "Europe")
-        self.assertEqual(
-            lookup_ipcc_region(594479566039285759), "Greenland/Iceland"
-        )
+        self.assertEqual(lookup_ipcc_region(594479566039285759), "Greenland/Iceland")
         geography = lookup_geography(600550049193132031)
         self.assertIsNotNone(geography)
         self.assertEqual(geography.continent, "Africa")

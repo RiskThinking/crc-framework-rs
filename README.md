@@ -69,6 +69,7 @@ Choose a distribution according to the form of the available data:
 - `FittedDistribution` for a known parametric family and its parameters.
 - `HurdleDistribution` for a point mass followed by a truncated parametric
   tail.
+- `PointMassDistribution` for a value that is constant at every probability.
 
 `TabulatedDistribution` does not extrapolate by default. Querying outside its
 declared probability range raises an error unless `extrapolate=True` is set.
@@ -284,8 +285,9 @@ continent and intersecting ISO3 country codes.
 The package exports the following primary interfaces:
 
 - Distributions: `EmpiricalDistribution`, `TabulatedDistribution`,
-  `FittedDistribution`, `HurdleDistribution`, `fit_distribution`,
-  `fit_quantiles`, `fit_hurdle_quantiles`, `fit_all`, and `quality_metrics`.
+  `FittedDistribution`, `HurdleDistribution`, `PointMassDistribution`,
+  `fit_distribution`, `fit_quantiles`, `fit_hurdle_quantiles`, `fit_all`, and
+  `quality_metrics`.
 - Transforms: `impacts`, `ImpactRegistry`, `ImpactFunction`, `ClimateImpact`,
   `LinearImpact`, `SigmoidImpact`, `PiecewiseLinearImpact`, `CallableImpact`,
   and `CallableTransform`.
