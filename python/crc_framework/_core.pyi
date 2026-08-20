@@ -100,6 +100,7 @@ class NativeRiskResult:
     branch_count: int
 
 def empirical_distribution(samples: Sequence[float]) -> NativeDistribution: ...
+def point_mass_distribution(location: float) -> NativeDistribution: ...
 def tabulated_distribution(
     probabilities: Sequence[float],
     values: Sequence[float],

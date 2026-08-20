@@ -256,6 +256,47 @@ impl Distribution for EmpiricalDistribution {
     }
 }
 
+/// A degenerate distribution whose entire probability mass is at one value.
+#[derive(Debug, Clone, Copy)]
+pub struct PointMassDistribution {
+    location: f64,
+}
+
+impl PointMassDistribution {
+    pub fn new(location: f64) -> Result<Self> {
+        if !location.is_finite() {
+            return Err(CrcError::InvalidInput(
+                "point-mass location must be finite".into(),
+            ));
+        }
+        Ok(Self { location })
+    }
+
+    pub fn location(&self) -> f64 {
+        self.location
+    }
+}
+
+impl Distribution for PointMassDistribution {
+    fn pdf(&self, _x: f64) -> f64 {
+        // A Dirac mass has no finite density with respect to Lebesgue measure.
+        0.0
+    }
+
+    fn cdf(&self, x: f64) -> f64 {
+        if x < self.location { 0.0 } else { 1.0 }
+    }
+
+    fn ppf(&self, probability: f64) -> Result<f64> {
+        validate_probability(probability)?;
+        Ok(self.location)
+    }
+
+    fn sample(&self, size: usize, _seed: Option<u64>) -> Result<Vec<f64>> {
+        Ok(vec![self.location; size])
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DistributionFamily {
     GenExtreme,
@@ -1128,6 +1169,18 @@ fn erf(x: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn point_mass_is_exact_at_every_probability() {
+        let distribution = PointMassDistribution::new(2.5).unwrap();
+        assert_eq!(
+            distribution.quantiles(&[0.0, 0.5, 1.0]).unwrap(),
+            vec![2.5; 3]
+        );
+        assert_eq!(distribution.cdf(2.49), 0.0);
+        assert_eq!(distribution.cdf(2.5), 1.0);
+        assert_eq!(distribution.sample(3, Some(42)).unwrap(), vec![2.5; 3]);
+    }
 
     #[test]
     fn return_periods_convert_to_upper_tail_probabilities() {

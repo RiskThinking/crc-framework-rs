@@ -16,24 +16,26 @@ from .fitting import (
     quality_metrics,
 )
 from .hurdle import HurdleDistribution
+from .point_mass import PointMassDistribution
 from .tabulated import Interpolation, TabulatedDistribution, Tail
 
 __all__ = [
     "Distribution",
     "DistributionFamily",
     "EmpiricalDistribution",
-    "FitDiagnostics",
     "FitConstraints",
+    "FitDiagnostics",
     "FitResult",
     "FittedDistribution",
     "HurdleDistribution",
     "HurdleQuantileFitDiagnostics",
     "HurdleQuantileFitResult",
     "Interpolation",
-    "TabulatedDistribution",
-    "Tail",
+    "PointMassDistribution",
     "QuantileFitDiagnostics",
     "QuantileFitResult",
+    "TabulatedDistribution",
+    "Tail",
     "fit_all",
     "fit_distribution",
     "fit_hurdle_quantiles",
