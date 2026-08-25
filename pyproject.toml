@@ -28,6 +28,11 @@ classifiers = [
 ]
 dynamic = ["version"]
 
+[project.urls]
+Homepage = "https://github.com/RiskThinking/crc-framework-rs"
+Repository = "https://github.com/RiskThinking/crc-framework-rs"
+Issues = "https://github.com/RiskThinking/crc-framework-rs/issues"
+
 [project.optional-dependencies]
 test = ["mypy", "pytest"]
 
