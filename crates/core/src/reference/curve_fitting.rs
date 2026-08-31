@@ -469,6 +469,17 @@ where
     let mut values: Vec<f64> = simplex.iter().map(|point| objective(point)).collect();
     let mut evaluations = values.len();
 
+    // Multi-start callers (e.g. GenExtreme's 5 shape starts) run this to
+    // completion for every start even when a start is clearly not
+    // converging. Nelder-Mead's improvement curve is front-loaded, so a
+    // start that hasn't beaten its best objective in STALL_LIMIT iterations
+    // is treated the same as one that exhausted max_iterations: it returns
+    // early as not-converged, which the caller already ranks below any
+    // converged candidate.
+    const STALL_LIMIT: usize = 300;
+    let mut best_seen = f64::INFINITY;
+    let mut stall_count = 0usize;
+
     for iteration in 0..max_iterations {
         let mut order: Vec<usize> = (0..simplex.len()).collect();
         order.sort_by(|&left, &right| values[left].total_cmp(&values[right]));
@@ -496,6 +507,22 @@ where
                 iterations: iteration,
                 evaluations,
             };
+        }
+
+        if values[best] < best_seen - objective_tolerance {
+            best_seen = values[best];
+            stall_count = 0;
+        } else {
+            stall_count += 1;
+            if stall_count >= STALL_LIMIT {
+                return SimplexResult {
+                    parameters: simplex[best].clone(),
+                    objective: values[best],
+                    converged: false,
+                    iterations: iteration,
+                    evaluations,
+                };
+            }
         }
 
         let mut centroid = vec![0.0; dimensions];
