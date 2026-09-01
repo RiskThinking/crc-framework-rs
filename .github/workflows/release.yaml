@@ -79,12 +79,11 @@ jobs:
         with:
           target: ${{ matrix.target }}
           args: >-
-            --release 
-            --out dist 
+            --release
+            --out dist
             --find-interpreter
           sccache: "true"
           container: "off"
-          rust-toolchain: nightly-2026-01-27
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -102,7 +101,6 @@ jobs:
         with:
           command: sdist
           args: --out dist
-          rust-toolchain: nightly-2026-01-27
       - name: Upload sdist
         uses: actions/upload-artifact@v4
         with:
