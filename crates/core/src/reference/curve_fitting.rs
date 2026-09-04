@@ -240,6 +240,9 @@ pub(crate) fn fit_quantile_points(
     };
     let value_range = values.iter().copied().fold(f64::NEG_INFINITY, f64::max)
         - values.iter().copied().fold(f64::INFINITY, f64::min);
+    // Loop-invariant across every start, iteration and objective evaluation of
+    // this fit; summed here in the same order the objective used to sum it.
+    let weight_sum = weights.iter().sum::<f64>();
     let mut best: Option<SimplexResult> = None;
 
     for start in starts {
@@ -268,6 +271,7 @@ pub(crate) fn fit_quantile_points(
                     probabilities,
                     values,
                     weights,
+                    weight_sum,
                     value_scale,
                     truncation_atom,
                 )
@@ -403,12 +407,16 @@ fn constrain_quantile_parameters(kind: DistributionKind, parameters: &mut [f64])
     }
 }
 
+/// `weight_sum` is `weights.iter().sum()`. It is a property of the fit, not of
+/// the trial parameters, so the caller computes it once instead of having every
+/// objective evaluation re-sum the weight vector.
 fn quantile_objective(
     kind: DistributionKind,
     parameters: &[f64],
     probabilities: &[f64],
     values: &[f64],
     weights: &[f64],
+    weight_sum: f64,
     value_scale: f64,
     truncation_atom: Option<f64>,
 ) -> f64 {
@@ -425,20 +433,36 @@ fn quantile_objective(
     if tail_start.is_some_and(|cdf| !cdf.is_finite() || 1.0 - cdf <= 1.0e-12) {
         return f64::INFINITY;
     }
-    let weight_sum = weights.iter().sum::<f64>();
+    // The truncation branch is loop-invariant, so it is resolved once here
+    // rather than per knot. Both arms compute exactly what the single combined
+    // loop computed, in the same order.
     let mut loss = 0.0;
-    for ((&probability, &value), &weight) in probabilities.iter().zip(values).zip(weights) {
-        if weight == 0.0 {
-            continue;
+    match tail_start {
+        None => {
+            for ((&probability, &value), &weight) in probabilities.iter().zip(values).zip(weights) {
+                if weight == 0.0 {
+                    continue;
+                }
+                let fitted = distribution.ppf(probability);
+                if !fitted.is_finite() {
+                    return f64::INFINITY;
+                }
+                loss += weight * ((fitted - value) / value_scale).powi(2);
+            }
         }
-        let base_probability = tail_start.map_or(probability, |cdf| {
-            (cdf + probability * (1.0 - cdf)).min(1.0 - 1.0e-15)
-        });
-        let fitted = distribution.ppf(base_probability);
-        if !fitted.is_finite() {
-            return f64::INFINITY;
+        Some(cdf) => {
+            for ((&probability, &value), &weight) in probabilities.iter().zip(values).zip(weights) {
+                if weight == 0.0 {
+                    continue;
+                }
+                let base_probability = (cdf + probability * (1.0 - cdf)).min(1.0 - 1.0e-15);
+                let fitted = distribution.ppf(base_probability);
+                if !fitted.is_finite() {
+                    return f64::INFINITY;
+                }
+                loss += weight * ((fitted - value) / value_scale).powi(2);
+            }
         }
-        loss += weight * ((fitted - value) / value_scale).powi(2);
     }
     loss / weight_sum
 }
