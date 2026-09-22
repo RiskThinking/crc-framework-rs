@@ -10,6 +10,9 @@
 
 use std::f64::consts::{PI, SQRT_2};
 
+use crate::distribution::{
+    Distribution as _, DistributionFamily, FittedDistribution as TailDistribution, truncated_ppf,
+};
 use crate::risk::climate::utility::get_hazard_limit;
 
 // Numeric constants
@@ -429,15 +432,36 @@ fn quantile_objective(
     else {
         return f64::INFINITY;
     };
-    let tail_start = truncation_atom.map(|atom| distribution.cdf(atom));
-    if tail_start.is_some_and(|cdf| !cdf.is_finite() || 1.0 - cdf <= 1.0e-12) {
-        return f64::INFINITY;
-    }
+    // The truncated tail is scored with the same survival-space inversion a
+    // stored hurdle curve is read back with, so an atom deep in the base's
+    // upper tail (where the whole tail rounds to one in cdf space) is fitted
+    // against the curve callers will actually evaluate.
+    let tail = match truncation_atom {
+        None => None,
+        Some(atom) => {
+            let Ok(base) = TailDistribution::from_parameters(
+                DistributionFamily::from_reference_kind(kind),
+                shape,
+                loc,
+                scale,
+            ) else {
+                return f64::INFINITY;
+            };
+            let atom_cdf = base.cdf(atom);
+            let atom_sf = base.sf(atom);
+            // Beyond this the truncated base has degenerated into its limiting
+            // upper tail and `loc` is no longer identified by the knots, so the
+            // simplex is kept out of that ridge.
+            if !atom_cdf.is_finite() || !(atom_sf > 1.0e-12) {
+                return f64::INFINITY;
+            }
+            Some((base, atom_cdf, atom_sf))
+        }
+    };
     // The truncation branch is loop-invariant, so it is resolved once here
-    // rather than per knot. Both arms compute exactly what the single combined
-    // loop computed, in the same order.
+    // rather than per knot.
     let mut loss = 0.0;
-    match tail_start {
+    match tail {
         None => {
             for ((&probability, &value), &weight) in probabilities.iter().zip(values).zip(weights) {
                 if weight == 0.0 {
@@ -450,13 +474,14 @@ fn quantile_objective(
                 loss += weight * ((fitted - value) / value_scale).powi(2);
             }
         }
-        Some(cdf) => {
+        Some((base, atom_cdf, atom_sf)) => {
             for ((&probability, &value), &weight) in probabilities.iter().zip(values).zip(weights) {
                 if weight == 0.0 {
                     continue;
                 }
-                let base_probability = (cdf + probability * (1.0 - cdf)).min(1.0 - 1.0e-15);
-                let fitted = distribution.ppf(base_probability);
+                let Ok(fitted) = truncated_ppf(&base, atom_cdf, atom_sf, probability) else {
+                    return f64::INFINITY;
+                };
                 if !fitted.is_finite() {
                     return f64::INFINITY;
                 }
