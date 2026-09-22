@@ -334,6 +334,19 @@ impl DistributionFamily {
     pub fn from_name(name: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|family| family.name() == name)
     }
+
+    pub(crate) fn from_reference_kind(kind: reference_curve_fitting::DistributionKind) -> Self {
+        use reference_curve_fitting::DistributionKind as Kind;
+        match kind {
+            Kind::GenExtreme => Self::GenExtreme,
+            Kind::WeibullMin => Self::WeibullMin,
+            Kind::WeibullMax => Self::WeibullMax,
+            Kind::SkewNorm => Self::SkewNormal,
+            Kind::GumbelR => Self::GumbelRight,
+            Kind::GumbelL => Self::GumbelLeft,
+            Kind::GenPareto => Self::GenPareto,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -380,6 +393,148 @@ impl FittedDistribution {
 
     fn z(&self, x: f64) -> f64 {
         (x - self.location) / self.scale
+    }
+
+    /// Upper-tail probability `P(X > x)`.
+    ///
+    /// Evaluated directly rather than as `1 - cdf(x)`, so it keeps full
+    /// relative precision deep in the upper tail where `cdf(x)` rounds to one.
+    pub fn sf(&self, x: f64) -> f64 {
+        let z = self.z(x);
+        match self.family {
+            DistributionFamily::GumbelRight => -(-(-z).exp()).exp_m1(),
+            DistributionFamily::GumbelLeft => (-z.exp()).exp(),
+            DistributionFamily::WeibullMin => {
+                if z < 0.0 {
+                    1.0
+                } else {
+                    (-z.powf(self.shape.expect("validated"))).exp()
+                }
+            }
+            DistributionFamily::WeibullMax => {
+                if z >= 0.0 {
+                    0.0
+                } else {
+                    -(-(-z).powf(self.shape.expect("validated"))).exp_m1()
+                }
+            }
+            DistributionFamily::GenPareto => {
+                let c = self.shape.expect("validated");
+                if z < 0.0 {
+                    1.0
+                } else if c.abs() < EPS {
+                    (-z).exp()
+                } else {
+                    let support = 1.0 + c * z;
+                    if support <= 0.0 {
+                        0.0
+                    } else {
+                        support.powf(-1.0 / c)
+                    }
+                }
+            }
+            DistributionFamily::GenExtreme => {
+                let c = self.shape.expect("validated");
+                if c.abs() < EPS {
+                    -(-(-z).exp()).exp_m1()
+                } else {
+                    let support = 1.0 - c * z;
+                    if support <= 0.0 {
+                        if c > 0.0 { 0.0 } else { 1.0 }
+                    } else {
+                        -(-support.powf(1.0 / c)).exp_m1()
+                    }
+                }
+            }
+            // If X ~ SN(alpha, loc, scale) then -X ~ SN(-alpha, -loc, scale).
+            DistributionFamily::SkewNormal => skew_normal_cdf(-z, -self.shape.expect("validated")),
+        }
+        .clamp(0.0, 1.0)
+    }
+
+    /// Inverse of [`Self::sf`]: the value exceeded with probability `survival`.
+    ///
+    /// The upper-tail counterpart of `ppf`, accurate for survival
+    /// probabilities far below the spacing of `f64` values near one.
+    pub fn isf(&self, survival: f64) -> Result<f64> {
+        validate_probability(survival)?;
+        if survival <= 0.0 || survival >= 1.0 {
+            return Err(CrcError::InvalidInput(
+                "parametric isf requires probability strictly between zero and one".into(),
+            ));
+        }
+        let value = match self.family {
+            DistributionFamily::GumbelRight => {
+                self.location - self.scale * (-(-survival).ln_1p()).ln()
+            }
+            DistributionFamily::GumbelLeft => self.location + self.scale * (-survival.ln()).ln(),
+            DistributionFamily::WeibullMin => {
+                self.location
+                    + self.scale * (-survival.ln()).powf(1.0 / self.shape.expect("validated"))
+            }
+            DistributionFamily::WeibullMax => {
+                self.location
+                    - self.scale * (-(-survival).ln_1p()).powf(1.0 / self.shape.expect("validated"))
+            }
+            DistributionFamily::GenPareto => {
+                let c = self.shape.expect("validated");
+                if c.abs() < EPS {
+                    self.location - self.scale * survival.ln()
+                } else {
+                    self.location + self.scale * (survival.powf(-c) - 1.0) / c
+                }
+            }
+            DistributionFamily::GenExtreme => {
+                let c = self.shape.expect("validated");
+                // -ln(cdf), formed from the survival probability without rounding
+                // the cdf to one first.
+                let neg_log_cdf = -(-survival).ln_1p();
+                if c.abs() < EPS {
+                    self.location - self.scale * neg_log_cdf.ln()
+                } else {
+                    self.location + self.scale * (1.0 - neg_log_cdf.powf(c)) / c
+                }
+            }
+            DistributionFamily::SkewNormal => {
+                let reflected = Self {
+                    shape: self.shape.map(|alpha| -alpha),
+                    location: -self.location,
+                    ..*self
+                };
+                -inverse_by_bisection(&reflected, survival)
+            }
+        };
+        Ok(value)
+    }
+}
+
+/// Quantile of `base` truncated to `(atom, inf)` at `conditional_probability`.
+///
+/// `atom_cdf` and `atom_sf` are `base.cdf(atom)` and `base.sf(atom)`. The
+/// target is inverted from whichever tail holds less than half the mass, so
+/// the result stays accurate when the atom sits deep in either tail of the
+/// base; e.g. an atom with `sf ~ 1e-12` leaves the whole conditional tail
+/// within a few ULPs of one in cdf space.
+pub(crate) fn truncated_ppf(
+    base: &FittedDistribution,
+    atom_cdf: f64,
+    atom_sf: f64,
+    conditional_probability: f64,
+) -> Result<f64> {
+    let survival = (1.0 - conditional_probability) * atom_sf;
+    if survival < 0.5 {
+        base.isf(survival)
+    } else {
+        base.ppf(atom_cdf + conditional_probability * atom_sf)
+    }
+}
+
+/// Conditional cdf of `base` truncated to `(atom, inf)`, evaluated at `x > atom`.
+fn truncated_cdf(base: &FittedDistribution, atom_cdf: f64, atom_sf: f64, x: f64) -> f64 {
+    if atom_cdf < atom_sf {
+        (base.cdf(x) - atom_cdf) / atom_sf
+    } else {
+        (atom_sf - base.sf(x)) / atom_sf
     }
 }
 
@@ -535,6 +690,7 @@ pub struct HurdleDistribution {
     atom_probability: f64,
     base: FittedDistribution,
     base_cdf_at_atom: f64,
+    base_sf_at_atom: f64,
 }
 
 impl HurdleDistribution {
@@ -554,7 +710,14 @@ impl HurdleDistribution {
             ));
         }
         let base_cdf_at_atom = base.cdf(atom_location);
-        if !base_cdf_at_atom.is_finite() || 1.0 - base_cdf_at_atom <= EPS {
+        let base_sf_at_atom = base.sf(atom_location);
+        // Only a tail that is empty (or has underflowed) is rejected: the
+        // conditional tail is evaluated in survival space, so an atom deep in
+        // the base's upper tail remains exact.
+        if !base_cdf_at_atom.is_finite()
+            || !base_sf_at_atom.is_finite()
+            || base_sf_at_atom < f64::MIN_POSITIVE
+        {
             return Err(CrcError::InvalidInput(
                 "hurdle base distribution must have positive probability above the atom".into(),
             ));
@@ -564,6 +727,7 @@ impl HurdleDistribution {
             atom_probability,
             base,
             base_cdf_at_atom,
+            base_sf_at_atom,
         })
     }
 
@@ -593,7 +757,7 @@ impl Distribution for HurdleDistribution {
         if x <= self.atom_location {
             0.0
         } else {
-            (1.0 - self.atom_probability) * self.base.pdf(x) / (1.0 - self.base_cdf_at_atom)
+            (1.0 - self.atom_probability) * self.base.pdf(x) / self.base_sf_at_atom
         }
     }
 
@@ -603,9 +767,9 @@ impl Distribution for HurdleDistribution {
         } else if x == self.atom_location {
             self.atom_probability
         } else {
-            (self.atom_probability
-                + (1.0 - self.atom_probability) * (self.base.cdf(x) - self.base_cdf_at_atom)
-                    / (1.0 - self.base_cdf_at_atom))
+            let conditional =
+                truncated_cdf(&self.base, self.base_cdf_at_atom, self.base_sf_at_atom, x);
+            (self.atom_probability + (1.0 - self.atom_probability) * conditional)
                 .clamp(self.atom_probability, 1.0)
         }
     }
@@ -621,9 +785,12 @@ impl Distribution for HurdleDistribution {
             ));
         }
         let conditional_probability = (q - self.atom_probability) / (1.0 - self.atom_probability);
-        let base_probability =
-            self.base_cdf_at_atom + conditional_probability * (1.0 - self.base_cdf_at_atom);
-        self.base.ppf(base_probability.min(1.0 - EPS))
+        truncated_ppf(
+            &self.base,
+            self.base_cdf_at_atom,
+            self.base_sf_at_atom,
+            conditional_probability,
+        )
     }
 }
 
@@ -811,9 +978,12 @@ fn fit_quantile_points_internal(
         .iter()
         .map(|&probability| {
             if let Some(atom) = truncation_atom {
-                let atom_cdf = distribution.cdf(atom);
-                let base_probability = (atom_cdf + probability * (1.0 - atom_cdf)).min(1.0 - EPS);
-                distribution.ppf(base_probability)
+                truncated_ppf(
+                    &distribution,
+                    distribution.cdf(atom),
+                    distribution.sf(atom),
+                    probability,
+                )
             } else {
                 distribution.ppf(probability)
             }
@@ -1343,6 +1513,202 @@ mod tests {
         let statistics = crate::metrics::calculate_statistics(&hurdle).unwrap();
         assert_eq!(statistics.minimum, 0.0);
         assert!(statistics.mean > 0.0);
+    }
+
+    fn tail_test_distributions() -> Vec<FittedDistribution> {
+        [
+            (DistributionFamily::GumbelRight, None),
+            (DistributionFamily::GumbelLeft, None),
+            (DistributionFamily::GenExtreme, Some(0.0)),
+            (DistributionFamily::GenExtreme, Some(0.2)),
+            (DistributionFamily::GenExtreme, Some(-0.2)),
+            (DistributionFamily::WeibullMin, Some(1.5)),
+            (DistributionFamily::WeibullMax, Some(2.0)),
+            (DistributionFamily::GenPareto, Some(0.0)),
+            (DistributionFamily::GenPareto, Some(0.2)),
+            (DistributionFamily::GenPareto, Some(-0.2)),
+            (DistributionFamily::SkewNormal, Some(3.0)),
+        ]
+        .into_iter()
+        .map(|(family, shape)| {
+            FittedDistribution::from_parameters(family, shape, 1.5, 2.5).unwrap()
+        })
+        .collect()
+    }
+
+    #[test]
+    fn survival_function_complements_cdf_and_inverts_for_every_family() {
+        for distribution in tail_test_distributions() {
+            // The skew-normal cdf is a quadrature over an erf approximation.
+            let (tolerance, isf_tolerance) =
+                if distribution.family == DistributionFamily::SkewNormal {
+                    (1.0e-6, 1.0e-5)
+                } else {
+                    (1.0e-12, 1.0e-8)
+                };
+            for q in [0.001, 0.05, 0.3, 0.5, 0.7, 0.95, 0.999] {
+                let x = distribution.ppf(q).unwrap();
+                let survival = distribution.sf(x);
+                assert!(
+                    (survival + distribution.cdf(x) - 1.0).abs() < tolerance,
+                    "{:?} sf+cdf at q={q}",
+                    distribution.family
+                );
+                assert!(
+                    (survival - (1.0 - q)).abs() < tolerance,
+                    "{:?} sf at q={q}",
+                    distribution.family
+                );
+                let inverted = distribution.isf(1.0 - q).unwrap();
+                assert!(
+                    (inverted - x).abs() < isf_tolerance * x.abs().max(1.0),
+                    "{:?} isf at q={q}: {inverted} vs {x}",
+                    distribution.family
+                );
+            }
+            assert!(distribution.isf(0.0).is_err());
+            assert!(distribution.isf(1.0).is_err());
+        }
+    }
+
+    #[test]
+    fn survival_function_keeps_relative_precision_deep_in_the_upper_tail() {
+        for distribution in tail_test_distributions() {
+            if distribution.family == DistributionFamily::SkewNormal {
+                continue;
+            }
+            // Far below the ~1.1e-16 spacing of f64 values just under one.
+            for survival in [1.0e-13, 1.0e-20, 1.0e-40] {
+                let Ok(x) = distribution.isf(survival) else {
+                    panic!("{:?} isf({survival})", distribution.family);
+                };
+                if !x.is_finite() {
+                    // Bounded upper supports (e.g. weibull_max) end first.
+                    continue;
+                }
+                let round_trip = distribution.sf(x);
+                if distribution.family == DistributionFamily::WeibullMax
+                    || distribution.family == DistributionFamily::GenPareto
+                        && distribution.shape == Some(-0.2)
+                    || distribution.family == DistributionFamily::GenExtreme
+                        && distribution.shape == Some(0.2)
+                {
+                    // Bounded above: the survival round-trips through a value
+                    // squeezed against the upper endpoint.
+                    assert!(round_trip <= 1.0e-12, "{:?}", distribution.family);
+                    continue;
+                }
+                assert!(
+                    ((round_trip - survival) / survival).abs() < 1.0e-9,
+                    "{:?} sf(isf({survival})) = {round_trip}",
+                    distribution.family
+                );
+            }
+        }
+        let gumbel =
+            FittedDistribution::from_parameters(DistributionFamily::GumbelRight, None, 0.0, 1.0)
+                .unwrap();
+        assert_eq!(gumbel.cdf(40.0), 1.0);
+        assert!(((gumbel.sf(40.0) - (-40.0f64).exp()) / (-40.0f64).exp()).abs() < 1.0e-15);
+    }
+
+    /// Ottawa hot_days (852b83b3fffffff, ">4 degrees", 2050) as published in the
+    /// canonical dataset: the atom sits ~27.6 scales into the base's upper tail,
+    /// leaving 1.0232e-12 of base mass above it. Capping the base probability at
+    /// `1 - 1e-12` collapsed every return period to ~0.41 days.
+    fn ottawa_hot_days() -> HurdleDistribution {
+        let base = FittedDistribution::from_parameters(
+            DistributionFamily::GumbelRight,
+            None,
+            -489.120_459_721_483_3,
+            17.716_588_490_591_306,
+        )
+        .unwrap();
+        HurdleDistribution::new(0.0, 0.032, base).unwrap()
+    }
+
+    #[test]
+    fn hurdle_quantiles_are_exact_when_the_atom_is_deep_in_the_base_tail() {
+        let hurdle = ottawa_hot_days();
+        // Reference values from 60-digit arithmetic on the stored parameters.
+        for (return_period, expected) in [
+            (10.0, 40.217_752_553_305_5),
+            (25.0, 56.451_298_387_663_2),
+            (100.0, 81.011_705_110_451_8),
+            (1000.0, 121.805_657_667_597),
+        ] {
+            let probability = 1.0 - 1.0 / return_period;
+            let value = hurdle.ppf(probability).unwrap();
+            assert!(
+                (value - expected).abs() < 1.0e-9,
+                "RP{return_period}: {value} vs {expected}"
+            );
+            assert!((hurdle.cdf(value) - probability).abs() < 1.0e-12);
+        }
+        assert_eq!(hurdle.ppf(0.032).unwrap(), 0.0);
+        let values = hurdle
+            .quantiles(&[0.05, 0.2, 0.5, 0.8, 0.95, 0.999, 0.999_999])
+            .unwrap();
+        assert!(values.windows(2).all(|pair| pair[0] < pair[1]));
+        // The continuous part is the base's (near-exponential) upper tail.
+        let continuous_mass = {
+            let steps = 20_000;
+            let upper = values[values.len() - 1];
+            let width = upper / steps as f64;
+            (0..steps)
+                .map(|index| hurdle.pdf((index as f64 + 0.5) * width) * width)
+                .sum::<f64>()
+        };
+        assert!((continuous_mass - 0.968).abs() < 1.0e-4);
+    }
+
+    #[test]
+    fn hurdle_accepts_an_atom_beyond_the_former_tail_guard() {
+        // cdf(atom) rounds to one here, but the survival mass is ~5.2e-17.
+        let base =
+            FittedDistribution::from_parameters(DistributionFamily::GumbelRight, None, -37.5, 1.0)
+                .unwrap();
+        assert_eq!(base.cdf(0.0), 1.0);
+        let hurdle = HurdleDistribution::new(0.0, 0.25, base).unwrap();
+        // The truncated tail is the unit exponential to within ~1e-15.
+        for q in [0.3, 0.6, 0.9, 0.99] {
+            let conditional: f64 = (q - 0.25) / 0.75;
+            let expected = -(-conditional).ln_1p();
+            assert!((hurdle.ppf(q).unwrap() - expected).abs() < 1.0e-9);
+        }
+        let empty =
+            FittedDistribution::from_parameters(DistributionFamily::GumbelRight, None, -800.0, 1.0)
+                .unwrap();
+        assert!(HurdleDistribution::new(0.0, 0.25, empty).is_err());
+    }
+
+    #[test]
+    fn hurdle_quantile_fitting_scores_a_deep_tail_atom_on_its_true_quantiles() {
+        let source = ottawa_hot_days();
+        // The curve_fit_cdf knot grid, from the last plateau knot at the atom.
+        let probabilities: Vec<f64> = (32..=999).map(|index| index as f64 / 1000.0).collect();
+        let values = source.quantiles(&probabilities).unwrap();
+        assert_eq!(values[0], 0.0);
+        let result = fit_hurdle_quantiles(
+            &probabilities,
+            &values,
+            None,
+            DistributionFamily::GumbelRight,
+            0.0,
+            0.032,
+        )
+        .unwrap();
+        // The truncated base is only identified up to its tail scale here.
+        assert!((result.distribution.base().scale - 17.716_588_490_591_306).abs() < 1.0e-3);
+        assert!(result.diagnostics.tail.normalized_rmse < 1.0e-4);
+        for probability in [0.5, 0.9, 0.99] {
+            let fitted = result.distribution.ppf(probability).unwrap();
+            let expected = source.ppf(probability).unwrap();
+            assert!(
+                (fitted - expected).abs() < 1.0e-2,
+                "{probability}: {fitted} vs {expected}"
+            );
+        }
     }
 
     #[test]
