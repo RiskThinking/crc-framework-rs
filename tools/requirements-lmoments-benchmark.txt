@@ -1,0 +1,6 @@
+# Versions used by the October 2026 research audit (Python 3.12.10).
+numpy==2.5.3
+scipy==1.18.0
+mpmath==1.4.1
+maturin==1.15.0
+threadpoolctl==3.7.0
