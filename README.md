@@ -95,6 +95,31 @@ Kolmogorov–Smirnov p-value. The supported families are `genextreme`,
 diagnostics. Passing a tabulated or fitted distribution is an error: those
 values are not independent observations.
 
+For a standalone L-moment estimate of GEV or Gumbel observations, select the
+estimator explicitly:
+
+```python
+from crc_framework import fit_distribution
+
+result = fit_distribution(annual_extremes, family="genextreme", method="lmoments")
+```
+
+This uses unbiased sample L-moments (Hosking, 1990), with an exact numerical
+solution of the GEV L-skewness equation. It supports `genextreme`, `gumbel_r`
+and `gumbel_l`, requires at least four finite, nonconstant observations, and
+performs no likelihood optimization or automatic family selection. GEV shape
+uses the SciPy convention (`c = -xi`); the finite-mean domain is `c > -1`.
+Degenerate L-skewness is rejected rather than clipped. Fit constraints can
+accept or reject the estimated distribution without refitting it.
+
+The native implementation sorts once, uses compensated sums in scaled and
+centered coordinates, and reuses that sort for diagnostics. Work is O(n log n)
+with O(n) storage. The Python binding releases the GIL during native fitting.
+The returned KS p-value is a descriptive diagnostic, not a calibrated hypothesis
+test after parameter estimation. Defaults and the existing sample fitter are
+unchanged. See [NIST's L-moments reference](https://www.itl.nist.gov/div898/software/dataplot/refman2/auxillar/lmoment.htm)
+for background and the Hosking references.
+
 Use `fit_quantiles` for probability/value knots. It minimizes weighted
 value-space differences between the supplied values and the selected family's
 PPF, requires an explicit family, and reports residual diagnostics rather than

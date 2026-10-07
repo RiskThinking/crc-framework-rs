@@ -11,7 +11,7 @@ pub use distribution::{
     DiagnosticMetrics, Distribution, DistributionFamily, EmpiricalDistribution, FitResult,
     FittedDistribution, HurdleDistribution, HurdleQuantileFitDiagnostics, HurdleQuantileFitResult,
     Interpolation, PointMassDistribution, QuantileFitDiagnostics, QuantileFitResult,
-    TabulatedDistribution, Tail, fit_hurdle_quantiles, fit_quantiles,
+    TabulatedDistribution, Tail, fit_hurdle_quantiles, fit_lmoments, fit_quantiles,
 };
 pub use error::{CrcError, Result};
 pub use metrics::{

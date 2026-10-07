@@ -158,9 +158,21 @@ def fit_distribution(
     *,
     candidates: Optional[Sequence[DistributionFamily]] = None,
     selector: str = "ks",
+    method: str = "default",
     constraints: Optional[Union[FitConstraints, Mapping[str, float]]] = None,
 ) -> FitResult:
-    """Fit explicitly; metric functions never call this automatically."""
+    """Fit observations explicitly; metrics never fit automatically.
+
+    ``method="default"`` preserves the existing sample fitter.
+    ``method="lmoments"`` uses unbiased sample L-moments for an explicit
+    ``genextreme``, ``gumbel_r`` or ``gumbel_l`` family, without optimization.
+    GEV shape uses the SciPy convention (c = -xi). Automatic family selection
+    and candidate lists are unavailable for L-moments.
+    """
+    if method not in ("default", "lmoments"):
+        raise ValueError(f"unknown fitting method {method!r}")
+    if method == "lmoments" and (family == "auto" or candidates is not None):
+        raise ValueError("L-moments fitting requires an explicit family and no candidates")
     if selector != "ks":
         raise ValueError("only the 'ks' selector is currently supported")
     active_constraints = (
@@ -168,6 +180,11 @@ def fit_distribution(
         if isinstance(constraints, Mapping)
         else constraints
     )
+    if method == "lmoments":
+        result = _result(_core.fit(_samples(data), family, method=method))
+        if active_constraints is not None and not active_constraints.accepts(result):
+            raise ValueError("L-moments fit does not satisfy the requested constraints")
+        return result
     if candidates is not None or active_constraints is not None:
         allowed = (
             set(candidates)
