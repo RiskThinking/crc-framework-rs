@@ -7,6 +7,8 @@ use crate::{
     reference::curve_fitting as reference_curve_fitting,
 };
 
+mod lmoments;
+
 const EPS: f64 = 1.0e-12;
 
 pub trait Distribution: Send + Sync {
@@ -856,6 +858,18 @@ pub fn fit_distribution(samples: &[f64], family: Option<DistributionFamily>) -> 
         .ok_or_else(|| CrcError::Unsupported("no candidate distribution could be fitted".into()))
 }
 
+/// Fit GEV or Gumbel observations by unbiased sample L-moments.
+///
+/// This is a standalone estimator: no likelihood optimization or family selection.
+/// GEV shape follows the SciPy convention (`c = -xi`).
+pub fn fit_lmoments(samples: &[f64], family: DistributionFamily) -> Result<FitResult> {
+    let (distribution, sorted) = lmoments::fit(samples, family)?;
+    Ok(FitResult {
+        diagnostics: diagnostics_sorted(&sorted, &distribution),
+        distribution,
+    })
+}
+
 pub fn fit_quantiles(
     probabilities: &[f64],
     values: &[f64],
@@ -1057,6 +1071,10 @@ fn reference_diagnostic(diagnostic: reference_curve_fitting::DiagnosticFit) -> R
 fn diagnostics(samples: &[f64], distribution: &dyn Distribution) -> DiagnosticMetrics {
     let mut sorted = samples.to_vec();
     sorted.sort_by(f64::total_cmp);
+    diagnostics_sorted(&sorted, distribution)
+}
+
+fn diagnostics_sorted(sorted: &[f64], distribution: &dyn Distribution) -> DiagnosticMetrics {
     let count = sorted.len() as f64;
     let mut ks: f64 = 0.0;
     let mut squared_error = 0.0;

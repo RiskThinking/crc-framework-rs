@@ -354,17 +354,36 @@ fn hurdle_distribution(
 }
 
 #[pyfunction]
-#[pyo3(signature = (samples, family=None))]
-fn fit(samples: Vec<f64>, family: Option<&str>) -> PyResult<PyFitResult> {
+#[pyo3(signature = (samples, family=None, *, method="default"))]
+fn fit(
+    py: Python<'_>,
+    samples: Vec<f64>,
+    family: Option<&str>,
+    method: &str,
+) -> PyResult<PyFitResult> {
     let family = family
         .map(|name| {
             DistributionFamily::from_name(name)
                 .ok_or_else(|| PyValueError::new_err(format!("unknown distribution family {name}")))
         })
         .transpose()?;
-    crc_framework_core::distribution::fit_distribution(&samples, family)
-        .map(fit_result_py)
-        .map_err(py_error)
+    let result = match method {
+        "default" => {
+            py.detach(|| crc_framework_core::distribution::fit_distribution(&samples, family))
+        }
+        "lmoments" => {
+            let family = family.ok_or_else(|| {
+                PyValueError::new_err("L-moments fitting requires an explicit family")
+            })?;
+            py.detach(|| crc_framework_core::distribution::fit_lmoments(&samples, family))
+        }
+        _ => {
+            return Err(PyValueError::new_err(format!(
+                "unknown fitting method {method}"
+            )));
+        }
+    };
+    result.map(fit_result_py).map_err(py_error)
 }
 
 #[pyfunction]
