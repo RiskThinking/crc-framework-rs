@@ -29,6 +29,23 @@ class NativeQuantileFitResult:
     iterations: int
     evaluations: int
 
+class NativeCensoredQuantileFitResult:
+    distribution: NativeDistribution
+    rmse: float
+    normalized_rmse: float
+    weighted_r_squared: float
+    maximum_absolute_residual: float
+    point_count: int
+    converged: bool
+    iterations: int
+    evaluations: int
+    negative_log_likelihood: float
+    residual_scale: float
+    residual_scale_floor: float
+    censor_location: float
+    censored_point_count: int
+    uncensored_point_count: int
+
 class NativeHurdleQuantileFitResult:
     distribution: NativeDistribution
     base_distribution: NativeDistribution
@@ -130,6 +147,14 @@ def fit_quantiles(
     family: str,
     weights: Optional[Sequence[float]] = ...,
 ) -> NativeQuantileFitResult: ...
+def fit_censored_quantiles(
+    probabilities: Sequence[float],
+    values: Sequence[float],
+    family: str,
+    censor_location: float = ...,
+    residual_scale_floor_ratio: float = ...,
+    weights: Optional[Sequence[float]] = ...,
+) -> NativeCensoredQuantileFitResult: ...
 def fit_hurdle_quantiles(
     probabilities: Sequence[float],
     values: Sequence[float],

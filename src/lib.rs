@@ -4,6 +4,7 @@ use crc_framework_core::{
     BinaryOutcome, Distribution, DistributionFamily, EmpiricalDistribution, FittedDistribution,
     HurdleDistribution, ImpactContext, ImpactRegistry, Interpolation, PointMassDistribution,
     ScenarioMetadata, TabulatedDistribution, Tail, Transform, compute_risk, compute_spanning_set,
+    fit_censored_quantiles as core_fit_censored_quantiles,
     fit_hurdle_quantiles as core_fit_hurdle_quantiles, fit_quantiles as core_fit_quantiles,
     generate_microscores,
 };
@@ -109,6 +110,41 @@ struct PyQuantileFitResult {
     evaluations: usize,
 }
 
+#[pyclass(name = "NativeCensoredQuantileFitResult", frozen)]
+#[derive(Clone)]
+struct PyCensoredQuantileFitResult {
+    #[pyo3(get)]
+    distribution: PyDistribution,
+    #[pyo3(get)]
+    rmse: f64,
+    #[pyo3(get)]
+    normalized_rmse: f64,
+    #[pyo3(get)]
+    weighted_r_squared: f64,
+    #[pyo3(get)]
+    maximum_absolute_residual: f64,
+    #[pyo3(get)]
+    point_count: usize,
+    #[pyo3(get)]
+    converged: bool,
+    #[pyo3(get)]
+    iterations: usize,
+    #[pyo3(get)]
+    evaluations: usize,
+    #[pyo3(get)]
+    negative_log_likelihood: f64,
+    #[pyo3(get)]
+    residual_scale: f64,
+    #[pyo3(get)]
+    residual_scale_floor: f64,
+    #[pyo3(get)]
+    censor_location: f64,
+    #[pyo3(get)]
+    censored_point_count: usize,
+    #[pyo3(get)]
+    uncensored_point_count: usize,
+}
+
 #[pyclass(name = "NativeHurdleQuantileFitResult", frozen)]
 #[derive(Clone)]
 struct PyHurdleQuantileFitResult {
@@ -196,6 +232,30 @@ fn quantile_fit_result_py(result: crc_framework_core::QuantileFitResult) -> PyQu
         converged: result.diagnostics.converged,
         iterations: result.diagnostics.iterations,
         evaluations: result.diagnostics.evaluations,
+    }
+}
+
+fn censored_quantile_fit_result_py(
+    result: crc_framework_core::CensoredQuantileFitResult,
+) -> PyCensoredQuantileFitResult {
+    let diagnostics = result.diagnostics;
+    let observed = diagnostics.observed;
+    PyCensoredQuantileFitResult {
+        distribution: fitted_py(result.distribution),
+        rmse: observed.rmse,
+        normalized_rmse: observed.normalized_rmse,
+        weighted_r_squared: observed.weighted_r_squared,
+        maximum_absolute_residual: observed.maximum_absolute_residual,
+        point_count: observed.point_count,
+        converged: observed.converged,
+        iterations: observed.iterations,
+        evaluations: observed.evaluations,
+        negative_log_likelihood: diagnostics.negative_log_likelihood,
+        residual_scale: diagnostics.residual_scale,
+        residual_scale_floor: diagnostics.residual_scale_floor,
+        censor_location: diagnostics.censor_location,
+        censored_point_count: diagnostics.censored_point_count,
+        uncensored_point_count: diagnostics.uncensored_point_count,
     }
 }
 
@@ -407,6 +467,40 @@ fn fit_quantiles(
     py.detach(move || core_fit_quantiles(&probabilities, &values, weights.as_deref(), family))
         .map(quantile_fit_result_py)
         .map_err(py_error)
+}
+
+#[pyfunction]
+#[pyo3(signature = (
+    probabilities,
+    values,
+    family,
+    censor_location=0.0,
+    residual_scale_floor_ratio=1.0e-3,
+    weights=None
+))]
+fn fit_censored_quantiles(
+    py: Python<'_>,
+    probabilities: Vec<f64>,
+    values: Vec<f64>,
+    family: &str,
+    censor_location: f64,
+    residual_scale_floor_ratio: f64,
+    weights: Option<Vec<f64>>,
+) -> PyResult<PyCensoredQuantileFitResult> {
+    let family = DistributionFamily::from_name(family)
+        .ok_or_else(|| PyValueError::new_err(format!("unknown distribution family {family}")))?;
+    py.detach(move || {
+        core_fit_censored_quantiles(
+            &probabilities,
+            &values,
+            weights.as_deref(),
+            family,
+            censor_location,
+            residual_scale_floor_ratio,
+        )
+    })
+    .map(censored_quantile_fit_result_py)
+    .map_err(py_error)
 }
 
 #[pyfunction]
@@ -895,6 +989,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDistribution>()?;
     m.add_class::<PyFitResult>()?;
     m.add_class::<PyQuantileFitResult>()?;
+    m.add_class::<PyCensoredQuantileFitResult>()?;
     m.add_class::<PyHurdleQuantileFitResult>()?;
     m.add_class::<PyMicroscore>()?;
     m.add_class::<PyMicroscoreSuite>()?;
@@ -912,6 +1007,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(fit, m)?)?;
     m.add_function(wrap_pyfunction!(fit_candidates, m)?)?;
     m.add_function(wrap_pyfunction!(fit_quantiles, m)?)?;
+    m.add_function(wrap_pyfunction!(fit_censored_quantiles, m)?)?;
     m.add_function(wrap_pyfunction!(fit_hurdle_quantiles, m)?)?;
     m.add_function(wrap_pyfunction!(diagnostic_metrics, m)?)?;
     m.add_function(wrap_pyfunction!(evaluate_impact, m)?)?;

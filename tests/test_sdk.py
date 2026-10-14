@@ -14,6 +14,7 @@ from crc_framework import (
     TransformContext,
     compute_risk,
     compute_spanning_set,
+    fit_censored_quantiles,
     fit_distribution,
     fit_hurdle_quantiles,
     fit_quantiles,
@@ -127,6 +128,25 @@ class DistributionTests(unittest.TestCase):
         self.assertLess(result.diagnostics.tail.rmse, 0.11)
         self.assertLess(np.max(np.abs(fitted[1:] - source.values[1:])), 0.25)
         self.assertEqual(result.diagnostics.atom_probability_lower_bound, 0.5)
+
+    def test_sparse_flood_curve_uses_censored_gev(self):
+        periods = np.asarray([2, 5, 10, 25, 50, 100, 250, 500, 1000], dtype=float)
+        probabilities = 1.0 - 1.0 / periods
+        depths = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.03, 0.06, 0.10]
+        result = fit_censored_quantiles(
+            probabilities, depths, family="genextreme"
+        )
+        fitted = np.maximum(
+            0.0, result.distribution.quantiles(probabilities)
+        )
+        np.testing.assert_array_equal(fitted[:6], np.zeros(6))
+        np.testing.assert_allclose(fitted[6:], depths[6:], atol=0.002)
+        self.assertEqual(result.diagnostics.censored_point_count, 6)
+        self.assertEqual(result.diagnostics.uncensored_point_count, 3)
+        self.assertGreaterEqual(
+            result.diagnostics.residual_scale,
+            result.diagnostics.residual_scale_floor,
+        )
 
 
 class PipelineTests(unittest.TestCase):
