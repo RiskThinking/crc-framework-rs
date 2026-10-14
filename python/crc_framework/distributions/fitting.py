@@ -47,6 +47,23 @@ class QuantileFitResult:
 
 
 @dataclass(frozen=True)
+class CensoredQuantileFitDiagnostics:
+    observed: QuantileFitDiagnostics
+    negative_log_likelihood: float
+    residual_scale: float
+    residual_scale_floor: float
+    censor_location: float
+    censored_point_count: int
+    uncensored_point_count: int
+
+
+@dataclass(frozen=True)
+class CensoredQuantileFitResult:
+    distribution: FittedDistribution
+    diagnostics: CensoredQuantileFitDiagnostics
+
+
+@dataclass(frozen=True)
 class HurdleQuantileFitDiagnostics:
     tail: QuantileFitDiagnostics
     atom_probability_lower_bound: float
@@ -118,6 +135,33 @@ def _quantile_result(native: _core.NativeQuantileFitResult) -> QuantileFitResult
             converged=native.converged,
             iterations=native.iterations,
             evaluations=native.evaluations,
+        ),
+    )
+
+
+def _censored_quantile_result(
+    native: _core.NativeCensoredQuantileFitResult,
+) -> CensoredQuantileFitResult:
+    observed = QuantileFitDiagnostics(
+        rmse=native.rmse,
+        normalized_rmse=native.normalized_rmse,
+        weighted_r_squared=native.weighted_r_squared,
+        maximum_absolute_residual=native.maximum_absolute_residual,
+        point_count=native.point_count,
+        converged=native.converged,
+        iterations=native.iterations,
+        evaluations=native.evaluations,
+    )
+    return CensoredQuantileFitResult(
+        distribution=FittedDistribution._from_native(native.distribution),
+        diagnostics=CensoredQuantileFitDiagnostics(
+            observed=observed,
+            negative_log_likelihood=native.negative_log_likelihood,
+            residual_scale=native.residual_scale,
+            residual_scale_floor=native.residual_scale_floor,
+            censor_location=native.censor_location,
+            censored_point_count=native.censored_point_count,
+            uncensored_point_count=native.uncensored_point_count,
         ),
     )
 
@@ -248,7 +292,9 @@ def fit_quantiles(
     knot_values: list[float]
     if isinstance(probabilities, TabulatedDistribution):
         if values is not None:
-            raise TypeError("values must be omitted when fitting a TabulatedDistribution")
+            raise TypeError(
+                "values must be omitted when fitting a TabulatedDistribution"
+            )
         knot_probabilities = probabilities.probabilities.tolist()
         knot_values = probabilities.values.tolist()
     else:
@@ -261,6 +307,68 @@ def fit_quantiles(
             knot_probabilities,
             knot_values,
             family,
+            None
+            if weights is None
+            else np.asarray(weights, dtype=np.float64).reshape(-1).tolist(),
+        )
+    )
+
+
+@overload
+def fit_censored_quantiles(
+    probabilities: TabulatedDistribution,
+    values: None = None,
+    family: DistributionFamily = "genextreme",
+    *,
+    censor_location: float = 0.0,
+    residual_scale_floor_ratio: float = 1.0e-3,
+    weights: Optional[Sequence[float]] = None,
+) -> CensoredQuantileFitResult: ...
+
+
+@overload
+def fit_censored_quantiles(
+    probabilities: Sequence[float],
+    values: Sequence[float],
+    family: DistributionFamily = "genextreme",
+    *,
+    censor_location: float = 0.0,
+    residual_scale_floor_ratio: float = 1.0e-3,
+    weights: Optional[Sequence[float]] = None,
+) -> CensoredQuantileFitResult: ...
+
+
+def fit_censored_quantiles(
+    probabilities: Union[TabulatedDistribution, Sequence[float]],
+    values: Optional[Sequence[float]] = None,
+    family: DistributionFamily = "genextreme",
+    *,
+    censor_location: float = 0.0,
+    residual_scale_floor_ratio: float = 1.0e-3,
+    weights: Optional[Sequence[float]] = None,
+) -> CensoredQuantileFitResult:
+    """Fit probability-labelled values with observations left-censored at a bound."""
+    knot_probabilities: list[float]
+    knot_values: list[float]
+    if isinstance(probabilities, TabulatedDistribution):
+        if values is not None:
+            raise TypeError(
+                "values must be omitted when fitting a TabulatedDistribution"
+            )
+        knot_probabilities = probabilities.probabilities.tolist()
+        knot_values = probabilities.values.tolist()
+    else:
+        if values is None:
+            raise TypeError("values are required with explicit probabilities")
+        knot_probabilities = [float(value) for value in probabilities]
+        knot_values = [float(value) for value in values]
+    return _censored_quantile_result(
+        _core.fit_censored_quantiles(
+            knot_probabilities,
+            knot_values,
+            family,
+            censor_location,
+            residual_scale_floor_ratio,
             None
             if weights is None
             else np.asarray(weights, dtype=np.float64).reshape(-1).tolist(),

@@ -8,10 +8,11 @@ pub mod spatial;
 pub mod transform;
 
 pub use distribution::{
-    DiagnosticMetrics, Distribution, DistributionFamily, EmpiricalDistribution, FitResult,
-    FittedDistribution, HurdleDistribution, HurdleQuantileFitDiagnostics, HurdleQuantileFitResult,
-    Interpolation, PointMassDistribution, QuantileFitDiagnostics, QuantileFitResult,
-    TabulatedDistribution, Tail, fit_hurdle_quantiles, fit_lmoments, fit_quantiles,
+    CensoredQuantileFitDiagnostics, CensoredQuantileFitResult, DiagnosticMetrics, Distribution,
+    DistributionFamily, EmpiricalDistribution, FitResult, FittedDistribution, HurdleDistribution,
+    HurdleQuantileFitDiagnostics, HurdleQuantileFitResult, Interpolation, PointMassDistribution,
+    QuantileFitDiagnostics, QuantileFitResult, TabulatedDistribution, Tail, fit_censored_quantiles,
+    fit_hurdle_quantiles, fit_lmoments, fit_quantiles,
 };
 pub use error::{CrcError, Result};
 pub use metrics::{

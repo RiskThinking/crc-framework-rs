@@ -150,6 +150,28 @@ fit = fit_hurdle_quantiles(
 )
 ```
 
+For sparse return-period curves whose lower values mean "at or below the
+physical detection bound", use `fit_censored_quantiles`. It fits every knot
+with a Gaussian left-censored likelihood, rather than treating repeated zeros
+as an exact atom or discarding them from the fit:
+
+```python
+from crc_framework import fit_censored_quantiles
+
+fit = fit_censored_quantiles(
+    [0.5, 0.8, 0.9, 0.96, 0.98, 0.99, 0.996, 0.998, 0.999],
+    [0, 0, 0, 0, 0, 0, 0.03, 0.06, 0.10],
+    family="genextreme",
+    censor_location=0.0,
+)
+```
+
+The residual scale has a reproducible positive floor (by default `1e-3` times
+the robust value scale) because sparse tails may otherwise make the likelihood
+unbounded as residual variance approaches zero. The fitted object is the latent
+parametric distribution; producers should clamp it at the censor location when
+storing a non-negative observed curve.
+
 `TabulatedDistribution` remains the lossless interpolation of the supplied
 knots. Parametric and hurdle fits are lossy, so systems that require source
 reconstruction must persist the original probability/value pairs separately.
@@ -311,8 +333,8 @@ The package exports the following primary interfaces:
 
 - Distributions: `EmpiricalDistribution`, `TabulatedDistribution`,
   `FittedDistribution`, `HurdleDistribution`, `PointMassDistribution`,
-  `fit_distribution`, `fit_quantiles`, `fit_hurdle_quantiles`, `fit_all`, and
-  `quality_metrics`.
+  `fit_distribution`, `fit_quantiles`, `fit_censored_quantiles`,
+  `fit_hurdle_quantiles`, `fit_all`, and `quality_metrics`.
 - Transforms: `impacts`, `ImpactRegistry`, `ImpactFunction`, `ClimateImpact`,
   `LinearImpact`, `SigmoidImpact`, `PiecewiseLinearImpact`, `CallableImpact`,
   and `CallableTransform`.

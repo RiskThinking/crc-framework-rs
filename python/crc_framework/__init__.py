@@ -2,6 +2,8 @@
 
 from .constants import HORIZONS, PATHWAYS, RISK_FACTORS, Pathway, RiskFactor
 from .distributions import (
+    CensoredQuantileFitDiagnostics,
+    CensoredQuantileFitResult,
     Distribution,
     EmpiricalDistribution,
     FitConstraints,
@@ -16,6 +18,7 @@ from .distributions import (
     QuantileFitResult,
     TabulatedDistribution,
     fit_all,
+    fit_censored_quantiles,
     fit_distribution,
     fit_hurdle_quantiles,
     fit_quantiles,
@@ -49,6 +52,8 @@ __all__ = [
     "PATHWAYS",
     "RISK_FACTORS",
     "BinaryOutcome",
+    "CensoredQuantileFitDiagnostics",
+    "CensoredQuantileFitResult",
     "CallableImpact",
     "CallableTransform",
     "ClimateImpact",
@@ -81,6 +86,7 @@ __all__ = [
     "compute_risk",
     "compute_spanning_set",
     "fit_all",
+    "fit_censored_quantiles",
     "fit_distribution",
     "fit_hurdle_quantiles",
     "fit_quantiles",

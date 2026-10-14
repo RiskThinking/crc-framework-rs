@@ -829,6 +829,23 @@ pub struct QuantileFitResult {
 }
 
 #[derive(Debug, Clone, Copy)]
+pub struct CensoredQuantileFitDiagnostics {
+    pub observed: QuantileFitDiagnostics,
+    pub negative_log_likelihood: f64,
+    pub residual_scale: f64,
+    pub residual_scale_floor: f64,
+    pub censor_location: f64,
+    pub censored_point_count: usize,
+    pub uncensored_point_count: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct CensoredQuantileFitResult {
+    pub distribution: FittedDistribution,
+    pub diagnostics: CensoredQuantileFitDiagnostics,
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct HurdleQuantileFitDiagnostics {
     pub tail: QuantileFitDiagnostics,
     pub atom_probability_lower_bound: f64,
@@ -878,6 +895,117 @@ pub fn fit_quantiles(
 ) -> Result<QuantileFitResult> {
     let weights = validate_quantile_points(probabilities, values, weights)?;
     fit_quantile_points_internal(probabilities, values, &weights, family, None)
+}
+
+pub fn fit_censored_quantiles(
+    probabilities: &[f64],
+    values: &[f64],
+    weights: Option<&[f64]>,
+    family: DistributionFamily,
+    censor_location: f64,
+    residual_scale_floor_ratio: f64,
+) -> Result<CensoredQuantileFitResult> {
+    let weights = validate_quantile_points(probabilities, values, weights)?;
+    if !censor_location.is_finite() {
+        return Err(CrcError::InvalidInput(
+            "censor location must be finite".into(),
+        ));
+    }
+    if !residual_scale_floor_ratio.is_finite() || residual_scale_floor_ratio <= 0.0 {
+        return Err(CrcError::InvalidInput(
+            "residual scale floor ratio must be finite and positive".into(),
+        ));
+    }
+    let censored_point_count = values
+        .iter()
+        .zip(&weights)
+        .filter(|(value, weight)| **weight > 0.0 && **value <= censor_location)
+        .count();
+    let uncensored_point_count = values
+        .iter()
+        .zip(&weights)
+        .filter(|(value, weight)| **weight > 0.0 && **value > censor_location)
+        .count();
+    if censored_point_count == 0 || uncensored_point_count == 0 {
+        return Err(CrcError::InvalidInput(
+            "censored quantile fitting requires censored and uncensored knots".into(),
+        ));
+    }
+
+    let conditioning_scale = censored_conditioning_scale(values, &weights, censor_location);
+    let residual_scale_floor = (residual_scale_floor_ratio * conditioning_scale).max(EPS);
+    if !residual_scale_floor.is_finite()
+        || residual_scale_floor > reference_curve_fitting::MAXIMUM_QUANTILE_SCALE
+    {
+        return Err(CrcError::InvalidInput(
+            "residual scale floor must be finite and no greater than 1e12".into(),
+        ));
+    }
+    let kind = reference_curve_fitting::DistributionKind::from_name(family.name())
+        .expect("public and reference family names are synchronized");
+    let optimized = reference_curve_fitting::fit_censored_quantile_points(
+        kind,
+        probabilities,
+        values,
+        &weights,
+        censor_location,
+        residual_scale_floor,
+    )
+    .ok_or_else(|| CrcError::Unsupported(format!("{} could not be fitted", family.name())))?;
+    if !optimized.converged {
+        return Err(CrcError::ConvergenceFailed {
+            family: family.name().into(),
+            iterations: optimized.iterations,
+        });
+    }
+    let distribution = FittedDistribution::from_parameters(
+        family,
+        optimized.shape,
+        optimized.loc,
+        optimized.scale,
+    )?;
+    // The likelihood scored this same distribution, so the gate and the
+    // residuals describe the curve callers evaluate.
+    let latent_values = probabilities
+        .iter()
+        .map(|&probability| distribution.ppf(probability))
+        .collect::<Result<Vec<_>>>()?;
+    let transition_is_preserved =
+        preserves_censor_transition(values, &latent_values, &weights, censor_location);
+    if !transition_is_preserved {
+        return Err(CrcError::Unsupported(
+            "censored fit does not preserve the observed censor transition".into(),
+        ));
+    }
+    let fitted_values = latent_values
+        .iter()
+        .map(|value| value.max(censor_location))
+        .collect::<Vec<_>>();
+    // Left-censored knots are scored at the bound. A placeholder below it is
+    // not an observed residual.
+    let bounded_values: Vec<f64> = values
+        .iter()
+        .map(|value| value.max(censor_location))
+        .collect();
+    let observed = quantile_diagnostics(
+        &bounded_values,
+        &fitted_values,
+        &weights,
+        optimized.iterations,
+        optimized.evaluations,
+    );
+    Ok(CensoredQuantileFitResult {
+        distribution,
+        diagnostics: CensoredQuantileFitDiagnostics {
+            observed,
+            negative_log_likelihood: optimized.negative_log_likelihood,
+            residual_scale: optimized.residual_scale,
+            residual_scale_floor,
+            censor_location,
+            censored_point_count,
+            uncensored_point_count,
+        },
+    })
 }
 
 pub fn fit_hurdle_quantiles(
@@ -1206,6 +1334,28 @@ fn validate_quantile_points(
 }
 
 fn robust_value_scale(values: &[f64], weights: &[f64]) -> f64 {
+    // Full endpoint span, including zero-weight knots. This scale divides every
+    // residual in the bit-exact quantile objective, so it stays on that formula.
+    conditioning_scale(
+        values,
+        weights,
+        values.last().expect("validated") - values[0],
+    )
+}
+
+fn censored_conditioning_scale(values: &[f64], weights: &[f64], censor_location: f64) -> f64 {
+    let bounded: Vec<f64> = values
+        .iter()
+        .map(|value| value.max(censor_location))
+        .collect();
+    conditioning_scale(
+        &bounded,
+        weights,
+        reference_curve_fitting::positive_value_span(&bounded, weights, censor_location),
+    )
+}
+
+fn conditioning_scale(values: &[f64], weights: &[f64], range: f64) -> f64 {
     let median = weighted_median(
         values
             .iter()
@@ -1220,7 +1370,6 @@ fn robust_value_scale(values: &[f64], weights: &[f64]) -> f64 {
             .zip(weights.iter().copied())
             .collect(),
     );
-    let range = values.last().expect("validated") - values[0];
     (1.4826 * mad).max(range * 1.0e-3).max(EPS)
 }
 
@@ -1235,6 +1384,29 @@ fn weighted_median(mut points: Vec<(f64, f64)>) -> f64 {
         }
     }
     unreachable!("validated positive total weight")
+}
+
+fn preserves_censor_transition(
+    values: &[f64],
+    latent_values: &[f64],
+    weights: &[f64],
+    censor_location: f64,
+) -> bool {
+    // `censor + 1e-12` is unchanged once the unit in the last place exceeds EPS,
+    // so a one-ulp overshoot has to be measured against the bound itself.
+    let slack = EPS.max(censor_location.abs() * f64::EPSILON);
+    values
+        .iter()
+        .zip(latent_values)
+        .zip(weights)
+        .all(|((&observed, &latent), &weight)| {
+            weight == 0.0
+                || if observed <= censor_location {
+                    latent - censor_location <= slack
+                } else {
+                    censor_location - latent < slack
+                }
+        })
 }
 
 fn quantile_diagnostics(
@@ -1281,9 +1453,11 @@ fn quantile_diagnostics(
         maximum_absolute_residual: observed
             .iter()
             .zip(fitted)
-            .map(|(observed, fitted)| (fitted - observed).abs())
+            .zip(weights)
+            .filter(|((_, _), weight)| **weight > 0.0)
+            .map(|((observed, fitted), _)| (fitted - observed).abs())
             .fold(0.0, f64::max),
-        point_count: observed.len(),
+        point_count: weights.iter().filter(|weight| **weight > 0.0).count(),
         converged: true,
         iterations,
         evaluations,
@@ -1357,6 +1531,70 @@ fn erf(x: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn censor_transition_allows_one_ulp_on_a_large_bound() {
+        let censor = 1.0e6;
+        assert_eq!(
+            censor + EPS,
+            censor,
+            "absolute EPS must vanish at this magnitude"
+        );
+        let one_ulp = f64::from_bits(censor.to_bits() + 1);
+        let two_ulps = f64::from_bits(censor.to_bits() + 2);
+        let values = [
+            censor,
+            censor,
+            censor,
+            censor + 1.0,
+            censor + 2.0,
+            censor + 3.0,
+        ];
+        let weights = [1.0; 6];
+        let one_ulp_overshoot = [
+            one_ulp,
+            censor,
+            censor,
+            censor + 1.0,
+            censor + 2.0,
+            censor + 3.0,
+        ];
+        assert!(preserves_censor_transition(
+            &values,
+            &one_ulp_overshoot,
+            &weights,
+            censor
+        ));
+        let two_ulp_overshoot = [
+            two_ulps,
+            censor,
+            censor,
+            censor + 1.0,
+            censor + 2.0,
+            censor + 3.0,
+        ];
+        assert!(!preserves_censor_transition(
+            &values,
+            &two_ulp_overshoot,
+            &weights,
+            censor
+        ));
+        let weights_with_sentinel = [0.0, 1.0, 1.0, 1.0, 1.0, 1.0];
+        let ignored = [
+            censor + 1.0,
+            censor,
+            censor,
+            censor + 1.0,
+            censor + 2.0,
+            censor + 3.0,
+        ];
+        assert!(preserves_censor_transition(
+            &values,
+            &ignored,
+            &weights_with_sentinel,
+            censor
+        ));
+    }
 
     #[test]
     fn point_mass_is_exact_at_every_probability() {

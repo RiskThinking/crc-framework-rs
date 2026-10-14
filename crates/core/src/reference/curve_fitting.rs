@@ -17,6 +17,7 @@ use crate::risk::climate::utility::get_hazard_limit;
 
 // Numeric constants
 const EPS: f64 = 2.220446049250313e-16;
+pub(crate) const MAXIMUM_QUANTILE_SCALE: f64 = 1.0e12;
 const LOGXMAX: f64 = 709.782712893384; // approx ln(max double)
 const EULER: f64 = 0.577215664901532860606512090082402431042; // -psi(1)
 const SQRTPI: f64 = 1.772453850905516027298167483341145182797549456; // sqrt(pi)
@@ -218,6 +219,18 @@ pub(crate) struct QuantileOptimization {
     pub evaluations: usize,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct CensoredQuantileOptimization {
+    pub shape: Option<f64>,
+    pub loc: f64,
+    pub scale: f64,
+    pub residual_scale: f64,
+    pub negative_log_likelihood: f64,
+    pub converged: bool,
+    pub iterations: usize,
+    pub evaluations: usize,
+}
+
 #[derive(Debug, Clone)]
 struct SimplexResult {
     parameters: Vec<f64>,
@@ -254,13 +267,7 @@ pub(crate) fn fit_quantile_points(
             steps[0] = 0.1 * value_range.max(value_scale);
             steps[1] = 0.1 * start[1].abs().max(value_scale);
         } else {
-            steps[0] = match kind {
-                DistributionKind::WeibullMin | DistributionKind::WeibullMax => {
-                    0.15 * start[0].abs().max(1.0)
-                }
-                DistributionKind::SkewNorm => 0.5,
-                _ => 0.15,
-            };
+            steps[0] = quantile_shape_step(kind, start[0]);
             steps[1] = 0.1 * value_range.max(value_scale);
             steps[2] = 0.1 * start[2].abs().max(value_scale);
         }
@@ -309,6 +316,133 @@ pub(crate) fn fit_quantile_points(
         shape,
         loc,
         scale,
+        converged: best.converged,
+        iterations: best.iterations,
+        evaluations: best.evaluations,
+    })
+}
+
+pub(crate) fn fit_censored_quantile_points(
+    kind: DistributionKind,
+    probabilities: &[f64],
+    values: &[f64],
+    weights: &[f64],
+    censor_location: f64,
+    residual_scale_floor: f64,
+) -> Option<CensoredQuantileOptimization> {
+    // A knot at or below the censor is left-censored. Its recorded magnitude is
+    // not a location, so the starts and the objective see the bound instead.
+    let bounded_values: Vec<f64> = values
+        .iter()
+        .map(|value| value.max(censor_location))
+        .collect();
+    let starts = quantile_starts(kind, probabilities, &bounded_values, weights);
+    let parameter_count = if matches!(kind, DistributionKind::GumbelR | DistributionKind::GumbelL) {
+        2
+    } else {
+        3
+    };
+    // Knots are non-decreasing, so a zero-weight endpoint would stretch a raw
+    // max-minus-min. Step size and the residual start follow the weighted knots.
+    let value_range = positive_value_span(&bounded_values, weights, censor_location);
+    let weight_sum = weights.iter().sum::<f64>();
+    let residual_start = (0.1 * value_range)
+        .max(10.0 * residual_scale_floor)
+        .max(1.0e-12);
+    let mut best: Option<SimplexResult> = None;
+
+    for start in starts {
+        let distribution_scale = if parameter_count == 2 {
+            start[1]
+        } else {
+            start[2]
+        };
+        // The initial simplex only steps these log coordinates upward, and the
+        // constraint caps them at ln(1e12). A start already on that cap would
+        // make the step a no-op, so neither scale could decrease.
+        let (log_distribution_scale, distribution_scale_step) =
+            separable_log_scale(distribution_scale, 0.1, 1.0e-12);
+        let (log_residual_scale, residual_step) =
+            separable_log_scale(residual_start, 0.25, residual_scale_floor);
+        let mut transformed = Vec::with_capacity(parameter_count + 1);
+        if parameter_count == 2 {
+            transformed.extend([start[0], log_distribution_scale, log_residual_scale]);
+        } else {
+            transformed.extend([
+                start[0],
+                start[1],
+                log_distribution_scale,
+                log_residual_scale,
+            ]);
+        }
+        let mut steps = vec![0.0; transformed.len()];
+        if parameter_count == 2 {
+            steps[0] = 0.1 * value_range.max(residual_scale_floor);
+            steps[1] = distribution_scale_step;
+            steps[2] = residual_step;
+        } else {
+            steps[0] = quantile_shape_step(kind, start[0]);
+            steps[1] = 0.1 * value_range.max(residual_scale_floor);
+            steps[2] = distribution_scale_step;
+            steps[3] = residual_step;
+        }
+        let result = quantile_nelder_mead(
+            transformed,
+            steps,
+            |parameters| {
+                censored_quantile_objective(
+                    kind,
+                    parameters,
+                    probabilities,
+                    &bounded_values,
+                    weights,
+                    weight_sum,
+                    censor_location,
+                    residual_scale_floor,
+                )
+            },
+            |parameters| {
+                constrain_censored_quantile_parameters(kind, parameters, residual_scale_floor)
+            },
+            20_000,
+            1.0e-10 * value_range.max(1.0),
+            1.0e-12,
+        );
+        if result.objective.is_finite()
+            && best.as_ref().is_none_or(|candidate| {
+                (result.converged && !candidate.converged)
+                    || (result.converged == candidate.converged
+                        && result.objective < candidate.objective)
+            })
+        {
+            best = Some(result);
+        }
+    }
+
+    let best = best?;
+    let (shape, loc, log_scale, log_residual_scale) = if parameter_count == 2 {
+        (
+            None,
+            best.parameters[0],
+            best.parameters[1],
+            best.parameters[2],
+        )
+    } else {
+        (
+            Some(best.parameters[0]),
+            best.parameters[1],
+            best.parameters[2],
+            best.parameters[3],
+        )
+    };
+    Some(CensoredQuantileOptimization {
+        shape,
+        loc,
+        scale: log_scale.exp(),
+        // `exp(ln(floor))` can fall slightly below the floor. The reported
+        // scale is the value the likelihood used, which is never below it.
+        residual_scale: log_residual_scale.exp().max(residual_scale_floor),
+        negative_log_likelihood: best.objective * weight_sum,
         converged: best.converged,
         iterations: best.iterations,
         evaluations: best.evaluations,
@@ -393,6 +527,44 @@ fn weighted_location_scale(
     (loc.is_finite() && scale.is_finite() && scale > 0.0).then_some((loc, scale))
 }
 
+fn separable_log_scale(scale: f64, step: f64, min_scale: f64) -> (f64, f64) {
+    let max_log = MAXIMUM_QUANTILE_SCALE.ln();
+    let min_log = min_scale.max(1.0e-12).ln().clamp(1.0e-12_f64.ln(), max_log);
+    let mut step = step.max(1.0e-8);
+    let mut log_scale = if scale.is_finite() && scale > 0.0 {
+        scale.ln().clamp(min_log, max_log)
+    } else {
+        min_log
+    };
+    if log_scale + step > max_log {
+        log_scale = (max_log - step).max(min_log);
+        if log_scale + step > max_log {
+            step = (max_log - min_log).max(1.0e-8);
+            log_scale = min_log;
+        }
+    }
+    (log_scale, step)
+}
+
+pub(crate) fn positive_value_span(values: &[f64], weights: &[f64], censor_location: f64) -> f64 {
+    let mut minimum = f64::INFINITY;
+    let mut maximum = f64::NEG_INFINITY;
+    for (&value, &weight) in values.iter().zip(weights) {
+        if weight > 0.0 {
+            // Left-censored placeholders can sit far below the bound. The
+            // likelihood never uses that magnitude.
+            let value = value.max(censor_location);
+            minimum = minimum.min(value);
+            maximum = maximum.max(value);
+        }
+    }
+    if maximum >= minimum {
+        maximum - minimum
+    } else {
+        0.0
+    }
+}
+
 fn constrain_quantile_parameters(kind: DistributionKind, parameters: &mut [f64]) {
     let scale_index = parameters.len() - 1;
     parameters[scale_index] = parameters[scale_index].clamp(1.0e-12, 1.0e12);
@@ -408,6 +580,122 @@ fn constrain_quantile_parameters(kind: DistributionKind, parameters: &mut [f64])
             DistributionKind::GumbelR | DistributionKind::GumbelL => parameters[0],
         };
     }
+}
+
+fn constrain_censored_quantile_parameters(
+    kind: DistributionKind,
+    parameters: &mut [f64],
+    residual_scale_floor: f64,
+) {
+    let residual_index = parameters.len() - 1;
+    let scale_index = residual_index - 1;
+    let max_log_scale = MAXIMUM_QUANTILE_SCALE.ln();
+    let min_log_scale = 1.0e-12_f64.ln();
+    // A floor above the scale limit would make `clamp` panic (`min > max`).
+    // The public fitter rejects that input; this keeps the optimizer itself safe.
+    let min_log_residual = if residual_scale_floor.is_finite() && residual_scale_floor > 0.0 {
+        residual_scale_floor
+            .ln()
+            .clamp(min_log_scale, max_log_scale)
+    } else {
+        min_log_scale
+    };
+    parameters[scale_index] = parameters[scale_index].clamp(min_log_scale, max_log_scale);
+    parameters[residual_index] = parameters[residual_index].clamp(min_log_residual, max_log_scale);
+    if parameters.len() == 4 {
+        parameters[0] = match kind {
+            DistributionKind::WeibullMin | DistributionKind::WeibullMax => {
+                parameters[0].clamp(0.05, 50.0)
+            }
+            DistributionKind::SkewNorm => parameters[0].clamp(-50.0, 50.0),
+            DistributionKind::GenExtreme | DistributionKind::GenPareto => {
+                parameters[0].clamp(-2.0, 2.0)
+            }
+            DistributionKind::GumbelR | DistributionKind::GumbelL => parameters[0],
+        };
+    }
+}
+
+fn censored_quantile_objective(
+    kind: DistributionKind,
+    parameters: &[f64],
+    probabilities: &[f64],
+    values: &[f64],
+    weights: &[f64],
+    weight_sum: f64,
+    censor_location: f64,
+    residual_scale_floor: f64,
+) -> f64 {
+    let (shape, loc, log_scale, log_residual_scale) = if parameters.len() == 3 {
+        (None, parameters[0], parameters[1], parameters[2])
+    } else {
+        (
+            Some(parameters[0]),
+            parameters[1],
+            parameters[2],
+            parameters[3],
+        )
+    };
+    let scale = log_scale.exp();
+    let residual_scale = log_residual_scale.exp().max(residual_scale_floor);
+    let log_residual_scale = residual_scale.ln();
+    // Score the same quantile the public fit returns. A second implementation
+    // can cross the censor after this likelihood has accepted the parameters.
+    let Ok(distribution) = TailDistribution::from_parameters(
+        DistributionFamily::from_reference_kind(kind),
+        shape,
+        loc,
+        scale,
+    ) else {
+        return f64::INFINITY;
+    };
+    let mut loss = 0.0;
+    const HALF_LOG_TWO_PI: f64 = 0.9189385332046727;
+    for ((&probability, &value), &weight) in probabilities.iter().zip(values).zip(weights) {
+        if weight == 0.0 {
+            continue;
+        }
+        let Ok(fitted) = distribution.ppf(probability) else {
+            return f64::INFINITY;
+        };
+        if !fitted.is_finite() {
+            return f64::INFINITY;
+        }
+        if value <= censor_location {
+            let z = (censor_location - fitted) / residual_scale;
+            loss -= weight * log_standard_normal_cdf(z);
+        } else {
+            let residual = (value - fitted) / residual_scale;
+            loss += weight * (HALF_LOG_TWO_PI + log_residual_scale + 0.5 * residual * residual);
+        }
+    }
+    loss / weight_sum
+}
+
+fn quantile_shape_step(kind: DistributionKind, shape: f64) -> f64 {
+    match kind {
+        DistributionKind::WeibullMin | DistributionKind::WeibullMax => 0.15 * shape.abs().max(1.0),
+        DistributionKind::SkewNorm => 0.5,
+        _ => 0.15,
+    }
+}
+
+fn log_standard_normal_cdf(value: f64) -> f64 {
+    if value >= 0.0 {
+        // The upper half is bounded away from zero, so `1 + erf` does not cancel.
+        return (0.5 * (1.0 + erf(value / SQRT_2))).ln();
+    }
+    // Φ(z) = erfc(-z/√2) / 2. Forming `1 + erf(z/√2)` cancels once `erf` is
+    // `erfc - 1`, which is every moderately negative argument.
+    let tail = erfc((-value) / SQRT_2);
+    if tail > 0.0 {
+        return (0.5 * tail).ln();
+    }
+    // `erfc` underflows for z ≲ -37. The Mills expansion stays finite there.
+    let inverse_square = 1.0 / (value * value);
+    let series = 1.0 - inverse_square + 3.0 * inverse_square * inverse_square;
+    let correction = if series > 0.0 { series.ln() } else { 0.0 };
+    -0.5 * value * value - (-value).ln() - 0.5 * (2.0 * PI).ln() + correction
 }
 
 /// `weight_sum` is `weights.iter().sum()`. It is a property of the fit, not of
@@ -3054,4 +3342,70 @@ pub fn fit_candidates_and_select_best_diagnostic(data: &[f64]) -> Option<Diagnos
                 .partial_cmp(&b.p_value)
                 .unwrap_or(std::cmp::Ordering::Equal)
         })
+}
+
+#[cfg(test)]
+mod log_standard_normal_cdf_accuracy {
+    use super::log_standard_normal_cdf;
+
+    #[test]
+    fn negative_tail_matches_a_non_cancelling_reference() {
+        // libm `log(erfc(-z/√2) / 2)`, the values the cancelling `1 + erf` form misses.
+        let references = [
+            (0.0, -6.931471805599453e-1),
+            (1.0, -1.727537790234499e-1),
+            (-1.0, -1.8410216450092636),
+            (-4.0, -1.0360101486527290e1),
+            (-7.9, -3.4206228170981710e1),
+            (-8.1, -3.5830502890801469e1),
+        ];
+        for (value, expected) in references {
+            let actual = log_standard_normal_cdf(value);
+            let relative = (actual - expected).abs() / expected.abs();
+            assert!(
+                relative < 1.0e-12,
+                "log Φ({value}) = {actual}, expected {expected}, relative {relative}"
+            );
+        }
+        let across_former_switch =
+            (log_standard_normal_cdf(-7.999) - log_standard_normal_cdf(-8.001)).abs();
+        assert!(
+            across_former_switch < 0.05,
+            "log Φ jumps by {across_former_switch} across -8"
+        );
+    }
+}
+
+#[cfg(test)]
+mod censored_scale_start {
+    use super::{DistributionKind, fit_censored_quantile_points};
+
+    #[test]
+    fn scales_can_decrease_when_the_start_exceeds_the_cap() {
+        let probabilities: Vec<f64> = [2.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0]
+            .iter()
+            .map(|period| 1.0 - 1.0 / period)
+            .collect();
+        let weights = [1.0; 9];
+        // `0.1 * range` is 4e12, above the log-scale cap, while the floor stays below it.
+        let values = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0e13, 2.0e13, 4.0e13];
+        let fit = fit_censored_quantile_points(
+            DistributionKind::GenExtreme,
+            &probabilities,
+            &values,
+            &weights,
+            0.0,
+            4.0e7,
+        )
+        .expect("a start above the scale cap should still optimize");
+        let below_cap = 1.0e12 * (1.0 - 1.0e-6);
+        assert!(fit.converged);
+        assert!(
+            fit.residual_scale < below_cap,
+            "residual scale {}",
+            fit.residual_scale
+        );
+        assert!(fit.scale < below_cap, "distribution scale {}", fit.scale);
+        assert!(fit.residual_scale >= 4.0e7);
+    }
 }
