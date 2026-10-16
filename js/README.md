@@ -103,13 +103,12 @@ supports only its stored knot interval (including endpoints). No clamping or
 extrapolation occurs. Malformed records are validated even outside support.
 Native and WASM transcendental math can differ slightly; parity tests use tolerances.
 
-## Build and release
+## Build and test
 
-From the repository root, install Rust's `wasm32-unknown-unknown` target and
-`wasm-pack 0.15.0`, then:
+Use the Node version in `.nvmrc`, install Rust's `wasm32-unknown-unknown` target
+and `wasm-pack 0.15.0`, then run from this directory:
 
 ```sh
-cd js
 npm ci
 npm run build
 npm test
@@ -119,46 +118,23 @@ npm run test:consumer # packed Vite + TypeScript + SSR/browser checks
 npm run benchmark
 npm run pack -- --dry-run
 npm run pack
-npm publish ./dist/riskthinking.ai-crc-framework-0.4.0-alpha.3.tgz --access public --tag alpha
 ```
 
-The release version is declared once, in `[workspace.package].version` in the
-root `Cargo.toml`. All three Rust crates inherit it with `version.workspace = true`.
-Maturin derives Python's version from Cargo (for example, `0.4.0a3`).
-
-The tracked `js/package.json` is a private, versionless development manifest;
+The tracked `package.json` is a private, versionless development manifest;
 `package-lock.json` pins its build/test dependencies. Keep both in Git. The build
-reads Cargo's resolved metadata, verifies wasm-pack's inherited version, and
-writes a publishable `js/dist/package.json` with that version. It copies the
-adapter, declarations, WASM glue/asset and license files into that ignored output
-directory. Development scripts, dev dependencies and the private flag are omitted
-from the published manifest. Source manifests and lockfiles are never rewritten
-by the build, and CI checks this explicitly.
+reads Cargo metadata and writes the public package to ignored `dist/`, including
+the derived version, JS adapter, declarations, WASM glue/asset, and licenses.
+Development scripts, dev dependencies, and the private flag are omitted.
+Source manifests and lockfiles are not rewritten by the build.
 
-Use `npm run pack` (or `npm pack ./dist`) to pack the generated package. Packing
-requires a successful build for the current workspace version; the private source
-package itself cannot be published. Tarballs live under `js/dist/` and the packed
-consumer test installs that exact artifact. A version bump changes the workspace
-version and refreshes `Cargo.lock` using Cargo; no npm version edits or CI commits
-are needed. The publish job checks that the tested artifact matches the release tag.
-Rust and npm use the same SemVer prerelease, so no Python-style suffix translation
-is needed. Prereleases use their identifier (`alpha`, `beta`, `rc`) as the npm tag;
-stable versions use `latest`.
+`npm run pack` (or `npm pack ./dist`) requires a successful build for the current
+workspace version and creates the tarball under `dist/`. The consumer test
+installs that artifact. The private development package itself cannot be published.
 
-`.github/workflows/npm.yaml` tests PRs, builds artifacts on tags, and publishes
-matching `v<version>` tags using npm trusted publishing and GitHub's existing
-`production` environment. A manual workflow run builds/tests without publishing.
-The initial package must be published manually before configuring its npm trust.
-On npm package Settings → Trusted Publisher, configure:
-
-- Provider: GitHub Actions; organization `RiskThinking`; repo `crc-framework-rs`.
-- Workflow: `npm.yaml`; environment: `production`.
-- Allow direct `npm publish` (not only staged publishing).
-
-See [npm's trusted publishing documentation](https://docs.npmjs.com/trusted-publishers/).
-No npm token/GitHub secret is required. Existing Python release workflows are
-independent. Merge the workflow and source before tagging a subsequent version;
-do not retag an already released Python version merely to publish JS.
+For version bumps, tag names, registry versions, and npm trusted publisher
+configuration, follow the repository's [versioning and release guide](../README.md#versioning-and-releases).
+The `JavaScript WASM` workflow tests PRs and publishes the tested tarball on
+matching `v<version>` tags. Manual runs on a branch build/test without publishing.
 
 ## Performance measurements
 
