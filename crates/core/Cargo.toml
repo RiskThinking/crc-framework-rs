@@ -1,13 +1,21 @@
 [package]
 name = "crc-framework-core"
-version = "0.4.0-alpha.1"
+version.workspace = true
 edition = "2024"
 rust-version = "1.85"
 description = "Core distribution and climate-risk algorithms for CRC Framework"
 authors = ["Riskthinking.AI"]
 license = "AGPL-3.0-or-later"
 
+[features]
+default = ["sampling"]
+sampling = ["dep:rand"]
+
 [dependencies]
 h3o = "=0.9.3"
 phf = { version = "0.14.0", features = ["macros"] }
-rand = "0.9"
+rand = { version = "0.9", optional = true }
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"

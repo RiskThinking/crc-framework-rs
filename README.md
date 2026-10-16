@@ -1,60 +1,89 @@
 # Climate Risk Commons Framework
 
-The Climate Risk Commons Framework provides a reusable Rust computation core
-and typed Python bindings for climate-risk calculations. It turns
-climate-hazard distributions into comparable impact microscores, scenario
-branches, and portfolio-level VaR/CVaR risk metrics.
+CRC Framework provides a shared Rust computation core with official Python and
+JavaScript/WebAssembly bindings for climate-risk calculations. It turns hazard
+distributions into comparable impact microscores, scenario branches, and
+portfolio-level VaR/CVaR risk metrics.
 
-This repository owns the native computation layer. The Python distribution is
-named `crc-framework` and imported as `crc_framework`. It packages the PyO3
-extension together with a typed binding layer. Higher-level, application-
-specific Python functionality is intended to live in a separate package that
-depends on and may re-export this API.
+| Interface | Package | Scope |
+| --- | --- | --- |
+| Python | `crc-framework` on PyPI; import `crc_framework` | Distributions, fitting, impacts, microscores, risk aggregation, and geography |
+| JavaScript / WASM | `@riskthinking.ai/crc-framework` on npm | Canonical CRC curve consumption: quantile evaluation, batches, prepared handles, and TypeScript declarations |
+| Rust | `crates/core` | Shared algorithms and reference data used by both bindings |
 
-## Features
+The initial WASM rollout in 0.4.0 focuses on consuming canonical datasets,
+including PMTiles/MVT properties. Broader Python parity and write/canonicalization
+APIs are planned for later releases. Application-specific Python functionality
+belongs in packages built on top of this framework.
 
-- Empirical, tabulated, and parametric probability distributions
-- Explicit parametric fitting with diagnostics and acceptance constraints
-- Built-in and composable exposure-to-impact transforms
-- Climate impact registry keyed by risk factor and scenario context
-- Microscores that turn distribution quantiles into binary risk outcomes
-- Spanning sets, VaR, CVaR, and factor-level attribution
-- H3-based IPCC region, continent, and country lookups
+- [Installation](#installation)
+- [Quick start](#quick-start)
+- [Python guide](#python-guide)
+- [Development](#development)
+- [Versioning and releases](#versioning-and-releases)
+- [License](#license)
 
 ## Installation
 
-Install the published Python wheel with:
+### Python
 
-```shell
+```sh
 python -m pip install crc-framework
+# Include prereleases during the 0.4.0 alpha cycle:
+python -m pip install --upgrade --pre crc-framework
 ```
 
-The package requires Python 3.9 or later. Installing a compatible prebuilt
-wheel does not require a Rust toolchain. Building from source requires Rust
-1.85 or later and a C compiler suitable for building Python extensions.
+Python 3.9 or later is required. Compatible prebuilt wheels need no Rust
+toolchain. Building from source requires Rust 1.85 or later and a C compiler
+suitable for Python extensions.
 
-Verify the installation:
+### JavaScript / WebAssembly
 
-```shell
-python -c "import crc_framework; print(crc_framework.__doc__)"
+```sh
+npm install @riskthinking.ai/crc-framework@alpha
 ```
 
-For local development, create an environment and install the project in
-editable mode:
+Use `@alpha` for the current prerelease channel; stable releases use npm's
+`latest` channel. The package is ESM, requires WebAssembly, and includes TypeScript
+declarations. See the [JavaScript guide](js/README.md) for browser, bundler, Node,
+and SSR setup, canonical input rules, and prepared collection APIs.
 
-```shell
-python -m venv .venv
-.venv/bin/python -m pip install --upgrade pip maturin
-.venv/bin/python -m pip install -e ".[test]"
+## Quick start
+
+### Python: evaluate a return-period curve
+
+```python
+from crc_framework import TabulatedDistribution
+
+exposure = TabulatedDistribution.from_return_periods(
+    periods=[10, 20, 50, 100, 200, 500],
+    values=[0.1, 0.2, 0.5, 0.9, 1.4, 2.0],
+    tail="upper",
+)
+print(exposure.ppf(0.99))  # 100-year return level: 0.9
 ```
 
-After changing Rust code, rebuild the extension:
+### JavaScript: consume a canonical curve
 
-```shell
-.venv/bin/maturin develop
+```js
+import init, { evaluateCurve } from '@riskthinking.ai/crc-framework';
+
+await init(); // initialize once at client startup
+const properties = {
+  curve_kind: 'fitted',
+  curve_type: 'gumbel_r',
+  curve_location: 1,
+  curve_scale: 2,
+};
+const value = evaluateCurve(properties, 0.99);
 ```
 
-## Core concepts
+Evaluation is synchronous after initialization. Imports are SSR-safe; initialize
+in the client, or load WASM bytes explicitly for Node evaluation. For repeated
+viewport or percentile queries, use `prepareCurves` to validate and transfer a
+collection once, then call `evaluate(q)` and free the handle when finished.
+
+## Python guide
 
 ### Distributions
 
@@ -95,12 +124,37 @@ Kolmogorov–Smirnov p-value. The supported families are `genextreme`,
 diagnostics. Passing a tabulated or fitted distribution is an error: those
 values are not independent observations.
 
+#### Fit observations
+
+```python
+import numpy as np
+
+from crc_framework import EmpiricalDistribution, FitConstraints, fit_distribution
+
+observations = np.array([0.1, 0.2, 0.4, 0.7, 1.1, 1.8])
+empirical = EmpiricalDistribution(observations)
+fit = fit_distribution(
+    empirical,
+    family="auto",
+    constraints=FitConstraints(probability=0.99, maximum_value=3.0),
+)
+median = fit.distribution.ppf(0.5)
+print(fit.distribution.family, fit.diagnostics.ks_pvalue, median)
+```
+
+Pass `family="auto"` (the default) to select a family, a family name to fit a
+specific family, or use `fit_all` to inspect every candidate. Use
+`quality_metrics` to calculate diagnostics for a selected fitted distribution.
+
+#### L-moment estimation
+
 For a standalone L-moment estimate of GEV or Gumbel observations, select the
 estimator explicitly:
 
 ```python
 from crc_framework import fit_distribution
 
+annual_extremes = [0.1, 0.2, 0.4, 0.7, 1.1, 1.8]
 result = fit_distribution(annual_extremes, family="genextreme", method="lmoments")
 ```
 
@@ -116,9 +170,10 @@ The native implementation sorts once, uses compensated sums in scaled and
 centered coordinates, and reuses that sort for diagnostics. Work is O(n log n)
 with O(n) storage. The Python binding releases the GIL during native fitting.
 The returned KS p-value is a descriptive diagnostic, not a calibrated hypothesis
-test after parameter estimation. Defaults and the existing sample fitter are
-unchanged. See [NIST's L-moments reference](https://www.itl.nist.gov/div898/software/dataplot/refman2/auxillar/lmoment.htm)
+test after parameter estimation. See [NIST's L-moments reference](https://www.itl.nist.gov/div898/software/dataplot/refman2/auxillar/lmoment.htm)
 for background and the Hosking references.
+
+#### Fit quantile curves
 
 Use `fit_quantiles` for probability/value knots. It minimizes weighted
 value-space differences between the supplied values and the selected family's
@@ -136,6 +191,8 @@ curve = TabulatedDistribution.from_return_periods(
 fit = fit_quantiles(curve, family="gumbel_r")
 ```
 
+#### Fit a known point mass and tail
+
 For a known point mass, use `fit_hurdle_quantiles` and supply its probability;
 the framework does not infer an exact mass from sparse zero-valued knots:
 
@@ -149,6 +206,8 @@ fit = fit_hurdle_quantiles(
     atom_location=0.0,
 )
 ```
+
+#### Fit censored quantiles
 
 For sparse return-period curves whose lower values mean "at or below the
 physical detection bound", use `fit_censored_quantiles`. It fits every knot
@@ -176,7 +235,7 @@ storing a non-negative observed curve.
 knots. Parametric and hurdle fits are lossy, so systems that require source
 reconstruction must persist the original probability/value pairs separately.
 
-## Create microscores from flood exposure
+### Create microscores from flood exposure
 
 ```python
 from crc_framework import (
@@ -215,29 +274,7 @@ inspect sampled exposure and impact values, `suite.at(q)` to obtain the binary
 outcome at a requested probability, and `exposure_statistics` and
 `impact_statistics` for summary diagnostics.
 
-## Fit observations explicitly
-
-```python
-import numpy as np
-
-from crc_framework import EmpiricalDistribution, FitConstraints, fit_distribution
-
-observations = np.array([0.1, 0.2, 0.4, 0.7, 1.1, 1.8])
-empirical = EmpiricalDistribution(observations)
-fit = fit_distribution(
-    empirical,
-    family="auto",
-    constraints=FitConstraints(probability=0.99, maximum_value=3.0),
-)
-median = fit.distribution.ppf(0.5)
-print(fit.distribution.family, fit.diagnostics.ks_pvalue, median)
-```
-
-Pass `family="auto"` (the default) to select a family, a family name to fit a
-specific family, or use `fit_all` to inspect every candidate. Use
-`quality_metrics` to calculate diagnostics for a selected fitted distribution.
-
-## Evaluate impacts
+### Evaluate impacts
 
 Impact functions expose two deliberately distinct operations:
 
@@ -258,8 +295,11 @@ supports distribution transformation.
 ```python
 import numpy as np
 
-from crc_framework import CallableImpact, LinearImpact, generate_microscores
+from crc_framework import (
+    CallableImpact, LinearImpact, TabulatedDistribution, generate_microscores,
+)
 
+exposure = TabulatedDistribution([0.5, 0.9, 0.99], [0.5, 1.0, 2.0])
 impact_function = LinearImpact(slope=0.25, maximum=1.0)
 event_impacts = impact_function.evaluate(np.array([0.5, 2.0]))
 impact = impact_function(exposure)
@@ -279,7 +319,7 @@ values; pass `overrides` when an application needs to replace transform
 parameters. Registry-backed impacts support the same point and distribution
 interfaces, with point evaluation delegated directly to the native registry.
 
-## Aggregate factor outcomes
+### Aggregate factor outcomes
 
 Each microscore can be converted to a `BinaryOutcome`. Combine outcomes into
 the full set of independent downside/upside branches, then calculate VaR and
@@ -306,7 +346,7 @@ Branch generation grows as `2**n` for `n` factors. Set `max_branches` on
 limit. `RiskLevel.attribution` reports each factor's contribution to VaR and
 CVaR.
 
-## Spatial helpers
+### Spatial helpers
 
 Spatial helpers accept an H3 cell as an integer or string, normalize it to H3
 resolution 4, and return `None` when no reference mapping exists.
@@ -327,7 +367,7 @@ print(region)
 IPCC region, and `lookup_geography` returns a `Geography` object with the
 continent and intersecting ISO3 country codes.
 
-## Public API
+### Public API
 
 The package exports the following primary interfaces:
 
@@ -344,16 +384,107 @@ The package exports the following primary interfaces:
 - Spatial lookup: `lookup_continent`, `lookup_ipcc_region`, and
   `lookup_geography`.
 
-## Package structure
+## Development
 
-- `crates/core` contains the reusable Rust algorithms and reference data.
-- `src/lib.rs` exposes the Rust core through PyO3.
-- `python/crc_framework` contains the typed Python binding layer and type
-  information shipped in the wheel.
+### Repository layout
 
-Consumers should import the stable `crc_framework` API rather than importing
-`crc_framework._core` directly. The `_core` module is an implementation detail
-and may change between releases.
+| Path | Responsibility |
+| --- | --- |
+| `crates/core` | Shared Rust algorithms and reference data |
+| `src/lib.rs` | PyO3 extension |
+| `python/crc_framework` | Typed Python API shipped with the extension |
+| `crates/wasm` | WASM exports backed by the Rust core |
+| `js` | JS adapter, TypeScript declarations, build tooling, and consumer tests |
+| `tests` | Python tests and shared parity fixtures |
+
+Python consumers should import `crc_framework`; `crc_framework._core` is an
+implementation detail that may change between releases.
+
+### Python setup and checks
+
+Run these commands from the repository root:
+
+```sh
+python -m venv .venv
+.venv/bin/python -m pip install --upgrade pip maturin
+.venv/bin/python -m pip install -e ".[test]"
+
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace --locked
+.venv/bin/python -m mypy
+.venv/bin/python -m pytest
+.venv/bin/maturin build --release --locked
+```
+
+After changing Rust code, run `.venv/bin/maturin develop` to rebuild the Python
+extension. Python-only edits are available directly from the editable install.
+
+### JavaScript setup and checks
+
+Use the Node version in [`js/.nvmrc`](js/.nvmrc), install the
+`wasm32-unknown-unknown` Rust target and `wasm-pack 0.15.0`, then:
+
+```sh
+cd js
+npm ci
+npm run build
+npm test
+npx playwright install chromium
+npm run test:browser
+npm run test:consumer
+```
+
+The consumer test packs the generated distribution and checks it with Vite,
+TypeScript, SSR, and Chromium. See [JS build and performance guidance](js/README.md#build-and-test)
+for packaging and benchmarking commands.
+
+Native and WASM transcendental math can differ slightly. Numerical regression
+and parity tests use explicit tolerances; structural validation stays exact.
+The [quantile fitting golden test](crates/core/tests/quantile_fit_golden.rs)
+documents the optional exact-comparison mode for refactors in a fixed environment.
+
+## Versioning and releases
+
+The single version source is `[workspace.package].version` in the root
+[`Cargo.toml`](Cargo.toml). All three Rust crates inherit it; maturin derives the
+Python version, and the JS build derives the npm version. Source
+`js/package.json` stays private and versionless; the build generates the public
+package manifest in ignored `js/dist/`.
+
+To release, for example, `0.4.0-alpha.4`:
+
+1. Edit only the workspace version in `Cargo.toml`, then run
+   `cargo check -p crc-framework-core` to refresh `Cargo.lock`.
+2. Review and commit `Cargo.toml` and `Cargo.lock` with the release changes.
+   Push and wait for the PR checks to pass.
+3. In GitHub Releases, create **`v0.4.0-alpha.4`** targeting the tested branch
+   or commit. A release can target `wasm` before it is merged into `main`.
+4. Check both **Package release** and **JavaScript WASM** workflow results.
+   Publishing is independent, so one registry can succeed while another fails.
+
+| Destination | Version in this example | Release behavior |
+| --- | --- | --- |
+| Rust workspace | `0.4.0-alpha.4` | Versioned source; no crates.io publishing workflow is configured |
+| PyPI: `crc-framework` | `0.4.0a4` | `release.yaml` builds wheels and an sdist, attaches assets to the GitHub release, and publishes to PyPI |
+| npm: `@riskthinking.ai/crc-framework` | `0.4.0-alpha.4` | `npm.yaml` builds/tests and publishes the tested tarball under the `alpha` dist-tag |
+
+Use **`v` + the exact Cargo version** for the Git tag. Python's `a4` spelling
+is an output conversion, not the release-tag format. The npm publisher rejects
+a tag that differs from its generated package version. Stable `0.4.0` uses tag
+`v0.4.0` and npm's `latest` channel; `beta` and `rc` prereleases use their
+respective channels. No npm version edits, extra versioning tools, or CI-generated
+version commits are needed.
+
+npm publishing uses GitHub OIDC with the `production` environment. The npm trusted
+publisher must authorize organization `RiskThinking`, repository
+`crc-framework-rs`, workflow `npm.yaml`, environment `production`, and direct
+`npm publish`; no npm token secret is needed. Python publishing also uses the
+`production` environment through its separate workflow.
+
+Tags trigger publishing. Re-running an existing tag uses the code at that tag;
+a new fix requires a new release version. Keep released tags fixed and increment
+the version for subsequent releases.
 
 ## License
 
@@ -364,17 +495,3 @@ Parts of the numerical distribution implementation are derived from or
 informed by SciPy and Cephes. Their applicable copyright notices and license
 terms are preserved in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-## Development
-
-```shell
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
-.venv/bin/python -m mypy
-.venv/bin/python -m pytest
-.venv/bin/maturin build --release
-```
-
-Run `maturin develop` again after changing the Rust extension. Python-only
-changes are available directly from the editable installation.

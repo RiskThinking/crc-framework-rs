@@ -1,0 +1,645 @@
+[
+  {
+    "name": "genextreme-0.1",
+    "properties": {
+      "curve_kind": "fitted",
+      "curve_type": "genextreme",
+      "curve_shape": 0.1,
+      "curve_location": 1.2,
+      "curve_scale": 2
+    },
+    "probabilities": [
+      0,
+      0.0001,
+      0.01,
+      0.1,
+      0.5,
+      0.9,
+      0.99,
+      0.9999,
+      1
+    ],
+    "expected": [
+      null,
+      -3.772243652774848,
+      -2.0999272007345713,
+      -0.539600778691206,
+      1.9197552906442061,
+      5.230262247671425,
+      8.574515497302757,
+      13.237816776454672,
+      null
+    ]
+  },
+  {
+    "name": "weibull_min-2.2",
+    "properties": {
+      "curve_kind": "fitted",
+      "curve_type": "weibull_min",
+      "curve_shape": 2.2,
+      "curve_location": -0.5,
+      "curve_scale": 1.5
+    },
+    "probabilities": [
+      0,
+      0.0001,
+      0.01,
+      0.1,
+      0.5,
+      0.9,
+      0.99,
+      0.9999,
+      1
+    ],
+    "expected": [
+      null,
+      -0.4772008155767209,
+      -0.3146504566589329,
+      0.03932920122121042,
+      0.7698113244714921,
+      1.691466084964171,
+      2.503077707511406,
+      3.615270493679329,
+      null
+    ]
+  },
+  {
+    "name": "weibull_max-1.7",
+    "properties": {
+      "curve_kind": "fitted",
+      "curve_type": "weibull_max",
+      "curve_shape": 1.7,
+      "curve_location": 4,
+      "curve_scale": 1.2
+    },
+    "probabilities": [
+      0,
+      0.0001,
+      0.01,
+      0.1,
+      0.5,
+      0.9,
+      0.99,
+      0.9999,
+      1
+    ],
+    "expected": [
+      null,
+      -0.42998478172686383,
+      1.0533689136172888,
+      2.040030567361824,
+      3.032726779376895,
+      3.6806360539639043,
+      3.9198334213963366,
+      3.9946758186050335,
+      null
+    ]
+  },
+  {
+    "name": "skewnorm-1.5",
+    "properties": {
+      "curve_kind": "fitted",
+      "curve_type": "skewnorm",
+      "curve_shape": 1.5,
+      "curve_location": 0.5,
+      "curve_scale": 1.3
+    },
+    "probabilities": [
+      0,
+      0.0001,
+      0.01,
+      0.1,
+      0.5,
+      0.9,
+      0.99,
+      0.9999,
+      1
+    ],
+    "expected": [
+      null,
+      -1.7996006569119891,
+      -0.7023450294976936,
+      0.16068962080631138,
+      1.3116054980438712,
+      2.636894754693131,
+      3.8485701409954896,
+      5.55776992564463,
+      null
+    ]
+  },
+  {
+    "name": "gumbel_r-None",
+    "properties": {
+      "curve_kind": "fitted",
+      "curve_type": "gumbel_r",
+      "curve_shape": null,
+      "curve_location": 1,
+      "curve_scale": 0.8
+    },
+    "probabilities": [
+      0,
+      0.0001,
+      0.01,
+      0.1,
+      0.5,
+      0.9,
+      0.99,
+      0.9999,
+      1
+    ],
+    "expected": [
+      null,
+      -0.7762614450942771,
+      -0.22174370064632098,
+      0.33277404380163533,
+      1.2932103364653316,
+      2.8002938618499567,
+      4.680119381421264,
+      8.368232295914268,
+      null
+    ]
+  },
+  {
+    "name": "gumbel_l-None",
+    "properties": {
+      "curve_kind": "fitted",
+      "curve_type": "gumbel_l",
+      "curve_shape": null,
+      "curve_location": 1,
+      "curve_scale": 0.8
+    },
+    "probabilities": [
+      0,
+      0.0001,
+      0.01,
+      0.1,
+      0.5,
+      0.9,
+      0.99,
+      0.9999,
+      1
+    ],
+    "expected": [
+      null,
+      -6.36823229591418,
+      -2.680119381421264,
+      -0.8002938618499564,
+      0.7067896635346684,
+      1.6672259561983647,
+      2.221743700646321,
+      2.7762614450942866,
+      null
+    ]
+  },
+  {
+    "name": "genpareto-0.15",
+    "properties": {
+      "curve_kind": "fitted",
+      "curve_type": "genpareto",
+      "curve_shape": 0.15,
+      "curve_location": -0.2,
+      "curve_scale": 1.1
+    },
+    "probabilities": [
+      0,
+      0.0001,
+      0.01,
+      0.1,
+      0.5,
+      0.9,
+      0.99,
+      0.9999,
+      1
+    ],
+    "expected": [
+      null,
+      -0.1998899936745461,
+      -0.18893629310877588,
+      -0.08318276993870212,
+      0.6035094618308638,
+      2.8252753272335323,
+      7.098590309771783,
+      21.66119250725695,
+      null
+    ]
+  },
+  {
+    "name": "genextreme-0",
+    "properties": {
+      "curve_kind": "fitted",
+      "curve_type": "genextreme",
+      "curve_shape": 0,
+      "curve_location": 0,
+      "curve_scale": 1
+    },
+    "probabilities": [
+      0,
+      0.0001,
+      0.01,
+      0.1,
+      0.5,
+      0.9,
+      0.99,
+      0.9999,
+      1
+    ],
+    "expected": [
+      null,
+      -2.2203268063678463,
+      -1.5271796258079011,
+      -0.8340324452479557,
+      0.36651292058166435,
+      2.2503673273124454,
+      4.600149226776579,
+      9.210290369892835,
+      null
+    ]
+  },
+  {
+    "name": "genpareto-0",
+    "properties": {
+      "curve_kind": "fitted",
+      "curve_type": "genpareto",
+      "curve_shape": 0,
+      "curve_location": 0,
+      "curve_scale": 1
+    },
+    "probabilities": [
+      0,
+      0.0001,
+      0.01,
+      0.1,
+      0.5,
+      0.9,
+      0.99,
+      0.9999,
+      1
+    ],
+    "expected": [
+      null,
+      0.00010000500033335834,
+      0.010050335853501442,
+      0.10536051565782631,
+      0.6931471805599453,
+      2.302585092994046,
+      4.605170185988091,
+      9.210340371976294,
+      null
+    ]
+  },
+  {
+    "name": "skewnorm--8",
+    "properties": {
+      "curve_kind": "fitted",
+      "curve_type": "skewnorm",
+      "curve_shape": -8,
+      "curve_location": 0,
+      "curve_scale": 1
+    },
+    "probabilities": [
+      0,
+      0.0001,
+      0.01,
+      0.1,
+      0.5,
+      0.9,
+      0.99,
+      0.9999,
+      1
+    ],
+    "expected": [
+      null,
+      -3.890591900685867,
+      -2.575829309722299,
+      -1.6448536264396845,
+      -0.6744897466396109,
+      -0.11337698086889514,
+      0.11153921334690242,
+      0.3369848030327498,
+      null
+    ]
+  },
+  {
+    "name": "skewnorm-0",
+    "properties": {
+      "curve_kind": "fitted",
+      "curve_type": "skewnorm",
+      "curve_shape": 0,
+      "curve_location": 0,
+      "curve_scale": 1
+    },
+    "probabilities": [
+      0,
+      0.0001,
+      0.01,
+      0.1,
+      0.5,
+      0.9,
+      0.99,
+      0.9999,
+      1
+    ],
+    "expected": [
+      null,
+      -3.719016498805538,
+      -2.3263478778884954,
+      -1.281551562793152,
+      1.236647229063692e-09,
+      1.2815515599684852,
+      2.326347902377541,
+      3.71901680204581,
+      null
+    ]
+  },
+  {
+    "name": "hurdle-gumbel_r-0",
+    "properties": {
+      "curve_kind": "hurdle",
+      "curve_type": "gumbel_r",
+      "curve_shape": null,
+      "curve_location": 0,
+      "curve_scale": 1,
+      "curve_atom_probability": 0.2,
+      "curve_atom_location": 0
+    },
+    "probabilities": [
+      0,
+      0.1,
+      0.2,
+      0.200001,
+      0.5,
+      0.99,
+      0.9999,
+      1
+    ],
+    "expected": [
+      0.0,
+      0.0,
+      0.0,
+      2.1478522856170536e-06,
+      0.6878584447070998,
+      4.836737957517073,
+      9.445832457213916,
+      null
+    ]
+  },
+  {
+    "name": "hurdle-gumbel_r-40",
+    "properties": {
+      "curve_kind": "hurdle",
+      "curve_type": "gumbel_r",
+      "curve_shape": null,
+      "curve_location": 0,
+      "curve_scale": 1,
+      "curve_atom_probability": 0.2,
+      "curve_atom_location": 40
+    },
+    "probabilities": [
+      0,
+      0.1,
+      0.2,
+      0.200001,
+      0.5,
+      0.99,
+      0.9999,
+      1
+    ],
+    "expected": [
+      40.0,
+      40.0,
+      40.0,
+      40.00000125000078,
+      40.47000362924574,
+      44.382026634673885,
+      48.987196820662525,
+      null
+    ]
+  },
+  {
+    "name": "hurdle-genpareto-100",
+    "properties": {
+      "curve_kind": "hurdle",
+      "curve_type": "genpareto",
+      "curve_shape": 0.2,
+      "curve_location": 0,
+      "curve_scale": 1,
+      "curve_atom_probability": 0.2,
+      "curve_atom_location": 100
+    },
+    "probabilities": [
+      0,
+      0.1,
+      0.2,
+      0.200001,
+      0.5,
+      0.99,
+      0.9999,
+      1
+    ],
+    "expected": [
+      100.0,
+      100.0,
+      100.0,
+      100.0000262500197,
+      110.34885704714237,
+      247.23613113610077,
+      628.5885153373125,
+      null
+    ]
+  },
+  {
+    "name": "hurdle-skewnorm-0",
+    "properties": {
+      "curve_kind": "hurdle",
+      "curve_type": "skewnorm",
+      "curve_shape": 1.5,
+      "curve_location": 0,
+      "curve_scale": 1,
+      "curve_atom_probability": 0.2,
+      "curve_atom_location": 0
+    },
+    "probabilities": [
+      0,
+      0.1,
+      0.2,
+      0.200001,
+      0.5,
+      0.99,
+      0.9999,
+      1
+    ],
+    "expected": [
+      0.0,
+      0.0,
+      0.0,
+      2.546833729688558e-06,
+      0.6095303240432441,
+      2.570315291868499,
+      3.8867289058000383,
+      null
+    ]
+  },
+  {
+    "name": "point-mass-negative-zero",
+    "properties": {
+      "curve_kind": "point_mass",
+      "curve_type": "point_mass",
+      "curve_location": -0.0,
+      "curve_scale": 0,
+      "curve_atom_probability": 1,
+      "curve_atom_location": -0.0
+    },
+    "probabilities": [
+      0,
+      0.5,
+      1
+    ],
+    "expected": [
+      -0.0,
+      -0.0,
+      -0.0
+    ]
+  },
+  {
+    "name": "tabulated-plateau",
+    "properties": {
+      "curve_kind": "tabulated",
+      "curve_type": "linear_probability",
+      "curve_probabilities": [
+        0,
+        0.2,
+        0.5,
+        0.9,
+        1
+      ],
+      "curve_values": [
+        0,
+        1,
+        1,
+        8,
+        10
+      ]
+    },
+    "probabilities": [
+      0,
+      0.1,
+      0.2,
+      0.35,
+      0.5,
+      0.85,
+      0.9,
+      0.99,
+      1
+    ],
+    "expected": [
+      0.0,
+      0.5,
+      1.0,
+      1.0,
+      1.0,
+      7.124999999999999,
+      8.0,
+      9.8,
+      10.0
+    ]
+  },
+  {
+    "name": "tabulated-narrow",
+    "properties": {
+      "curve_kind": "tabulated",
+      "curve_type": "linear_probability",
+      "curve_probabilities": [
+        0.998,
+        0.999
+      ],
+      "curve_values": [
+        0.1597156259295522,
+        0.17687592042871514
+      ]
+    },
+    "probabilities": [
+      0.5,
+      0.99,
+      0.998,
+      0.9985,
+      0.999,
+      0.9995
+    ],
+    "expected": [
+      null,
+      null,
+      0.1597156259295522,
+      0.16829577317913463,
+      0.17687592042871514,
+      null
+    ]
+  },
+  {
+    "name": "below_effective_resolution",
+    "properties": {
+      "curve_kind": "no_data",
+      "curve_type": "below_effective_resolution"
+    },
+    "probabilities": [
+      0,
+      0.5,
+      1
+    ],
+    "expected": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "name": "insufficient_informative_support",
+    "properties": {
+      "curve_kind": "no_data",
+      "curve_type": "insufficient_informative_support"
+    },
+    "probabilities": [
+      0,
+      0.5,
+      1
+    ],
+    "expected": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "name": "degenerate_effective_range",
+    "properties": {
+      "curve_kind": "no_data",
+      "curve_type": "degenerate_effective_range"
+    },
+    "probabilities": [
+      0,
+      0.5,
+      1
+    ],
+    "expected": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "name": "scientific_exclusion",
+    "properties": {
+      "curve_kind": "no_data",
+      "curve_type": "scientific_exclusion"
+    },
+    "probabilities": [
+      0,
+      0.5,
+      1
+    ],
+    "expected": [
+      null,
+      null,
+      null
+    ]
+  }
+]

@@ -1,0 +1,47 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>CRC Framework browser parity</title>
+<pre id="result">Loading WASM…</pre>
+<script type="module">
+import init, {evaluateCurve, evaluateCurves, prepareCurve, prepareCurves} from '../src/index.js';
+try {
+  const start=performance.now();
+  await Promise.all([init(),init()]);
+  const initMs=performance.now()-start;
+  const cases=await (await fetch('../../tests/fixtures/canonical-quantiles.json')).json();
+  let assertions=0;
+  for (const fixture of cases) {
+    const prepared=prepareCurve(fixture.properties);
+    try {
+      const values=prepared.quantiles(fixture.probabilities);
+      fixture.probabilities.forEach((q,index)=>{
+        const expected=fixture.expected[index];
+        for(const actual of [evaluateCurve(fixture.properties,q),evaluateCurves([fixture.properties],q)[0],values[index]]) {
+          if(expected===null ? actual!==null : Math.abs(actual-expected)>2e-10*Math.max(1,Math.abs(expected))) {
+            throw new Error(`${fixture.name} q=${q}: ${actual} != ${expected}`);
+          }
+          assertions++;
+        }
+      });
+    } finally {prepared.free();}
+  }
+  const collection = prepareCurves(cases.map(fixture=>fixture.properties));
+  try {
+    for (const q of [0,.1,.2,.5,.9,.99,.9985,1]) {
+      const values = collection.evaluate(q);
+      cases.forEach((fixture,index)=>{
+        const expected=evaluateCurve(fixture.properties,q);
+        if(!Object.is(values[index],expected)) throw new Error('Prepared batch parity failed');
+        assertions++;
+      });
+    }
+  } finally {collection.free();}
+  const row={curve_kind:'tabulated',curve_type:'linear_probability',curve_probabilities:'[0.2,0.8]',curve_values:'[1,4]'};
+  if(Math.abs(evaluateCurve(row,.5)-2.5)>1e-12) throw new Error('MVT decoding failed');
+  document.querySelector('#result').textContent=JSON.stringify({status:'passed',assertions,initMs});
+  window.testResult={status:'passed',assertions,initMs};
+} catch(error) {
+  document.querySelector('#result').textContent=error.stack;
+  window.testResult={status:'failed',error:String(error)};
+}
+</script>

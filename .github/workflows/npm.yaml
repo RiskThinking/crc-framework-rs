@@ -1,0 +1,72 @@
+name: JavaScript WASM
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: js/.nvmrc
+          cache: npm
+          cache-dependency-path: js/package-lock.json
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Test native core and Python parity
+        run: |
+          cargo test -p crc-framework-core --locked
+          cargo test -p crc-framework-core --no-default-features --lib --test canonical_consumer --locked
+          pip install maturin pytest numpy
+          maturin build --release --locked --out /tmp/crc-wheels
+          pip install /tmp/crc-wheels/*.whl
+          python -m pytest -q
+      - name: Install WASM build tooling
+        run: cargo install wasm-pack --version 0.15.0 --locked
+      - name: Build and test package
+        working-directory: js
+        run: |
+          npm ci
+          npm run build
+          npm test
+          npx playwright install --with-deps chromium
+          npm run test:browser
+          npm run benchmark
+          npm run test:consumer
+      - name: Verify build leaves version sources unchanged
+        run: git diff --exit-code -- Cargo.toml Cargo.lock crates/core/Cargo.toml crates/wasm/Cargo.toml js/package.json js/package-lock.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-package
+          path: js/dist/*.tgz
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: js/.nvmrc
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@v8
+        with:
+          name: npm-package
+          path: artifact
+      - name: Publish tested tarball using npm OIDC
+        run: node js/publish.mjs artifact
