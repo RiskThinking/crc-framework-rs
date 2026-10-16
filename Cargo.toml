@@ -1,6 +1,6 @@
 [package]
 name = "crc-framework-rs"
-version = "0.4.0-alpha.1"
+version = "0.4.0-alpha.2"
 edition = "2024"
 rust-version = "1.85"
 description = "Rust-powered Python bindings for the Climate Risk Commons Framework"
@@ -9,7 +9,7 @@ license = "AGPL-3.0-or-later"
 readme = "README.md"
 
 [workspace]
-members = ["crates/core"]
+members = ["crates/core", "crates/wasm"]
 
 [lib]
 name = "_core"

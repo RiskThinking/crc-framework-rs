@@ -1,0 +1,43 @@
+{
+  "name": "@riskthinking.ai/crc-framework",
+  "version": "0.4.0-alpha.2",
+  "description": "Official CRC Framework WebAssembly bindings for canonical climate curve consumption",
+  "type": "module",
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RiskThinking/crc-framework-rs.git",
+    "directory": "js"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    },
+    "./crc_framework_bg.wasm": "./wasm/crc_framework_bg.wasm"
+  },
+  "files": [
+    "src/",
+    "wasm/",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test/*.test.mjs",
+    "benchmark": "node test/benchmark.mjs",
+    "prepack": "node build.mjs --check",
+    "test:browser": "node test/browser.mjs",
+    "test:consumer": "npm pack && node test/consumer.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.64.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.4"
+  }
+}
