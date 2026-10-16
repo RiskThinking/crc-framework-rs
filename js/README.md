@@ -117,15 +117,33 @@ npx playwright install chromium
 npm run test:browser
 npm run test:consumer # packed Vite + TypeScript + SSR/browser checks
 npm run benchmark
-npm pack --dry-run
-npm pack
-npm publish riskthinking.ai-crc-framework-0.4.0-alpha.2.tgz --access public --tag alpha
+npm run pack -- --dry-run
+npm run pack
+npm publish ./dist/riskthinking.ai-crc-framework-0.4.0-alpha.3.tgz --access public --tag alpha
 ```
 
-`build.mjs` derives npm's version from the root Cargo manifest and checks both
-Rust crates agree. Rust and npm both accept `0.4.0-alpha.1`; no Python-style suffix
-translation is needed. A prerelease publishes under its identifier (`alpha`,
-`beta`, `rc`), and a stable version uses `latest`.
+The release version is declared once, in `[workspace.package].version` in the
+root `Cargo.toml`. All three Rust crates inherit it with `version.workspace = true`.
+Maturin derives Python's version from Cargo (for example, `0.4.0a3`).
+
+The tracked `js/package.json` is a private, versionless development manifest;
+`package-lock.json` pins its build/test dependencies. Keep both in Git. The build
+reads Cargo's resolved metadata, verifies wasm-pack's inherited version, and
+writes a publishable `js/dist/package.json` with that version. It copies the
+adapter, declarations, WASM glue/asset and license files into that ignored output
+directory. Development scripts, dev dependencies and the private flag are omitted
+from the published manifest. Source manifests and lockfiles are never rewritten
+by the build, and CI checks this explicitly.
+
+Use `npm run pack` (or `npm pack ./dist`) to pack the generated package. Packing
+requires a successful build for the current workspace version; the private source
+package itself cannot be published. Tarballs live under `js/dist/` and the packed
+consumer test installs that exact artifact. A version bump changes the workspace
+version and refreshes `Cargo.lock` using Cargo; no npm version edits or CI commits
+are needed. The publish job checks that the tested artifact matches the release tag.
+Rust and npm use the same SemVer prerelease, so no Python-style suffix translation
+is needed. Prereleases use their identifier (`alpha`, `beta`, `rc`) as the npm tag;
+stable versions use `latest`.
 
 `.github/workflows/npm.yaml` tests PRs, builds artifacts on tags, and publishes
 matching `v<version>` tags using npm trusted publishing and GitHub's existing
