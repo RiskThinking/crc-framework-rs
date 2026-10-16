@@ -5,7 +5,8 @@ import path from 'node:path';
 const directory=process.argv[2];
 const files=readdirSync(directory).filter(name=>name.endsWith('.tgz'));
 if(files.length!==1) throw new Error('Expected exactly one tested package tarball');
-const filename=path.join(directory,files[0]);
+// npm can interpret an unprefixed relative path as owner/repository shorthand.
+const filename=path.resolve(directory,files[0]);
 const manifest=JSON.parse(execFileSync('tar',['-xOf',filename,'package/package.json'],{encoding:'utf8'}));
 const version=manifest.version;
 if(manifest.name!=='@riskthinking.ai/crc-framework' || manifest.private || typeof version!=='string' || process.env.GITHUB_REF!==`refs/tags/v${version}`) {
