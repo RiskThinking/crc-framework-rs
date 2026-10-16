@@ -1,18 +1,21 @@
-//! Bit-exact golden tests for the quantile Nelder-Mead fitting path.
+//! Portable golden tests for the quantile Nelder-Mead fitting path.
 //!
 //! `fit_quantiles` drives `quantile_nelder_mead`, the simplex optimizer used to
-//! produce production risk-model parameters. These tests pin the exact IEEE-754
-//! bit patterns of the fitted parameters together with the simplex iteration and
-//! evaluation counts, so any change to the optimizer that is meant to be purely
-//! mechanical (allocation strategy, code motion) can be verified as producing
-//! identical output rather than merely similar output.
+//! produce production risk-model parameters. One shared baseline checks fitted
+//! parameters and diagnostics within explicit absolute/relative tolerances;
+//! convergence, point counts, optional shape presence, and errors remain exact.
 //!
 //! The objective calls `exp`, `ln` and `pow` from the platform's libm, so the
-//! table is pinned to the libm that produced it (it was generated on macOS
-//! 15 / aarch64 and verified identical in both debug and release builds). Treat
-//! a mismatch on a different platform as a portability finding to investigate,
-//! not as an automatic regression, and regenerate the table only for an
-//! intentional numerical change:
+//! results need not be bit-identical across architectures, operating systems,
+//! or toolchains. Rounding can change simplex branches and iteration/evaluation
+//! counts while preserving fit quality. Counters are recorded for investigation,
+//! but are not portable correctness assertions; use benchmarks for performance.
+//!
+//! The baseline was generated on macOS 15 / aarch64. For mechanical optimizer
+//! refactors on that environment, CRC_GOLDEN_EXACT=1 restores bit-exact checks,
+//! including counters. For another environment, capture fingerprints before and
+//! after the change with CRC_GOLDEN_REGEN and diff them on the same toolchain.
+//! Regenerate the shared baseline only after reviewing the numerical change:
 //!
 //! ```text
 //! CRC_GOLDEN_REGEN=1 cargo test -p crc-framework-core --test quantile_fit_golden -- --nocapture
@@ -126,8 +129,8 @@ fn cases() -> Vec<Case> {
     ]
 }
 
-/// One line per (family, case) with the exact bit patterns of everything the
-/// optimizer produces. Bits, not decimals: this is the whole point of the test.
+/// One line per (family, case), preserving full precision for numeric comparison
+/// and optional bit-exact checks without decimal round trips.
 fn fingerprint() -> Vec<String> {
     let mut lines = Vec::new();
     for family in DistributionFamily::ALL {
@@ -171,7 +174,7 @@ fn fingerprint() -> Vec<String> {
 }
 
 #[test]
-fn quantile_fits_are_bit_identical_to_golden() {
+fn quantile_fits_match_golden() {
     let actual = fingerprint();
 
     if std::env::var_os("CRC_GOLDEN_REGEN").is_some() {
@@ -189,9 +192,10 @@ fn quantile_fits_are_bit_identical_to_golden() {
         expected.len(),
         "golden table is stale: case count changed"
     );
+    let exact = std::env::var_os("CRC_GOLDEN_EXACT").is_some();
     let mut mismatches = Vec::new();
     for (actual_line, expected_line) in actual.iter().zip(&expected) {
-        if actual_line != expected_line {
+        if !matches_golden(actual_line, expected_line, exact) {
             mismatches.push(format!(
                 "  expected: {expected_line}\n  actual:   {actual_line}"
             ));
@@ -207,6 +211,98 @@ fn quantile_fits_are_bit_identical_to_golden() {
 }
 
 const GOLDEN: &str = include_str!("quantile_fit_golden.txt");
+
+// Across the reviewed macOS ARM / Linux x86 fits, parameters differ by up to
+// 1.9e-8 relatively, residual maxima by 6.3e-8, and RMSE by 2e-15. Allow modest
+// headroom for optimizer trajectories, but hold objective diagnostics much more
+// tightly. The absolute floor handles values near zero. These are regression
+// budgets for these cases, not guarantees for arbitrary fitting inputs.
+fn close_bits(actual: &str, expected: &str, relative_tolerance: f64) -> bool {
+    let decode = |bits| u64::from_str_radix(bits, 16).ok().map(f64::from_bits);
+    let (Some(actual), Some(expected)) = (decode(actual), decode(expected)) else {
+        return false;
+    };
+    actual.is_finite()
+        && expected.is_finite()
+        && (actual - expected).abs() <= 1e-12 + relative_tolerance * expected.abs()
+}
+
+fn matches_golden(actual: &str, expected: &str, exact: bool) -> bool {
+    if exact || expected.contains(" err(") {
+        return actual == expected;
+    }
+    let actual: Vec<_> = actual.split_whitespace().collect();
+    let expected: Vec<_> = expected.split_whitespace().collect();
+    actual.len() == expected.len()
+        && actual.iter().zip(&expected).all(|(actual, expected)| {
+            let (Some((key, actual)), Some((expected_key, expected))) =
+                (actual.split_once('='), expected.split_once('='))
+            else {
+                return actual == expected;
+            };
+            key == expected_key
+                && match key {
+                    "shape" if expected == "none" => actual == expected,
+                    "shape" | "loc" | "scale" | "maxres" => close_bits(actual, expected, 1e-7),
+                    "rmse" | "nrmse" | "r2" => close_bits(actual, expected, 1e-12),
+                    "iterations" | "evaluations" => actual.parse::<usize>().is_ok(),
+                    _ => actual == expected,
+                }
+        })
+}
+
+#[test]
+fn portable_comparison_accepts_reviewed_linux_rounding() {
+    let expected = GOLDEN
+        .lines()
+        .find(|line| line.starts_with("genextreme/wide-large-scale "))
+        .unwrap();
+    // Ubuntu 24.04 x86_64 GNU, identical in CI runs 38949609404 / 38952108918.
+    let linux = "genextreme/wide-large-scale shape=3fcb69bfe714749c loc=40a9b86d9f12c9fd scale=4093f20ccd1d628b converged=true iterations=118 evaluations=213 points=13 rmse=4067177582d6cd68 nrmse=3fa13ce24c18f25e r2=3fefa0d26881e6cf maxres=40751d528a24bcd0";
+    assert!(matches_golden(linux, expected, false));
+    assert!(!matches_golden(linux, expected, true));
+}
+
+#[test]
+fn portable_comparison_rejects_material_changes() {
+    let expected = GOLDEN.lines().next().unwrap();
+    for (key, value) in [
+        ("shape", "3ff0000000000000"),
+        ("loc", "0000000000000000"),
+        ("scale", "7ff8000000000000"), // NaN must never pass a tolerance.
+        ("rmse", "3ff0000000000000"),
+        ("converged", "false"),
+        ("points", "12"),
+        ("shape", "none"),
+    ] {
+        let changed = expected
+            .split_whitespace()
+            .map(|field| {
+                if field.starts_with(&format!("{key}=")) {
+                    format!("{key}={value}")
+                } else {
+                    field.to_owned()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(
+            !matches_golden(&changed, expected, false),
+            "accepted changed {key}"
+        );
+    }
+    assert!(!matches_golden(
+        "case err(new error)",
+        "case err(old error)",
+        false
+    ));
+    // A generic loose tolerance would hide this objective regression.
+    assert!(!close_bits(
+        &format!("{:016x}", (1.0_f64 + 1e-9).to_bits()),
+        "3ff0000000000000",
+        1e-12
+    ));
+}
 
 /// Wall-clock micro-benchmark for the fitting hot path, at the knot widths the
 /// curve_fit_cdf pipeline actually uses (999 knots per curve) plus a narrower
