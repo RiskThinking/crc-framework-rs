@@ -1,5 +1,6 @@
 use std::f64::consts::{PI, SQRT_2};
 
+#[cfg(feature = "sampling")]
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use crate::{
@@ -28,6 +29,7 @@ pub trait Distribution: Send + Sync {
         probabilities.iter().map(|&q| self.ppf(q)).collect()
     }
 
+    #[cfg(feature = "sampling")]
     fn sample(&self, size: usize, seed: Option<u64>) -> Result<Vec<f64>> {
         let mut rng = StdRng::seed_from_u64(seed.unwrap_or_else(rand::random));
         let (minimum, maximum) = self.probability_support();
@@ -294,6 +296,7 @@ impl Distribution for PointMassDistribution {
         Ok(self.location)
     }
 
+    #[cfg(feature = "sampling")]
     fn sample(&self, size: usize, _seed: Option<u64>) -> Result<Vec<f64>> {
         Ok(vec![self.location; size])
     }
@@ -1475,6 +1478,11 @@ fn inverse_by_bisection(distribution: &dyn Distribution, q: f64) -> f64 {
     }
     for _ in 0..120 {
         let middle = (lower + upper) * 0.5;
+        // Once the bounds are adjacent f64 values, further CDF integrations
+        // cannot refine the quantile. This preserves the converged result.
+        if middle == lower || middle == upper {
+            break;
+        }
         if distribution.cdf(middle) < q {
             lower = middle;
         } else {
@@ -1605,6 +1613,7 @@ mod tests {
         );
         assert_eq!(distribution.cdf(2.49), 0.0);
         assert_eq!(distribution.cdf(2.5), 1.0);
+        #[cfg(feature = "sampling")]
         assert_eq!(distribution.sample(3, Some(42)).unwrap(), vec![2.5; 3]);
     }
 
@@ -1762,10 +1771,13 @@ mod tests {
             .map(|index| hurdle.pdf((index as f64 + 0.5) * width) * width)
             .sum::<f64>();
         assert!((continuous_mass - 0.6).abs() < 2.0e-3);
-        let samples = hurdle.sample(5_000, Some(42)).unwrap();
-        let atom_fraction =
-            samples.iter().filter(|value| **value == 0.0).count() as f64 / samples.len() as f64;
-        assert!((atom_fraction - 0.4).abs() < 0.03);
+        #[cfg(feature = "sampling")]
+        {
+            let samples = hurdle.sample(5_000, Some(42)).unwrap();
+            let atom_fraction =
+                samples.iter().filter(|value| **value == 0.0).count() as f64 / samples.len() as f64;
+            assert!((atom_fraction - 0.4).abs() < 0.03);
+        }
         let statistics = crate::metrics::calculate_statistics(&hurdle).unwrap();
         assert_eq!(statistics.minimum, 0.0);
         assert!(statistics.mean > 0.0);

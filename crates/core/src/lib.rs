@@ -1,3 +1,5 @@
+pub mod canonical;
+pub use canonical::{CanonicalCurve, CurveParameters};
 pub mod constants;
 pub mod distribution;
 pub mod error;

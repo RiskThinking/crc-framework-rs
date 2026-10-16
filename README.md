@@ -378,3 +378,10 @@ cargo test --workspace
 
 Run `maturin develop` again after changing the Rust extension. Python-only
 changes are available directly from the editable installation.
+
+## JavaScript / WebAssembly
+
+The official [`@riskthinking.ai/crc-framework`](js/README.md) package consumes canonical
+CRC curve records in browsers and Node. The 0.4.0 rollout includes quantile
+evaluation, scalar/batch APIs, prepared handles and TypeScript declarations.
+See the package README for installation, browser initialization, and releases.

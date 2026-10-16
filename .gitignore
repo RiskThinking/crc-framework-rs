@@ -14,3 +14,9 @@ build/
 .vscode/
 .idea/
 .ruff_cache/
+
+js/wasm/
+js/LICENSE
+js/THIRD_PARTY_NOTICES.md
+js/*.tgz
+js/node_modules/
