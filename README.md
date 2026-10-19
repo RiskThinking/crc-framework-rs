@@ -436,8 +436,8 @@ npm run test:consumer
 ```
 
 The consumer test packs the generated distribution and checks it with Vite,
-TypeScript, SSR, and Chromium. See [JS build and performance guidance](js/README.md#build-and-test)
-for packaging and benchmarking commands.
+TypeScript, SSR, and Chromium. See the [JS build and test guide](js/README.md#build-and-test)
+for packaging and validation commands.
 
 Native and WASM transcendental math can differ slightly. Numerical regression
 and parity tests use explicit tolerances; structural validation stays exact.
