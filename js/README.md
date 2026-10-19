@@ -135,32 +135,3 @@ For version bumps, tag names, registry versions, and npm trusted publisher
 configuration, follow the repository's [versioning and release guide](../README.md#versioning-and-releases).
 The `JavaScript WASM` workflow tests PRs and publishes the tested tarball on
 matching `v<version>` tags. Manual runs on a branch build/test without publishing.
-
-## Performance measurements
-
-The alpha.1 bottleneck was object conversion through `serde-wasm-bindgen`,
-repeated reconstruction, and formatting frontend cache keys for every curve.
-Alpha.2 transfers numeric buffers, prepares a whole tile/view at once, and evaluates
-that collection with one WASM call. VELO compares canonical fields directly to
-reuse preparation across freshly queried MapLibre objects and percentile changes.
-
-On a 5,367-record Ontario PMTiles sample in production Chromium, the old JS
-consumer took about 0.62 ms, prepared WASM about 0.17 ms, and VELO's prepared
-viewport path about 0.28 ms (fresh objects and changing q). One-shot batch calls
-still cost about 1.55 ms because they convert/validate/reconstruct each time;
-scalar convenience calls cost more. Initial viewport preparation additionally
-pays JIT/cache warmup and remains slower than JS. Use prepared collections for
-interactive workloads; these measurements do not claim a universal WASM speedup.
-The WASM asset is approximately 74 KB (32 KB gzip).
-
-Reproduce from `visual-eyes` and then this package directory:
-
-```sh
-node --experimental-strip-types scripts/benchmark-crc-curves.mjs <archive.pmtiles> /tmp/curve-rows.json
-# From crc-framework-rs/js; choose a Git ref containing the old evaluator:
-node test/performance.mjs /path/to/visual-eyes /tmp/curve-rows.json <baseline-ref>
-```
-
-The browser benchmark checks output parity and includes complete H3 cell collection
-as well as isolated evaluation. Treat timings as workload/hardware-specific;
-CI enforces numerical and lifetime correctness, not fragile wall-clock thresholds.
