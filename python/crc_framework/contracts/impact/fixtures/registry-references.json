@@ -1,0 +1,232 @@
+{
+  "contract": "registry_impact_reference",
+  "schema": "schemas/registry-impact-reference-1.0.schema.json",
+  "identity": "reference_hash",
+  "description": "Accepted cases record exact canonical UTF-8 text and content_hash = 'sha256:' + hex(sha256(canonical bytes)). Rejected cases contain exactly one defect and record its error code and JSON Pointer path. schema_valid records whether the JSON Schema alone accepts the input (null when the text is not strict JSON); semantic rules beyond JSON Schema are listed in x-crc-rules.",
+  "accepted": [
+    {
+      "name": "minimal",
+      "description": "Required members only; overrides, context defaults and fallback policy materialize.",
+      "input_json": "{\"schema_version\":\"1.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\"}",
+      "canonical_json": "{\"context_defaults\":{\"building_type\":null,\"cell\":null,\"continent\":null,\"country\":null,\"historic_mean\":null},\"factor\":\"cyclone\",\"fallback_policy\":\"error\",\"overrides\":{},\"registry_id\":\"crc-climate-impacts\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"registry_revision\":\"2026.10.0\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"schema_version\":\"1.0\"}",
+      "content_hash": "sha256:758c8bb469383b4d9b3670ac82fcc3c10817ad077c0c5b79aa4c2164a4bdce3b",
+      "schema_valid": true
+    },
+    {
+      "name": "override-omitted",
+      "description": "Omitted zero_below uses the pinned registry default.",
+      "input_json": "{\"schema_version\":\"1.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\",\"overrides\":{\"maximum_damage\":0.8}}",
+      "canonical_json": "{\"context_defaults\":{\"building_type\":null,\"cell\":null,\"continent\":null,\"country\":null,\"historic_mean\":null},\"factor\":\"cyclone\",\"fallback_policy\":\"error\",\"overrides\":{\"maximum_damage\":0.8},\"registry_id\":\"crc-climate-impacts\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"registry_revision\":\"2026.10.0\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"schema_version\":\"1.0\"}",
+      "content_hash": "sha256:daf11bbab536cd9b650c70e1762fa97fc2d0c337caceb9ed750f47fe87936e73",
+      "schema_valid": true
+    },
+    {
+      "name": "override-null",
+      "description": "Explicit null clears zero_below; distinct identity from override-omitted.",
+      "input_json": "{\"schema_version\":\"1.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\",\"overrides\":{\"maximum_damage\":0.8,\"zero_below\":null}}",
+      "canonical_json": "{\"context_defaults\":{\"building_type\":null,\"cell\":null,\"continent\":null,\"country\":null,\"historic_mean\":null},\"factor\":\"cyclone\",\"fallback_policy\":\"error\",\"overrides\":{\"maximum_damage\":0.8,\"zero_below\":null},\"registry_id\":\"crc-climate-impacts\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"registry_revision\":\"2026.10.0\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"schema_version\":\"1.0\"}",
+      "content_hash": "sha256:0b8d44c0540e4cd87bce654ad153c09c7ede30cbe5737bd98d7fa6794ae9bc4c",
+      "schema_valid": true
+    },
+    {
+      "name": "sigmoid-overrides",
+      "description": "Every sigmoid override key.",
+      "input_json": "{\"schema_version\":\"1.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"fwi\",\"overrides\":{\"midpoint\":30,\"steepness\":0.25,\"minimum_damage\":0.05,\"maximum_damage\":0.95,\"zero_below\":5.0}}",
+      "canonical_json": "{\"context_defaults\":{\"building_type\":null,\"cell\":null,\"continent\":null,\"country\":null,\"historic_mean\":null},\"factor\":\"fwi\",\"fallback_policy\":\"error\",\"overrides\":{\"maximum_damage\":0.95,\"midpoint\":30.0,\"minimum_damage\":0.05,\"steepness\":0.25,\"zero_below\":5.0},\"registry_id\":\"crc-climate-impacts\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"registry_revision\":\"2026.10.0\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"schema_version\":\"1.0\"}",
+      "content_hash": "sha256:32c7cf69c80b679b36c11ab5bbbea2adaeb78e554d7ea77941ccf92a67b47dec",
+      "schema_valid": true
+    },
+    {
+      "name": "spei-override",
+      "description": "SPEI water unit cost override.",
+      "input_json": "{\"schema_version\":\"1.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"spei\",\"overrides\":{\"water_unit_cost\":3.1},\"context_defaults\":{\"country\":\"CAN\",\"building_type\":\"Commercial buildings\"}}",
+      "canonical_json": "{\"context_defaults\":{\"building_type\":\"Commercial buildings\",\"cell\":null,\"continent\":null,\"country\":\"CAN\",\"historic_mean\":null},\"factor\":\"spei\",\"fallback_policy\":\"error\",\"overrides\":{\"water_unit_cost\":3.1},\"registry_id\":\"crc-climate-impacts\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"registry_revision\":\"2026.10.0\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"schema_version\":\"1.0\"}",
+      "content_hash": "sha256:afb464001999752a499f04dae9d52829d36c31dd1eda12d8bf9d7eb59867b7f6",
+      "schema_valid": true
+    },
+    {
+      "name": "context-defaults-legacy",
+      "description": "Context defaults and explicit legacy fallbacks.",
+      "input_json": "{\"schema_version\":\"1.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cflood\",\"overrides\":{\"maximum_damage\":2},\"context_defaults\":{\"continent\":\"Europe\",\"building_type\":\"Residential buildings\"},\"fallback_policy\":\"legacy_defaults\"}",
+      "canonical_json": "{\"context_defaults\":{\"building_type\":\"Residential buildings\",\"cell\":null,\"continent\":\"Europe\",\"country\":null,\"historic_mean\":null},\"factor\":\"cflood\",\"fallback_policy\":\"legacy_defaults\",\"overrides\":{\"maximum_damage\":2.0},\"registry_id\":\"crc-climate-impacts\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"registry_revision\":\"2026.10.0\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"schema_version\":\"1.0\"}",
+      "content_hash": "sha256:1d2aacbc7d8b07f927214f49957eebf75231c9c27a27496d1b5b14316a55ac7e",
+      "schema_valid": true
+    },
+    {
+      "name": "hot-days-null-clamp",
+      "description": "Hot-days clamps are nullable overrides.",
+      "input_json": "{\"schema_version\":\"1.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"hot_days\",\"overrides\":{\"minimum_damage\":null,\"maximum_damage\":0.25,\"slope\":0.0002,\"intercept\":-0.01}}",
+      "canonical_json": "{\"context_defaults\":{\"building_type\":null,\"cell\":null,\"continent\":null,\"country\":null,\"historic_mean\":null},\"factor\":\"hot_days\",\"fallback_policy\":\"error\",\"overrides\":{\"intercept\":-0.01,\"maximum_damage\":0.25,\"minimum_damage\":null,\"slope\":0.0002},\"registry_id\":\"crc-climate-impacts\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"registry_revision\":\"2026.10.0\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"schema_version\":\"1.0\"}",
+      "content_hash": "sha256:26458241f6666e7bcb56580aadf40b1188e29be3638d0bb91fabbddb54823b48",
+      "schema_valid": true
+    },
+    {
+      "name": "cooling-branch-override",
+      "description": "Factor-level acceptance; branch applicability is checked after context resolution.",
+      "input_json": "{\"schema_version\":\"1.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cooling_degree_days\",\"overrides\":{\"cooling_cost\":15000000.0}}",
+      "canonical_json": "{\"context_defaults\":{\"building_type\":null,\"cell\":null,\"continent\":null,\"country\":null,\"historic_mean\":null},\"factor\":\"cooling_degree_days\",\"fallback_policy\":\"error\",\"overrides\":{\"cooling_cost\":15000000.0},\"registry_id\":\"crc-climate-impacts\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"registry_revision\":\"2026.10.0\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"schema_version\":\"1.0\"}",
+      "content_hash": "sha256:92d98ea501b97b83e6defd1218efeccb359ee66be16b5a319d01a542741d88f1",
+      "schema_valid": true
+    },
+    {
+      "name": "no-override-factor",
+      "description": "maximum_consecutive_dry_days accepts no overrides.",
+      "input_json": "{\"schema_version\":\"1.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"maximum_consecutive_dry_days\",\"context_defaults\":{\"cell\":\"8a2a1072b59ffff\",\"historic_mean\":12.5}}",
+      "canonical_json": "{\"context_defaults\":{\"building_type\":null,\"cell\":\"8a2a1072b59ffff\",\"continent\":null,\"country\":null,\"historic_mean\":12.5},\"factor\":\"maximum_consecutive_dry_days\",\"fallback_policy\":\"error\",\"overrides\":{},\"registry_id\":\"crc-climate-impacts\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"registry_revision\":\"2026.10.0\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"schema_version\":\"1.0\"}",
+      "content_hash": "sha256:d3e00e0b330bb0a104d2a90ffd8d0171aa2263143e1409c97c58f8cde1d22c0c",
+      "schema_valid": true
+    }
+  ],
+  "rejected": [
+    {
+      "name": "missing-manifest",
+      "description": "References pin the manifest digest.",
+      "input_json": "{\"schema_version\":\"1.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\"}",
+      "error": {
+        "code": "missing_field",
+        "path": "/registry_manifest_sha256"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "missing-revision",
+      "description": "No persisted reference means latest.",
+      "input_json": "{\"schema_version\":\"1.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\"}",
+      "error": {
+        "code": "missing_field",
+        "path": "/registry_revision"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "unknown-field",
+      "description": "Unknown reference field.",
+      "input_json": "{\"schema_version\":\"1.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\",\"latest\":true}",
+      "error": {
+        "code": "unknown_field",
+        "path": "/latest"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "unknown-override",
+      "description": "Typo override key.",
+      "input_json": "{\"schema_version\":\"1.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\",\"overrides\":{\"midpiont\":1.0}}",
+      "error": {
+        "code": "unknown_override",
+        "path": "/overrides/midpiont"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "inapplicable-override",
+      "description": "Override key not accepted for the factor.",
+      "input_json": "{\"schema_version\":\"1.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"spei\",\"overrides\":{\"cooling_cost\":1.0}}",
+      "error": {
+        "code": "inapplicable_override",
+        "path": "/overrides/cooling_cost"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "no-override-factor",
+      "description": "maximum_consecutive_dry_days accepts no overrides.",
+      "input_json": "{\"schema_version\":\"1.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"maximum_consecutive_dry_days\",\"overrides\":{\"maximum_damage\":1.0}}",
+      "error": {
+        "code": "inapplicable_override",
+        "path": "/overrides/maximum_damage"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "null-override",
+      "description": "Null is not accepted for midpoint.",
+      "input_json": "{\"schema_version\":\"1.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\",\"overrides\":{\"midpoint\":null}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/overrides/midpoint"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "string-override",
+      "description": "Override values are numbers.",
+      "input_json": "{\"schema_version\":\"1.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\",\"overrides\":{\"midpoint\":\"70\"}}",
+      "error": {
+        "code": "invalid_type",
+        "path": "/overrides/midpoint"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "schema-version",
+      "description": "Unsupported reference schema.",
+      "input_json": "{\"schema_version\":\"2.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\"}",
+      "error": {
+        "code": "unsupported_schema_version",
+        "path": "/schema_version"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "resolver-version",
+      "description": "Unsupported resolver semantics.",
+      "input_json": "{\"schema_version\":\"1.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"latest\",\"factor\":\"cyclone\"}",
+      "error": {
+        "code": "unsupported_semantics_version",
+        "path": "/resolver_semantics_version"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "fallback-policy",
+      "description": "Unknown fallback policy.",
+      "input_json": "{\"schema_version\":\"1.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\",\"fallback_policy\":\"nearest\"}",
+      "error": {
+        "code": "unsupported_value",
+        "path": "/fallback_policy"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "unknown-factor",
+      "description": "Unknown factor.",
+      "input_json": "{\"schema_version\":\"1.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"heatwave\"}",
+      "error": {
+        "code": "unsupported_value",
+        "path": "/factor"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "context-null-defaults",
+      "description": "Context defaults are an object, not null.",
+      "input_json": "{\"schema_version\":\"1.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\",\"context_defaults\":null}",
+      "error": {
+        "code": "invalid_type",
+        "path": "/context_defaults"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "context-empty-country",
+      "description": "Textual context members are non-empty.",
+      "input_json": "{\"schema_version\":\"1.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\",\"context_defaults\":{\"country\":\"\"}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/context_defaults/country"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "manifest-digest-prefixed",
+      "description": "Manifest digests are bare hex.",
+      "input_json": "{\"schema_version\":\"1.0\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"sha256:3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\"}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/registry_manifest_sha256"
+      },
+      "schema_valid": false
+    }
+  ]
+}

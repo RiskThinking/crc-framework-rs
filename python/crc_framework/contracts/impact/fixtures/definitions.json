@@ -1,0 +1,1006 @@
+{
+  "contract": "impact_definition",
+  "schema": "schemas/impact-definition-1.0.schema.json",
+  "identity": "definition_hash",
+  "description": "Accepted cases record exact canonical UTF-8 text and content_hash = 'sha256:' + hex(sha256(canonical bytes)). Rejected cases contain exactly one defect and record its error code and JSON Pointer path. schema_valid records whether the JSON Schema alone accepts the input (null when the text is not strict JSON); semantic rules beyond JSON Schema are listed in x-crc-rules.",
+  "accepted": [
+    {
+      "name": "plan-example-tabulated",
+      "description": "Section 2.1 example with every default already materialized.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"flood_depth\",\"exposure_unit\":\"m\",\"impact_metric\":\"damage_ratio\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"tabulated\",\"interpolation\":\"linear\",\"outside_domain\":\"clamp\",\"points\":[{\"x\":0.0,\"y\":0.0},{\"x\":0.3,\"y\":0.08},{\"x\":1.0,\"y\":0.45},{\"x\":2.0,\"y\":1.0}]},\"clamp\":{\"minimum\":0.0,\"maximum\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"},\"sources\":[],\"derived_from\":[]}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"m\",\"exposure_variable\":\"flood_depth\",\"impact_metric\":\"damage_ratio\",\"impact_unit\":\"1\"},\"clamp\":{\"maximum\":1.0,\"minimum\":0.0},\"model\":{\"interpolation\":\"linear\",\"kind\":\"tabulated\",\"outside_domain\":\"clamp\",\"points\":[{\"x\":0.0,\"y\":0.0},{\"x\":0.3,\"y\":0.08},{\"x\":1.0,\"y\":0.45},{\"x\":2.0,\"y\":1.0}]},\"provenance\":{\"derived_from\":[],\"origin\":{\"kind\":\"user_defined\"},\"sources\":[]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0",
+      "schema_valid": true
+    },
+    {
+      "name": "linear-minimal",
+      "description": "Required fields only: intercept, clamp and provenance arrays are materialized.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":0.5},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"1\",\"exposure_variable\":\"value\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"clamp\":null,\"model\":{\"intercept\":0.0,\"kind\":\"linear\",\"slope\":0.5},\"provenance\":{\"derived_from\":[],\"origin\":{\"kind\":\"user_defined\"},\"sources\":[]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:01d21b40b6911b6db04042b1b86f11865c6e0f2c3c5ddf7d8fc596f7dde51c39",
+      "schema_valid": true
+    },
+    {
+      "name": "linear-integer-spelling",
+      "description": "Integer spellings and integer negative zero convert to binary64; a one-sided clamp materializes its null member.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":2,\"intercept\":-0},\"clamp\":{\"minimum\":0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"1\",\"exposure_variable\":\"value\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"clamp\":{\"maximum\":null,\"minimum\":0.0},\"model\":{\"intercept\":0.0,\"kind\":\"linear\",\"slope\":2.0},\"provenance\":{\"derived_from\":[],\"origin\":{\"kind\":\"user_defined\"},\"sources\":[]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:5e0a0b3aaeaf8a69ae09d73487ae0749bd30bfdc16682e02d1a0ef9d21b5c1a8",
+      "schema_valid": true
+    },
+    {
+      "name": "linear-float-spelling",
+      "description": "Same function as linear-integer-spelling with float, exponent and negative-zero spellings; identical bytes and hash.",
+      "input_json": "{\"provenance\":{\"origin\":{\"kind\":\"user_defined\"},\"sources\":[],\"derived_from\":[]},\"clamp\":{\"maximum\":null,\"minimum\":0.0E0},\"model\":{\"intercept\":-0.0,\"slope\":20e-1,\"kind\":\"linear\"},\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"semantics_version\":\"crc-impact/1\",\"schema_version\":\"1.0\"}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"1\",\"exposure_variable\":\"value\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"clamp\":{\"maximum\":null,\"minimum\":0.0},\"model\":{\"intercept\":0.0,\"kind\":\"linear\",\"slope\":2.0},\"provenance\":{\"derived_from\":[],\"origin\":{\"kind\":\"user_defined\"},\"sources\":[]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:5e0a0b3aaeaf8a69ae09d73487ae0749bd30bfdc16682e02d1a0ef9d21b5c1a8",
+      "schema_valid": true
+    },
+    {
+      "name": "linear-negative-slope-upper-clamp",
+      "description": "Negative slope with only an upper clamp.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":-1.5,\"intercept\":3.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}},\"clamp\":{\"maximum\":1.0}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"1\",\"exposure_variable\":\"value\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"clamp\":{\"maximum\":1.0,\"minimum\":null},\"model\":{\"intercept\":3.0,\"kind\":\"linear\",\"slope\":-1.5},\"provenance\":{\"derived_from\":[],\"origin\":{\"kind\":\"user_defined\"},\"sources\":[]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:9083ef20a50461d8295c99e8bf5456ee5f2a2f3188288b55ce42c140a4a4791d",
+      "schema_valid": true
+    },
+    {
+      "name": "linear-equal-clamp",
+      "description": "Equal clamp limits give a constant response.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}},\"clamp\":{\"minimum\":0.5,\"maximum\":0.5}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"1\",\"exposure_variable\":\"value\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"clamp\":{\"maximum\":0.5,\"minimum\":0.5},\"model\":{\"intercept\":0.0,\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"derived_from\":[],\"origin\":{\"kind\":\"user_defined\"},\"sources\":[]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:7f22eb40ff87d39c722e268d06f0d94d67f58782c07e4b8a70b98102b326e7b0",
+      "schema_valid": true
+    },
+    {
+      "name": "linear-zero-slope",
+      "description": "Zero slope is a valid constant model.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":0.0,\"intercept\":0.25},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"1\",\"exposure_variable\":\"value\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"clamp\":null,\"model\":{\"intercept\":0.25,\"kind\":\"linear\",\"slope\":0.0},\"provenance\":{\"derived_from\":[],\"origin\":{\"kind\":\"user_defined\"},\"sources\":[]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:b9660f2da9b46a640c2a03fd60a9f590b830446b1a271af5d14e3346f90923b5",
+      "schema_valid": true
+    },
+    {
+      "name": "clamp-both-null",
+      "description": "A clamp with both members null normalizes to null.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}},\"clamp\":{\"minimum\":null,\"maximum\":null}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"1\",\"exposure_variable\":\"value\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"clamp\":null,\"model\":{\"intercept\":0.0,\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"derived_from\":[],\"origin\":{\"kind\":\"user_defined\"},\"sources\":[]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:b1d879fc61af593dff15715b014304af9ea2e9ec2aa15450390d6182d3d8c2ee",
+      "schema_valid": true
+    },
+    {
+      "name": "clamp-empty-object",
+      "description": "An empty clamp object normalizes to null.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}},\"clamp\":{}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"1\",\"exposure_variable\":\"value\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"clamp\":null,\"model\":{\"intercept\":0.0,\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"derived_from\":[],\"origin\":{\"kind\":\"user_defined\"},\"sources\":[]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:b1d879fc61af593dff15715b014304af9ea2e9ec2aa15450390d6182d3d8c2ee",
+      "schema_valid": true
+    },
+    {
+      "name": "clamp-explicit-null",
+      "description": "Explicit null clamp.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}},\"clamp\":null}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"1\",\"exposure_variable\":\"value\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"clamp\":null,\"model\":{\"intercept\":0.0,\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"derived_from\":[],\"origin\":{\"kind\":\"user_defined\"},\"sources\":[]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:b1d879fc61af593dff15715b014304af9ea2e9ec2aa15450390d6182d3d8c2ee",
+      "schema_valid": true
+    },
+    {
+      "name": "sigmoid-minimal",
+      "description": "Sigmoid defaults: offset 0, amplitude 1, no origin adjustment, no threshold.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"sigmoid\",\"midpoint\":35.65,\"steepness\":0.2051873853077659},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"1\",\"exposure_variable\":\"value\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"clamp\":null,\"model\":{\"amplitude\":1.0,\"kind\":\"sigmoid\",\"midpoint\":35.65,\"offset\":0.0,\"origin_adjustment\":\"none\",\"steepness\":0.2051873853077659,\"zero_below\":null},\"provenance\":{\"derived_from\":[],\"origin\":{\"kind\":\"user_defined\"},\"sources\":[]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:b32a7f8c7c272b0335158be7bd6c38e2414995f8ea102a16d3ee48414f27e164",
+      "schema_valid": true
+    },
+    {
+      "name": "sigmoid-full",
+      "description": "Every sigmoid member, origin subtraction, threshold and final clamp.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"sigmoid\",\"midpoint\":2.0,\"steepness\":-1.25,\"offset\":0.1,\"amplitude\":0.9,\"origin_adjustment\":\"subtract_at_zero\",\"zero_below\":0.5},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}},\"clamp\":{\"minimum\":0.0,\"maximum\":1.0}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"1\",\"exposure_variable\":\"value\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"clamp\":{\"maximum\":1.0,\"minimum\":0.0},\"model\":{\"amplitude\":0.9,\"kind\":\"sigmoid\",\"midpoint\":2.0,\"offset\":0.1,\"origin_adjustment\":\"subtract_at_zero\",\"steepness\":-1.25,\"zero_below\":0.5},\"provenance\":{\"derived_from\":[],\"origin\":{\"kind\":\"user_defined\"},\"sources\":[]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:0e49e98bb79e291db0a281a042daeb9ad88cce00f53d5526ebd5d2c98864ce02",
+      "schema_valid": true
+    },
+    {
+      "name": "sigmoid-constant",
+      "description": "Zero amplitude and zero steepness are valid constant responses.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"sigmoid\",\"midpoint\":0.0,\"steepness\":0.0,\"amplitude\":0.0,\"offset\":0.3},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"1\",\"exposure_variable\":\"value\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"clamp\":null,\"model\":{\"amplitude\":0.0,\"kind\":\"sigmoid\",\"midpoint\":0.0,\"offset\":0.3,\"origin_adjustment\":\"none\",\"steepness\":0.0,\"zero_below\":null},\"provenance\":{\"derived_from\":[],\"origin\":{\"kind\":\"user_defined\"},\"sources\":[]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:e5625b76698ae7aa2203d12240c3cf6ee571660e1402b0844d98c94fc63cf55e",
+      "schema_valid": true
+    },
+    {
+      "name": "tabulated-step-left-error-domain",
+      "description": "Step-left interpolation, outside-domain error and decreasing response values.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"tabulated\",\"points\":[{\"x\":-1.0,\"y\":1.0},{\"x\":0.0,\"y\":0.5},{\"x\":2.5,\"y\":0.0}],\"interpolation\":\"step_left\",\"outside_domain\":\"error\"},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"1\",\"exposure_variable\":\"value\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"clamp\":null,\"model\":{\"interpolation\":\"step_left\",\"kind\":\"tabulated\",\"outside_domain\":\"error\",\"points\":[{\"x\":-1.0,\"y\":1.0},{\"x\":0.0,\"y\":0.5},{\"x\":2.5,\"y\":0.0}]},\"provenance\":{\"derived_from\":[],\"origin\":{\"kind\":\"user_defined\"},\"sources\":[]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:5bdaf20deefb1f546e1e0303d824c6dcb24cf0cdb8f53c6515ecb99d2b3e5913",
+      "schema_valid": true
+    },
+    {
+      "name": "tabulated-step-right-non-monotone",
+      "description": "Step-right interpolation with a non-monotone response.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"tabulated\",\"points\":[{\"x\":0.0,\"y\":0.0},{\"x\":0.5,\"y\":1.0},{\"x\":1.0,\"y\":0.0}],\"interpolation\":\"step_right\"},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"1\",\"exposure_variable\":\"value\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"clamp\":null,\"model\":{\"interpolation\":\"step_right\",\"kind\":\"tabulated\",\"outside_domain\":\"clamp\",\"points\":[{\"x\":0.0,\"y\":0.0},{\"x\":0.5,\"y\":1.0},{\"x\":1.0,\"y\":0.0}]},\"provenance\":{\"derived_from\":[],\"origin\":{\"kind\":\"user_defined\"},\"sources\":[]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:4c422fc78837b22492265abd185e6252a136896f2e4244206e597d68183dace3",
+      "schema_valid": true
+    },
+    {
+      "name": "binned-flood",
+      "description": "Binned response used by the aligned histogram expectation fixture.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"flood_depth\",\"exposure_unit\":\"m\",\"impact_metric\":\"damage_ratio\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"binned\",\"bin_edges\":[0.0,0.1,0.5,1.5,4.0],\"values\":[0.0,0.05,0.35,0.9]},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"m\",\"exposure_variable\":\"flood_depth\",\"impact_metric\":\"damage_ratio\",\"impact_unit\":\"1\"},\"clamp\":null,\"model\":{\"bin_edges\":[0.0,0.1,0.5,1.5,4.0],\"kind\":\"binned\",\"outside_domain\":\"clamp\",\"values\":[0.0,0.05,0.35,0.9]},\"provenance\":{\"derived_from\":[],\"origin\":{\"kind\":\"user_defined\"},\"sources\":[]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:06548a7d39380e7ee0ccd67e57e8e221577027b7ba753bea20c066db6d5f0e30",
+      "schema_valid": true
+    },
+    {
+      "name": "binned-single-interval-error",
+      "description": "One interval with outside-domain error.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"binned\",\"bin_edges\":[0.0,1.0],\"values\":[-2.5],\"outside_domain\":\"error\"},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"1\",\"exposure_variable\":\"value\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"clamp\":null,\"model\":{\"bin_edges\":[0.0,1.0],\"kind\":\"binned\",\"outside_domain\":\"error\",\"values\":[-2.5]},\"provenance\":{\"derived_from\":[],\"origin\":{\"kind\":\"user_defined\"},\"sources\":[]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:205dead77c8e3350a565e81804712b429d70730e0cab145ee8d523ea766b1a5e",
+      "schema_valid": true
+    },
+    {
+      "name": "snapshot-spei",
+      "description": "SPEI registry snapshot model.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"spei\",\"exposure_unit\":\"1\",\"impact_metric\":\"normalized_water_cost\",\"impact_unit\":\"crc-legacy-normalized-cost\"},\"model\":{\"kind\":\"spei\",\"water_consumption_asset\":1250000.5,\"original_water_unit_cost\":2.9809},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"1\",\"exposure_variable\":\"spei\",\"impact_metric\":\"normalized_water_cost\",\"impact_unit\":\"crc-legacy-normalized-cost\"},\"clamp\":null,\"model\":{\"kind\":\"spei\",\"original_water_unit_cost\":2.9809,\"water_consumption_asset\":1250000.5},\"provenance\":{\"derived_from\":[],\"origin\":{\"kind\":\"user_defined\"},\"sources\":[]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:e510a75eb5f259ba354ec2a04c58141f62aeec6e16ce744f532b37e2b43e16e6",
+      "schema_valid": true
+    },
+    {
+      "name": "snapshot-cooling",
+      "description": "Cooling registry snapshot model.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"cooling_degree_days\",\"exposure_unit\":\"K.d\",\"impact_metric\":\"normalized_cooling_cost\",\"impact_unit\":\"crc-legacy-normalized-cost\"},\"model\":{\"kind\":\"cooling\",\"cooling_cost\":52000000.0,\"historic_mean\":410.5},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"K.d\",\"exposure_variable\":\"cooling_degree_days\",\"impact_metric\":\"normalized_cooling_cost\",\"impact_unit\":\"crc-legacy-normalized-cost\"},\"clamp\":null,\"model\":{\"cooling_cost\":52000000.0,\"historic_mean\":410.5,\"kind\":\"cooling\"},\"provenance\":{\"derived_from\":[],\"origin\":{\"kind\":\"user_defined\"},\"sources\":[]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:c8e06890a599b4c5b10ebc2736f5f7119913c40ea655efe2f2a4909ebb129cec",
+      "schema_valid": true
+    },
+    {
+      "name": "snapshot-crop",
+      "description": "Crop registry snapshot model; weights are not renormalized.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"cooling_degree_days\",\"exposure_unit\":\"K.d\",\"impact_metric\":\"crop_yield_change\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"crop\",\"weights\":{\"maize\":0.5,\"rice\":0.3,\"wheat\":0.25},\"country\":{\"maize\":1.2,\"rice\":0.8,\"wheat\":1.1},\"yearly\":{\"maize\":0.0004,\"rice\":0.0002,\"wheat\":0.0003},\"index\":{\"maize\":-0.002,\"rice\":-0.001,\"wheat\":-0.0015},\"historic_mean\":150.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"K.d\",\"exposure_variable\":\"cooling_degree_days\",\"impact_metric\":\"crop_yield_change\",\"impact_unit\":\"1\"},\"clamp\":null,\"model\":{\"country\":{\"maize\":1.2,\"rice\":0.8,\"wheat\":1.1},\"historic_mean\":150.0,\"index\":{\"maize\":-0.002,\"rice\":-0.001,\"wheat\":-0.0015},\"kind\":\"crop\",\"weights\":{\"maize\":0.5,\"rice\":0.3,\"wheat\":0.25},\"yearly\":{\"maize\":0.0004,\"rice\":0.0002,\"wheat\":0.0003}},\"provenance\":{\"derived_from\":[],\"origin\":{\"kind\":\"user_defined\"},\"sources\":[]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:98613d6e46d5edf6a99786eb9185ff592d87c5459d9103e54eea64c7fe46408f",
+      "schema_valid": true
+    },
+    {
+      "name": "snapshot-cyclone-registry-origin",
+      "description": "Registry origin trace with exact f32-widened coefficients.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"wind_speed\",\"exposure_unit\":\"m/s\",\"impact_metric\":\"damage_ratio\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"sigmoid\",\"midpoint\":74.69999694824219,\"steepness\":0.11457369476556778,\"offset\":0.0,\"amplitude\":0.8,\"origin_adjustment\":\"subtract_at_zero\",\"zero_below\":28.5},\"provenance\":{\"origin\":{\"kind\":\"registry\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\",\"context\":{\"country\":\"PHL\"},\"overrides\":{\"maximum_damage\":0.8},\"fallback_policy\":\"error\",\"lookups\":[{\"table_id\":\"wind.cyclone_params\",\"table_sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"requested_key\":\"PHL\",\"resolved_key\":\"PHL\",\"status\":\"exact\"}]}}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"m/s\",\"exposure_variable\":\"wind_speed\",\"impact_metric\":\"damage_ratio\",\"impact_unit\":\"1\"},\"clamp\":null,\"model\":{\"amplitude\":0.8,\"kind\":\"sigmoid\",\"midpoint\":74.69999694824219,\"offset\":0.0,\"origin_adjustment\":\"subtract_at_zero\",\"steepness\":0.11457369476556778,\"zero_below\":28.5},\"provenance\":{\"derived_from\":[],\"origin\":{\"context\":{\"building_type\":null,\"cell\":null,\"continent\":null,\"country\":\"PHL\",\"historic_mean\":null},\"factor\":\"cyclone\",\"fallback_policy\":\"error\",\"kind\":\"registry\",\"lookups\":[{\"requested_key\":\"PHL\",\"resolved_key\":\"PHL\",\"status\":\"exact\",\"table_id\":\"wind.cyclone_params\",\"table_sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"}],\"overrides\":{\"maximum_damage\":0.8},\"registry_id\":\"crc-climate-impacts\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"registry_revision\":\"2026.10.0\",\"resolver_semantics_version\":\"crc-impact-registry/1\"},\"sources\":[]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:0e052a65e9260393ef4bc3f702ff6471966eb55b62433fc406694e19c5a9834b",
+      "schema_valid": true
+    },
+    {
+      "name": "origin-registry-legacy-fallback",
+      "description": "Registry origin with composite lookup keys, a recorded fallback, a null override and full context.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"rx1day\",\"exposure_unit\":\"mm\",\"impact_metric\":\"damage_ratio\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"sigmoid\",\"midpoint\":682.5,\"steepness\":0.007,\"origin_adjustment\":\"subtract_at_zero\"},\"provenance\":{\"origin\":{\"kind\":\"registry\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"rx1day\",\"context\":{\"cell\":\"8a2a1072b59ffff\",\"country\":null,\"continent\":null,\"building_type\":null,\"historic_mean\":null},\"overrides\":{\"zero_below\":null,\"steepness\":0.007},\"fallback_policy\":\"legacy_defaults\",\"lookups\":[{\"table_id\":\"precipitation.rx1day_threshold\",\"table_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"requested_key\":{\"h3_resolution\":\"4\",\"cell\":\"0842a107fffffff\"},\"resolved_key\":\"global_default\",\"status\":\"fallback\"}]}}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"mm\",\"exposure_variable\":\"rx1day\",\"impact_metric\":\"damage_ratio\",\"impact_unit\":\"1\"},\"clamp\":null,\"model\":{\"amplitude\":1.0,\"kind\":\"sigmoid\",\"midpoint\":682.5,\"offset\":0.0,\"origin_adjustment\":\"subtract_at_zero\",\"steepness\":0.007,\"zero_below\":null},\"provenance\":{\"derived_from\":[],\"origin\":{\"context\":{\"building_type\":null,\"cell\":\"8a2a1072b59ffff\",\"continent\":null,\"country\":null,\"historic_mean\":null},\"factor\":\"rx1day\",\"fallback_policy\":\"legacy_defaults\",\"kind\":\"registry\",\"lookups\":[{\"requested_key\":{\"cell\":\"0842a107fffffff\",\"h3_resolution\":\"4\"},\"resolved_key\":\"global_default\",\"status\":\"fallback\",\"table_id\":\"precipitation.rx1day_threshold\",\"table_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}],\"overrides\":{\"steepness\":0.007,\"zero_below\":null},\"registry_id\":\"crc-climate-impacts\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"registry_revision\":\"2026.10.0\",\"resolver_semantics_version\":\"crc-impact-registry/1\"},\"sources\":[]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:6f09aa8623198c6721d5046aade2318235a7aeaf3bd20051d139fe7254bfcf8f",
+      "schema_valid": true
+    },
+    {
+      "name": "origin-published",
+      "description": "Published origin with a complete source record.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":0.000222739726},\"provenance\":{\"origin\":{\"kind\":\"published\",\"source_id\":\"huizinga-2017\"},\"sources\":[{\"id\":\"huizinga-2017\",\"kind\":\"publication\",\"uri\":\"https://doi.org/10.2760/16510\",\"revision\":\"v1\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}]}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"1\",\"exposure_variable\":\"value\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"clamp\":null,\"model\":{\"intercept\":0.0,\"kind\":\"linear\",\"slope\":0.000222739726},\"provenance\":{\"derived_from\":[],\"origin\":{\"kind\":\"published\",\"source_id\":\"huizinga-2017\"},\"sources\":[{\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"id\":\"huizinga-2017\",\"kind\":\"publication\",\"revision\":\"v1\",\"uri\":\"https://doi.org/10.2760/16510\"}]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:abaf06f72b2fbc3776ce50d61e515e0717ce37ef093fbe81287c962a82e94b76",
+      "schema_valid": true
+    },
+    {
+      "name": "origin-imported",
+      "description": "Imported origin; an omitted build digest materializes as null and source defaults expand.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"imported\",\"source_id\":\"table\",\"importer_name\":\"crc-curve-import\",\"importer_version\":\"0.3.1\"},\"sources\":[{\"id\":\"table\",\"kind\":\"dataset\",\"uri\":\"s3://curves/table.csv\"},{\"id\":\"code\",\"kind\":\"code\",\"uri\":\"git+https://example.org/importer\"}]}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"1\",\"exposure_variable\":\"value\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"clamp\":null,\"model\":{\"intercept\":0.0,\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"derived_from\":[],\"origin\":{\"importer_build_sha256\":null,\"importer_name\":\"crc-curve-import\",\"importer_version\":\"0.3.1\",\"kind\":\"imported\",\"source_id\":\"table\"},\"sources\":[{\"content_sha256\":null,\"id\":\"table\",\"kind\":\"dataset\",\"revision\":null,\"uri\":\"s3://curves/table.csv\"},{\"content_sha256\":null,\"id\":\"code\",\"kind\":\"code\",\"revision\":null,\"uri\":\"git+https://example.org/importer\"}]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:266084e7db427237e772f233983a080f8baa56cff4c20643fdb5db9101918961",
+      "schema_valid": true
+    },
+    {
+      "name": "origin-imported-build",
+      "description": "Imported origin with an importer build digest.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"binned\",\"bin_edges\":[0.0,1.0,2.0],\"values\":[0.1,0.2]},\"provenance\":{\"origin\":{\"kind\":\"imported\",\"source_id\":\"table\",\"importer_name\":\"crc-curve-import\",\"importer_version\":\"0.3.1\",\"importer_build_sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"sources\":[{\"id\":\"table\",\"kind\":\"dataset\",\"uri\":\"s3://curves/table.csv\",\"revision\":\"2024-01\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}]}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"1\",\"exposure_variable\":\"value\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"clamp\":null,\"model\":{\"bin_edges\":[0.0,1.0,2.0],\"kind\":\"binned\",\"outside_domain\":\"clamp\",\"values\":[0.1,0.2]},\"provenance\":{\"derived_from\":[],\"origin\":{\"importer_build_sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"importer_name\":\"crc-curve-import\",\"importer_version\":\"0.3.1\",\"kind\":\"imported\",\"source_id\":\"table\"},\"sources\":[{\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"id\":\"table\",\"kind\":\"dataset\",\"revision\":\"2024-01\",\"uri\":\"s3://curves/table.csv\"}]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:2b3599d8230628eef3026a41cb1041012eeff754dbe7ade889d6d518ae43bad8",
+      "schema_valid": true
+    },
+    {
+      "name": "origin-derived-unicode",
+      "description": "Derived origin: parents are sorted; Unicode, quotes, backslashes and control characters use the canonical escapes.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"profondeur_d’eau\",\"exposure_unit\":\"m\",\"impact_metric\":\"coût_relatif\",\"impact_unit\":\"€/m²\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"derived\",\"description\":\"Rescaled \\\"Huizinga\\\" \\\\ curve\\n\\ttab \\u0001 del:\\u007f ls:\\u2028 emoji:\\ud83d\\ude00 é\"},\"derived_from\":[\"sha256:2222222222222222222222222222222222222222222222222222222222222222\",\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"],\"sources\":[{\"id\":\"parent\",\"kind\":\"definition\",\"uri\":\"crc:definition/sha256:1111111111111111111111111111111111111111111111111111111111111111\"}]}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"m\",\"exposure_variable\":\"profondeur_d’eau\",\"impact_metric\":\"coût_relatif\",\"impact_unit\":\"€/m²\"},\"clamp\":null,\"model\":{\"intercept\":0.0,\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"derived_from\":[\"sha256:1111111111111111111111111111111111111111111111111111111111111111\",\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"],\"origin\":{\"description\":\"Rescaled \\\"Huizinga\\\" \\\\ curve\\n\\ttab \\u0001 del: ls:  emoji:😀 é\",\"kind\":\"derived\"},\"sources\":[{\"content_sha256\":null,\"id\":\"parent\",\"kind\":\"definition\",\"revision\":null,\"uri\":\"crc:definition/sha256:1111111111111111111111111111111111111111111111111111111111111111\"}]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:056ebed062fc2620d753652a5bf940f2c0aabe5718ce0b2a44881f58cf532c7a",
+      "schema_valid": true
+    },
+    {
+      "name": "number-boundaries",
+      "description": "Exponent placement, subnormal, large integer literal and shortest round-trip boundaries.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"tabulated\",\"points\":[{\"x\":-1.7976931348623157e308,\"y\":5e-324},{\"x\":-1e-7,\"y\":0.00001},{\"x\":0,\"y\":0.30000000000000004},{\"x\":1e15,\"y\":9007199254740993},{\"x\":1e16,\"y\":1.5e300},{\"x\":123456789012345678901,\"y\":2.2250738585072014e-308}]},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "canonical_json": "{\"calibration\":{\"exposure_unit\":\"1\",\"exposure_variable\":\"value\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"clamp\":null,\"model\":{\"interpolation\":\"linear\",\"kind\":\"tabulated\",\"outside_domain\":\"clamp\",\"points\":[{\"x\":-1.7976931348623157e+308,\"y\":5e-324},{\"x\":-1e-7,\"y\":0.00001},{\"x\":0.0,\"y\":0.30000000000000004},{\"x\":1000000000000000.0,\"y\":9007199254740992.0},{\"x\":1e+16,\"y\":1.5e+300},{\"x\":1.2345678901234568e+20,\"y\":2.2250738585072014e-308}]},\"provenance\":{\"derived_from\":[],\"origin\":{\"kind\":\"user_defined\"},\"sources\":[]},\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\"}",
+      "content_hash": "sha256:76fec5ab5e22817b071b788201068c2fd42539b23c398637c3352ef27dd3691d",
+      "schema_valid": true
+    }
+  ],
+  "rejected": [
+    {
+      "name": "invalid-json-syntax",
+      "description": "Truncated JSON text.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}",
+      "error": {
+        "code": "invalid_json",
+        "path": ""
+      },
+      "schema_valid": null
+    },
+    {
+      "name": "invalid-json-trailing-comma",
+      "description": "Trailing comma.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}},}",
+      "error": {
+        "code": "invalid_json",
+        "path": ""
+      },
+      "schema_valid": null
+    },
+    {
+      "name": "invalid-json-bom",
+      "description": "Leading byte order mark.",
+      "input_json": "﻿{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "invalid_json",
+        "path": ""
+      },
+      "schema_valid": null
+    },
+    {
+      "name": "invalid-json-lone-surrogate",
+      "description": "Unpaired surrogate escape in a string.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"\\ud800\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "invalid_json",
+        "path": "/calibration/exposure_variable"
+      },
+      "schema_valid": null
+    },
+    {
+      "name": "duplicate-key-root",
+      "description": "Duplicate top-level key.",
+      "input_json": "{\"schema_version\":\"1.0\",\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "duplicate_key",
+        "path": "/schema_version"
+      },
+      "schema_valid": null
+    },
+    {
+      "name": "duplicate-key-model",
+      "description": "Duplicate model key.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0,\"slope\":2.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "duplicate_key",
+        "path": "/model/slope"
+      },
+      "schema_valid": null
+    },
+    {
+      "name": "non-finite-nan",
+      "description": "NaN token.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":NaN},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "non_finite_number",
+        "path": "/model/slope"
+      },
+      "schema_valid": null
+    },
+    {
+      "name": "non-finite-infinity",
+      "description": "Infinity token.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":Infinity},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "non_finite_number",
+        "path": "/model/slope"
+      },
+      "schema_valid": null
+    },
+    {
+      "name": "non-finite-negative-infinity",
+      "description": "Negative infinity token.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":-Infinity},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "non_finite_number",
+        "path": "/model/slope"
+      },
+      "schema_valid": null
+    },
+    {
+      "name": "overflow-float-literal",
+      "description": "Float literal beyond binary64.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1e400},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "number_overflow",
+        "path": "/model/slope"
+      },
+      "schema_valid": null
+    },
+    {
+      "name": "overflow-integer-literal",
+      "description": "Integer literal beyond binary64.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "number_overflow",
+        "path": "/model/slope"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "boolean-number",
+      "description": "Boolean in a numeric field.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":true},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "invalid_type",
+        "path": "/model/slope"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "string-number",
+      "description": "Numeric string in a numeric field.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":\"1.0\"},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "invalid_type",
+        "path": "/model/slope"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "string-clamp",
+      "description": "Numeric string clamp member.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}},\"clamp\":{\"minimum\":\"0\"}}",
+      "error": {
+        "code": "invalid_type",
+        "path": "/clamp/minimum"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "calibration-type",
+      "description": "Non-string calibration member.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":1,\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "invalid_type",
+        "path": "/calibration/exposure_unit"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "schema-version-number",
+      "description": "Schema version spelled as a number.",
+      "input_json": "{\"schema_version\":1.0,\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "invalid_type",
+        "path": "/schema_version"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "schema-version-unsupported",
+      "description": "Unsupported schema version.",
+      "input_json": "{\"schema_version\":\"2.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "unsupported_schema_version",
+        "path": "/schema_version"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "schema-version-minor",
+      "description": "Unknown minor schema version.",
+      "input_json": "{\"schema_version\":\"1.1\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "unsupported_schema_version",
+        "path": "/schema_version"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "semantics-version-unsupported",
+      "description": "Unsupported numerical semantics.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/2\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "unsupported_semantics_version",
+        "path": "/semantics_version"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "missing-schema-version",
+      "description": "Versions are never inferred.",
+      "input_json": "{\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "missing_field",
+        "path": "/schema_version"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "missing-semantics-version",
+      "description": "Versions are never inferred.",
+      "input_json": "{\"schema_version\":\"1.0\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "missing_field",
+        "path": "/semantics_version"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "missing-calibration",
+      "description": "Calibration is required.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "missing_field",
+        "path": "/calibration"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "missing-calibration-member",
+      "description": "All four calibration members are required.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "missing_field",
+        "path": "/calibration/impact_unit"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "missing-provenance",
+      "description": "Provenance is required.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0}}",
+      "error": {
+        "code": "missing_field",
+        "path": "/provenance"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "missing-origin",
+      "description": "Origin is required.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"sources\":[]}}",
+      "error": {
+        "code": "missing_field",
+        "path": "/provenance/origin"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "missing-model-kind",
+      "description": "Model kind is required.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "missing_field",
+        "path": "/model/kind"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "missing-slope",
+      "description": "Linear slope is required.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\"},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "missing_field",
+        "path": "/model/slope"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "unknown-root-field",
+      "description": "Unknown top-level field.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}},\"output\":{\"bounds\":[0,1]}}",
+      "error": {
+        "code": "unknown_field",
+        "path": "/output"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "unknown-label-field",
+      "description": "Human labels live outside the definition.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}},\"name\":\"flood curve\"}",
+      "error": {
+        "code": "unknown_field",
+        "path": "/name"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "unknown-calibration-field",
+      "description": "Unknown calibration field.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\",\"currency\":\"USD\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "unknown_field",
+        "path": "/calibration/currency"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "unknown-model-field",
+      "description": "Legacy linear minimum is not a model field.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0,\"minimum\":0.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "unknown_field",
+        "path": "/model/minimum"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "unknown-sigmoid-legacy-boolean",
+      "description": "The ambiguous adjust_at_zero boolean is not accepted.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"sigmoid\",\"midpoint\":1.0,\"steepness\":1.0,\"adjust_at_zero\":true},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "unknown_field",
+        "path": "/model/adjust_at_zero"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "unknown-clamp-field",
+      "description": "Unknown clamp field.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}},\"clamp\":{\"minimum\":0.0,\"inclusive\":true}}",
+      "error": {
+        "code": "unknown_field",
+        "path": "/clamp/inclusive"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "unknown-provenance-field",
+      "description": "Unknown provenance field.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"},\"created_at\":\"2026-10-21\"}}",
+      "error": {
+        "code": "unknown_field",
+        "path": "/provenance/created_at"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "unknown-origin-field",
+      "description": "Unknown origin field.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\",\"author\":\"x\"}}}",
+      "error": {
+        "code": "unknown_field",
+        "path": "/provenance/origin/author"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "unknown-source-field",
+      "description": "Unknown source field.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"},\"sources\":[{\"id\":\"s\",\"kind\":\"code\",\"uri\":\"u\",\"license\":\"MIT\"}]}}",
+      "error": {
+        "code": "unknown_field",
+        "path": "/provenance/sources/0/license"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "unknown-point-field",
+      "description": "Unknown knot field.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"tabulated\",\"points\":[{\"x\":0.0,\"y\":0.0,\"w\":1.0},{\"x\":1.0,\"y\":1.0}]},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "unknown_field",
+        "path": "/model/points/0/w"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "unsupported-model-kind",
+      "description": "Unknown model kind.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"cubic\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "unsupported_kind",
+        "path": "/model/kind"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "registry-model-kind",
+      "description": "Registry references are not model kinds.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"registry\",\"factor\":\"hot_days\"},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "unsupported_kind",
+        "path": "/model/kind"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "unsupported-origin-kind",
+      "description": "Unknown origin kind.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"latest\"}}}",
+      "error": {
+        "code": "unsupported_kind",
+        "path": "/provenance/origin/kind"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "unsupported-interpolation",
+      "description": "Unknown interpolation.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"tabulated\",\"points\":[{\"x\":0.0,\"y\":0.0},{\"x\":1.0,\"y\":1.0}],\"interpolation\":\"cubic\"},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "unsupported_value",
+        "path": "/model/interpolation"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "unsupported-outside-domain",
+      "description": "Extrapolation is not supported in v1.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"binned\",\"bin_edges\":[0.0,1.0],\"values\":[1.0],\"outside_domain\":\"extrapolate\"},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "unsupported_value",
+        "path": "/model/outside_domain"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "unsupported-origin-adjustment",
+      "description": "Unknown origin adjustment.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"sigmoid\",\"midpoint\":1.0,\"steepness\":1.0,\"origin_adjustment\":\"normalize\"},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "unsupported_value",
+        "path": "/model/origin_adjustment"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "unsupported-source-kind",
+      "description": "Unknown source kind.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"},\"sources\":[{\"id\":\"s\",\"kind\":\"blog\",\"uri\":\"u\"}]}}",
+      "error": {
+        "code": "unsupported_value",
+        "path": "/provenance/sources/0/kind"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "calibration-empty",
+      "description": "Empty calibration member.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/calibration/exposure_unit"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "calibration-whitespace",
+      "description": "Surrounding whitespace in a calibration member.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\" m\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/calibration/exposure_unit"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "clamp-order",
+      "description": "Clamp minimum above maximum.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}},\"clamp\":{\"minimum\":1.0,\"maximum\":0.0}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/clamp"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "sigmoid-negative-amplitude",
+      "description": "Amplitude must be non-negative.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"sigmoid\",\"midpoint\":1.0,\"steepness\":1.0,\"amplitude\":-0.5},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/model/amplitude"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "tabulated-one-point",
+      "description": "Tables need two knots.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"tabulated\",\"points\":[{\"x\":0.0,\"y\":0.0}]},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/model/points"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "tabulated-equal-knots",
+      "description": "Knots must strictly increase; they are never sorted.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"tabulated\",\"points\":[{\"x\":0.0,\"y\":0.0},{\"x\":1.0,\"y\":1.0},{\"x\":1.0,\"y\":2.0}]},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/model/points/2/x"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "tabulated-unsorted-knots",
+      "description": "Unsorted knots are rejected, not repaired.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"tabulated\",\"points\":[{\"x\":1.0,\"y\":0.0},{\"x\":0.0,\"y\":1.0}]},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/model/points/1/x"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "binned-decreasing-edges",
+      "description": "Edges must strictly increase.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"binned\",\"bin_edges\":[0.0,2.0,1.0],\"values\":[0.0,1.0]},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/model/bin_edges/2"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "binned-value-count",
+      "description": "One value per interval.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"binned\",\"bin_edges\":[0.0,1.0,2.0],\"values\":[0.0]},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/model/values"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "spei-negative-cost",
+      "description": "Costs are non-negative.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"spei\",\"water_consumption_asset\":1.0,\"original_water_unit_cost\":-1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/model/original_water_unit_cost"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "cooling-zero-mean",
+      "description": "Cooling historic mean is positive.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"cooling\",\"cooling_cost\":1.0,\"historic_mean\":0.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/model/historic_mean"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "crop-zero-weights",
+      "description": "Crop weights need a positive total.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"cooling_degree_days\",\"exposure_unit\":\"K.d\",\"impact_metric\":\"crop_yield_change\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"crop\",\"weights\":{\"maize\":0.0,\"rice\":0.0,\"wheat\":0.0},\"country\":{\"maize\":1.2,\"rice\":0.8,\"wheat\":1.1},\"yearly\":{\"maize\":0.0004,\"rice\":0.0002,\"wheat\":0.0003},\"index\":{\"maize\":-0.002,\"rice\":-0.001,\"wheat\":-0.0015},\"historic_mean\":150.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/model/weights"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "crop-negative-weight",
+      "description": "Crop weights are non-negative.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"cooling_degree_days\",\"exposure_unit\":\"K.d\",\"impact_metric\":\"crop_yield_change\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"crop\",\"weights\":{\"maize\":0.5,\"rice\":-0.1,\"wheat\":0.25},\"country\":{\"maize\":1.2,\"rice\":0.8,\"wheat\":1.1},\"yearly\":{\"maize\":0.0004,\"rice\":0.0002,\"wheat\":0.0003},\"index\":{\"maize\":-0.002,\"rice\":-0.001,\"wheat\":-0.0015},\"historic_mean\":150.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/model/weights/rice"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "crop-missing-crop",
+      "description": "Crop vectors contain exactly maize, rice and wheat.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"cooling_degree_days\",\"exposure_unit\":\"K.d\",\"impact_metric\":\"crop_yield_change\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"crop\",\"weights\":{\"maize\":0.5,\"rice\":0.3,\"wheat\":0.25},\"country\":{\"maize\":1.2,\"rice\":0.8,\"wheat\":1.1},\"yearly\":{\"maize\":0.0004,\"rice\":0.0002,\"wheat\":0.0003},\"index\":{\"maize\":-0.002,\"rice\":-0.001},\"historic_mean\":150.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "missing_field",
+        "path": "/model/index/wheat"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "crop-extra-crop",
+      "description": "Crop vectors contain exactly maize, rice and wheat.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"cooling_degree_days\",\"exposure_unit\":\"K.d\",\"impact_metric\":\"crop_yield_change\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"crop\",\"weights\":{\"maize\":0.5,\"rice\":0.3,\"wheat\":0.25},\"country\":{\"maize\":1.2,\"rice\":0.8,\"wheat\":1.1},\"yearly\":{\"maize\":0.0004,\"rice\":0.0002,\"wheat\":0.0003},\"index\":{\"maize\":-0.002,\"rice\":-0.001,\"wheat\":-0.0015,\"soy\":0.1},\"historic_mean\":150.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"}}}",
+      "error": {
+        "code": "unknown_field",
+        "path": "/model/index/soy"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "derived-from-uppercase",
+      "description": "Parent hashes use lowercase hex.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"},\"derived_from\":[\"sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/provenance/derived_from/0"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "derived-from-bare",
+      "description": "Parent hashes carry the sha256: prefix.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"},\"derived_from\":[\"1111111111111111111111111111111111111111111111111111111111111111\"]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/provenance/derived_from/0"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "derived-from-duplicate",
+      "description": "Parents are duplicate-free.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"},\"derived_from\":[\"sha256:1111111111111111111111111111111111111111111111111111111111111111\",\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"]}}",
+      "error": {
+        "code": "duplicate_identifier",
+        "path": "/provenance/derived_from/1"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "source-digest-length",
+      "description": "Source digests are 64 hex characters.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"},\"sources\":[{\"id\":\"s\",\"kind\":\"code\",\"uri\":\"u\",\"content_sha256\":\"abc\"}]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/provenance/sources/0/content_sha256"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "source-duplicate-id",
+      "description": "Source ids are unique.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"user_defined\"},\"sources\":[{\"id\":\"s\",\"kind\":\"code\",\"uri\":\"u\"},{\"id\":\"s\",\"kind\":\"dataset\",\"uri\":\"v\"}]}}",
+      "error": {
+        "code": "duplicate_identifier",
+        "path": "/provenance/sources/1/id"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "published-missing-source",
+      "description": "Published source_id must resolve.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"published\",\"source_id\":\"nope\"}}}",
+      "error": {
+        "code": "invalid_reference",
+        "path": "/provenance/origin/source_id"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "derived-without-parents",
+      "description": "Derived origins need a parent.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"value\",\"exposure_unit\":\"1\",\"impact_metric\":\"response\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"linear\",\"slope\":1.0},\"provenance\":{\"origin\":{\"kind\":\"derived\",\"description\":\"edited\"}}}",
+      "error": {
+        "code": "invalid_reference",
+        "path": "/provenance/derived_from"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "registry-unknown-override",
+      "description": "Unknown override key.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"wind_speed\",\"exposure_unit\":\"m/s\",\"impact_metric\":\"damage_ratio\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"sigmoid\",\"midpoint\":74.69999694824219,\"steepness\":0.11457369476556778,\"offset\":0.0,\"amplitude\":0.8,\"origin_adjustment\":\"subtract_at_zero\",\"zero_below\":28.5},\"provenance\":{\"origin\":{\"kind\":\"registry\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\",\"context\":{\"country\":\"PHL\"},\"overrides\":{\"maximum\":1.0},\"fallback_policy\":\"error\",\"lookups\":[{\"table_id\":\"wind.cyclone_params\",\"table_sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"requested_key\":\"PHL\",\"resolved_key\":\"PHL\",\"status\":\"exact\"}]}}}",
+      "error": {
+        "code": "unknown_override",
+        "path": "/provenance/origin/overrides/maximum"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "registry-inapplicable-override",
+      "description": "Override key not accepted for the factor.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"wind_speed\",\"exposure_unit\":\"m/s\",\"impact_metric\":\"damage_ratio\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"sigmoid\",\"midpoint\":74.69999694824219,\"steepness\":0.11457369476556778,\"offset\":0.0,\"amplitude\":0.8,\"origin_adjustment\":\"subtract_at_zero\",\"zero_below\":28.5},\"provenance\":{\"origin\":{\"kind\":\"registry\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\",\"context\":{\"country\":\"PHL\"},\"overrides\":{\"slope\":1.0},\"fallback_policy\":\"error\",\"lookups\":[{\"table_id\":\"wind.cyclone_params\",\"table_sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"requested_key\":\"PHL\",\"resolved_key\":\"PHL\",\"status\":\"exact\"}]}}}",
+      "error": {
+        "code": "inapplicable_override",
+        "path": "/provenance/origin/overrides/slope"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "registry-null-override",
+      "description": "Null only clears thresholds or linear clamps.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"wind_speed\",\"exposure_unit\":\"m/s\",\"impact_metric\":\"damage_ratio\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"sigmoid\",\"midpoint\":74.69999694824219,\"steepness\":0.11457369476556778,\"offset\":0.0,\"amplitude\":0.8,\"origin_adjustment\":\"subtract_at_zero\",\"zero_below\":28.5},\"provenance\":{\"origin\":{\"kind\":\"registry\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\",\"context\":{\"country\":\"PHL\"},\"overrides\":{\"midpoint\":null},\"fallback_policy\":\"error\",\"lookups\":[{\"table_id\":\"wind.cyclone_params\",\"table_sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"requested_key\":\"PHL\",\"resolved_key\":\"PHL\",\"status\":\"exact\"}]}}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/provenance/origin/overrides/midpoint"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "registry-unknown-factor",
+      "description": "Unknown registry factor.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"wind_speed\",\"exposure_unit\":\"m/s\",\"impact_metric\":\"damage_ratio\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"sigmoid\",\"midpoint\":74.69999694824219,\"steepness\":0.11457369476556778,\"offset\":0.0,\"amplitude\":0.8,\"origin_adjustment\":\"subtract_at_zero\",\"zero_below\":28.5},\"provenance\":{\"origin\":{\"kind\":\"registry\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"drought\",\"context\":{\"country\":\"PHL\"},\"overrides\":{\"maximum_damage\":0.8},\"fallback_policy\":\"error\",\"lookups\":[{\"table_id\":\"wind.cyclone_params\",\"table_sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"requested_key\":\"PHL\",\"resolved_key\":\"PHL\",\"status\":\"exact\"}]}}}",
+      "error": {
+        "code": "unsupported_value",
+        "path": "/provenance/origin/factor"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "registry-resolver-version",
+      "description": "Unsupported resolver semantics.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"wind_speed\",\"exposure_unit\":\"m/s\",\"impact_metric\":\"damage_ratio\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"sigmoid\",\"midpoint\":74.69999694824219,\"steepness\":0.11457369476556778,\"offset\":0.0,\"amplitude\":0.8,\"origin_adjustment\":\"subtract_at_zero\",\"zero_below\":28.5},\"provenance\":{\"origin\":{\"kind\":\"registry\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/2\",\"factor\":\"cyclone\",\"context\":{\"country\":\"PHL\"},\"overrides\":{\"maximum_damage\":0.8},\"fallback_policy\":\"error\",\"lookups\":[{\"table_id\":\"wind.cyclone_params\",\"table_sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"requested_key\":\"PHL\",\"resolved_key\":\"PHL\",\"status\":\"exact\"}]}}}",
+      "error": {
+        "code": "unsupported_semantics_version",
+        "path": "/provenance/origin/resolver_semantics_version"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "registry-cell-uppercase",
+      "description": "Persisted H3 cells use 15 lowercase hex characters.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"wind_speed\",\"exposure_unit\":\"m/s\",\"impact_metric\":\"damage_ratio\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"sigmoid\",\"midpoint\":74.69999694824219,\"steepness\":0.11457369476556778,\"offset\":0.0,\"amplitude\":0.8,\"origin_adjustment\":\"subtract_at_zero\",\"zero_below\":28.5},\"provenance\":{\"origin\":{\"kind\":\"registry\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\",\"context\":{\"cell\":\"8A2A1072B59FFFF\"},\"overrides\":{\"maximum_damage\":0.8},\"fallback_policy\":\"error\",\"lookups\":[{\"table_id\":\"wind.cyclone_params\",\"table_sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"requested_key\":\"PHL\",\"resolved_key\":\"PHL\",\"status\":\"exact\"}]}}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/provenance/origin/context/cell"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "registry-cell-padded",
+      "description": "Persisted H3 cells never carry a leading zero.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"wind_speed\",\"exposure_unit\":\"m/s\",\"impact_metric\":\"damage_ratio\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"sigmoid\",\"midpoint\":74.69999694824219,\"steepness\":0.11457369476556778,\"offset\":0.0,\"amplitude\":0.8,\"origin_adjustment\":\"subtract_at_zero\",\"zero_below\":28.5},\"provenance\":{\"origin\":{\"kind\":\"registry\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\",\"context\":{\"cell\":\"08a2a1072b59ffff\"},\"overrides\":{\"maximum_damage\":0.8},\"fallback_policy\":\"error\",\"lookups\":[{\"table_id\":\"wind.cyclone_params\",\"table_sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"requested_key\":\"PHL\",\"resolved_key\":\"PHL\",\"status\":\"exact\"}]}}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/provenance/origin/context/cell"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "registry-cell-short",
+      "description": "Persisted H3 cells have exactly 15 characters.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"wind_speed\",\"exposure_unit\":\"m/s\",\"impact_metric\":\"damage_ratio\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"sigmoid\",\"midpoint\":74.69999694824219,\"steepness\":0.11457369476556778,\"offset\":0.0,\"amplitude\":0.8,\"origin_adjustment\":\"subtract_at_zero\",\"zero_below\":28.5},\"provenance\":{\"origin\":{\"kind\":\"registry\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\",\"context\":{\"cell\":\"a2a1072b59ffff\"},\"overrides\":{\"maximum_damage\":0.8},\"fallback_policy\":\"error\",\"lookups\":[{\"table_id\":\"wind.cyclone_params\",\"table_sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"requested_key\":\"PHL\",\"resolved_key\":\"PHL\",\"status\":\"exact\"}]}}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/provenance/origin/context/cell"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "registry-cell-non-hex",
+      "description": "Persisted H3 cells are hexadecimal.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"wind_speed\",\"exposure_unit\":\"m/s\",\"impact_metric\":\"damage_ratio\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"sigmoid\",\"midpoint\":74.69999694824219,\"steepness\":0.11457369476556778,\"offset\":0.0,\"amplitude\":0.8,\"origin_adjustment\":\"subtract_at_zero\",\"zero_below\":28.5},\"provenance\":{\"origin\":{\"kind\":\"registry\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\",\"context\":{\"cell\":\"8a2a1072b59fffg\"},\"overrides\":{\"maximum_damage\":0.8},\"fallback_policy\":\"error\",\"lookups\":[{\"table_id\":\"wind.cyclone_params\",\"table_sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"requested_key\":\"PHL\",\"resolved_key\":\"PHL\",\"status\":\"exact\"}]}}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/provenance/origin/context/cell"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "registry-fallback-under-error",
+      "description": "Fallback lookups require legacy_defaults.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"wind_speed\",\"exposure_unit\":\"m/s\",\"impact_metric\":\"damage_ratio\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"sigmoid\",\"midpoint\":74.69999694824219,\"steepness\":0.11457369476556778,\"offset\":0.0,\"amplitude\":0.8,\"origin_adjustment\":\"subtract_at_zero\",\"zero_below\":28.5},\"provenance\":{\"origin\":{\"kind\":\"registry\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\",\"context\":{\"country\":\"PHL\"},\"overrides\":{\"maximum_damage\":0.8},\"fallback_policy\":\"error\",\"lookups\":[{\"table_id\":\"wind.cyclone_params\",\"table_sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"requested_key\":\"PHL\",\"resolved_key\":\"PHL\",\"status\":\"fallback\"}]}}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/provenance/origin/lookups/0/status"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "registry-missing-lookups",
+      "description": "The resolution trace is complete.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"wind_speed\",\"exposure_unit\":\"m/s\",\"impact_metric\":\"damage_ratio\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"sigmoid\",\"midpoint\":74.69999694824219,\"steepness\":0.11457369476556778,\"offset\":0.0,\"amplitude\":0.8,\"origin_adjustment\":\"subtract_at_zero\",\"zero_below\":28.5},\"provenance\":{\"origin\":{\"kind\":\"registry\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\",\"context\":{\"country\":\"PHL\"},\"overrides\":{\"maximum_damage\":0.8},\"fallback_policy\":\"error\"}}}",
+      "error": {
+        "code": "missing_field",
+        "path": "/provenance/origin/lookups"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "registry-unknown-context-field",
+      "description": "Unknown context field.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-impact/1\",\"calibration\":{\"exposure_variable\":\"wind_speed\",\"exposure_unit\":\"m/s\",\"impact_metric\":\"damage_ratio\",\"impact_unit\":\"1\"},\"model\":{\"kind\":\"sigmoid\",\"midpoint\":74.69999694824219,\"steepness\":0.11457369476556778,\"offset\":0.0,\"amplitude\":0.8,\"origin_adjustment\":\"subtract_at_zero\",\"zero_below\":28.5},\"provenance\":{\"origin\":{\"kind\":\"registry\",\"registry_id\":\"crc-climate-impacts\",\"registry_revision\":\"2026.10.0\",\"registry_manifest_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"resolver_semantics_version\":\"crc-impact-registry/1\",\"factor\":\"cyclone\",\"context\":{\"region\":\"x\"},\"overrides\":{\"maximum_damage\":0.8},\"fallback_policy\":\"error\",\"lookups\":[{\"table_id\":\"wind.cyclone_params\",\"table_sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"requested_key\":\"PHL\",\"resolved_key\":\"PHL\",\"status\":\"exact\"}]}}}",
+      "error": {
+        "code": "unknown_field",
+        "path": "/provenance/origin/context/region"
+      },
+      "schema_valid": false
+    }
+  ]
+}

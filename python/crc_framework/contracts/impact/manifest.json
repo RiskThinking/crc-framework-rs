@@ -1,0 +1,134 @@
+{
+  "artifact": "crc-impact-contracts",
+  "artifact_version": "1.0.0",
+  "canonical_profile": "crc-canonical-json/1",
+  "contracts": {
+    "impact_definition": {
+      "schema": "schemas/impact-definition-1.0.schema.json",
+      "fixtures": "fixtures/definitions.json"
+    },
+    "registry_impact_reference": {
+      "schema": "schemas/registry-impact-reference-1.0.schema.json",
+      "fixtures": "fixtures/registry-references.json"
+    },
+    "impact_evaluation_record": {
+      "schema": "schemas/impact-evaluation-record-1.0.schema.json",
+      "fixtures": "fixtures/evaluation-records.json"
+    },
+    "spatial_combination_policy": {
+      "schema": "schemas/spatial-combination-policy-1.0.schema.json",
+      "fixtures": "fixtures/spatial-policies.json"
+    },
+    "spatial_impact_evaluation_record": {
+      "schema": "schemas/spatial-impact-evaluation-record-1.0.schema.json",
+      "fixtures": "fixtures/spatial-records.json"
+    }
+  },
+  "versions": {
+    "impact_definition_schema": "1.0",
+    "impact_semantics": "crc-impact/1",
+    "registry_reference_schema": "1.0",
+    "resolver_semantics": "crc-impact-registry/1",
+    "evaluation_record_schema": "1.0",
+    "spatial_policy_schema": "1.0",
+    "spatial_semantics": "crc-spatial-combination/1",
+    "spatial_record_schema": "1.0"
+  },
+  "files": [
+    {
+      "path": "catalogs/error-codes.json",
+      "sha256": "0f34f334aafa2b56bb1897fe24c824888f3f88daec345ef84bbe7ae802733af7",
+      "bytes": 4843
+    },
+    {
+      "path": "catalogs/native-capabilities.json",
+      "sha256": "eb1852a0bbdd44c7c9d570f441bd75cfd5c034eda8819fae9797a995e506e29d",
+      "bytes": 446
+    },
+    {
+      "path": "catalogs/registry-overrides.json",
+      "sha256": "8dd8d8f37dff107869a387a304a7c8292a2361380f087fabb343df70bb132d8d",
+      "bytes": 4543
+    },
+    {
+      "path": "catalogs/semantics-constants.json",
+      "sha256": "78e06b9a2206b520154756ad5b745a34468255e911eb242ed6916e0f92b0d535",
+      "bytes": 3648
+    },
+    {
+      "path": "catalogs/unit-aliases.json",
+      "sha256": "da3e58242e917ddb91a49da8a0c60126f1fb3d7bca9d61c311fdff68928d5caa",
+      "bytes": 334
+    },
+    {
+      "path": "fixtures/canonical-json.json",
+      "sha256": "ef0ff71969db8f65d08ac7e5104ced5d22b98a5713ea70727616ed40ebdb3960",
+      "bytes": 7649
+    },
+    {
+      "path": "fixtures/definitions.json",
+      "sha256": "54460a41ab7446b017c6a9d353da6615037cbabaa9f223703ba4db9bad7085c4",
+      "bytes": 91026
+    },
+    {
+      "path": "fixtures/evaluation-records.json",
+      "sha256": "ab1a5e9c2f7771573d8602f19c143c0c4e3f61f923998028e4011c465a8ae9dd",
+      "bytes": 99840
+    },
+    {
+      "path": "fixtures/monotonicity.json",
+      "sha256": "c31dd9bc2f08dea0a36937e7e9293d5f17ae093d5637e6117815a304f4c798f0",
+      "bytes": 24137
+    },
+    {
+      "path": "fixtures/operations.json",
+      "sha256": "f0594a48259cd9ff2f292387f27a4cac74ff5dcb13ce6aa6cc058224b57e623b",
+      "bytes": 43720
+    },
+    {
+      "path": "fixtures/point-evaluations.json",
+      "sha256": "ab61709297a787bca80bc3da1c61fc238007982715cfa1d8405d46ae6510c880",
+      "bytes": 32673
+    },
+    {
+      "path": "fixtures/registry-references.json",
+      "sha256": "dcd2123acdbc9fb76d9a6cb391ac89b6d095b8113c0fa0e287bd1871a1bf844c",
+      "bytes": 19302
+    },
+    {
+      "path": "fixtures/spatial-policies.json",
+      "sha256": "0da6da08ef3e7ffbe7eed8cd625b425393f208401e10b981293b6844d9bde530",
+      "bytes": 7850
+    },
+    {
+      "path": "fixtures/spatial-records.json",
+      "sha256": "ed80d18f25e5a82baa02eba9352b54c9fe7fbd5a9d6e44cf881cc21a054807c1",
+      "bytes": 44389
+    },
+    {
+      "path": "schemas/impact-definition-1.0.schema.json",
+      "sha256": "3932c5b3b9730e6d0d8f28589b43e6d50749276dc404b160c061b2c6ddb1d717",
+      "bytes": 46298
+    },
+    {
+      "path": "schemas/impact-evaluation-record-1.0.schema.json",
+      "sha256": "86a5fed1d4c5a03ea232288da4eb4b45c4d7f770ee6b05ce8c63a5c3140c1140",
+      "bytes": 51317
+    },
+    {
+      "path": "schemas/registry-impact-reference-1.0.schema.json",
+      "sha256": "9ff7d2dc1d1dab2e50bb233b5c1e3305a4a9fbda885e8548cf8cdd76865f3fff",
+      "bytes": 13347
+    },
+    {
+      "path": "schemas/spatial-combination-policy-1.0.schema.json",
+      "sha256": "1529f86f695b2db95bb42a148f1ddfd9fbd0f91b706e715fe3e2d28ac3384c09",
+      "bytes": 5732
+    },
+    {
+      "path": "schemas/spatial-impact-evaluation-record-1.0.schema.json",
+      "sha256": "f28ee4fa8e3395f42d0d4a8819a59a6b499978a23ea808d129c0fdc3c7dc7500",
+      "bytes": 21382
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "description": "Documented v1 alias normalization applied before exact canonical unit equality. Physical conversions are never implied.",
+  "aliases": {
+    "metre": "m",
+    "metres": "m",
+    "meter": "m",
+    "meters": "m",
+    "day": "d",
+    "days": "d",
+    "fraction": "1",
+    "ratio": "1",
+    "dimensionless": "1"
+  }
+}

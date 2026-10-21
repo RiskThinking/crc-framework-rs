@@ -1,0 +1,1499 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.riskthinking.ai/crc/impact/1.0.0/impact-evaluation-record-1.0.schema.json",
+  "title": "CRC impact evaluation record 1.0",
+  "type": "object",
+  "description": "Independently versioned record of one impact operation: function identity, data identity, operation settings, engine identity and replay completeness. record_hash uses the canonical profile.",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Evaluation-record format.",
+      "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+      "x-crc-native": "ImpactEvaluationRecord::schema_version"
+    },
+    "function": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/function_definition"
+        },
+        {
+          "$ref": "#/$defs/function_custom"
+        }
+      ],
+      "description": "Function identity.",
+      "x-crc-canonical": "tagged object",
+      "x-crc-native": "ImpactEvaluationRecord::function: FunctionIdentity"
+    },
+    "operation": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/operation_point"
+        },
+        {
+          "$ref": "#/$defs/operation_expected_value"
+        },
+        {
+          "$ref": "#/$defs/operation_transform_distribution"
+        },
+        {
+          "$ref": "#/$defs/operation_tabulate"
+        }
+      ],
+      "description": "Operation and its typed settings.",
+      "x-crc-canonical": "tagged object",
+      "x-crc-native": "ImpactEvaluationRecord::operation: Operation"
+    },
+    "engine": {
+      "$ref": "#/$defs/engine",
+      "description": "Engine identity.",
+      "x-crc-canonical": "object with all members present",
+      "x-crc-native": "ImpactEvaluationRecord::engine: EngineIdentity"
+    },
+    "source": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/source_point_array"
+        },
+        {
+          "$ref": "#/$defs/source_canonical_distribution"
+        },
+        {
+          "$ref": "#/$defs/source_histogram"
+        },
+        {
+          "$ref": "#/$defs/source_untracked"
+        }
+      ],
+      "description": "Evaluated-input description.",
+      "x-crc-canonical": "tagged object with all members present",
+      "x-crc-native": "ImpactEvaluationRecord::source: SourceIdentity"
+    },
+    "preprocessing": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/preprocessing_step"
+      },
+      "description": "Ordered explicit preprocessing.",
+      "x-crc-canonical": "array order preserved",
+      "x-crc-native": "ImpactEvaluationRecord::preprocessing: Vec<PreprocessingStep>"
+    },
+    "resolution": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/resolution"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Registry resolution for this application, or null.",
+      "x-crc-canonical": "object or null",
+      "x-crc-native": "ImpactEvaluationRecord::resolution: Option<Resolution>"
+    },
+    "diagnostics": {
+      "$ref": "#/$defs/diagnostics",
+      "description": "Method diagnostics.",
+      "x-crc-canonical": "object with all members present",
+      "x-crc-native": "ImpactEvaluationRecord::diagnostics: Diagnostics"
+    },
+    "replay": {
+      "$ref": "#/$defs/replay",
+      "description": "Replay completeness.",
+      "x-crc-canonical": "object",
+      "x-crc-native": "ImpactEvaluationRecord::replay: Replay"
+    }
+  },
+  "required": [
+    "schema_version",
+    "function",
+    "operation",
+    "engine",
+    "source",
+    "preprocessing",
+    "resolution",
+    "diagnostics",
+    "replay"
+  ],
+  "x-crc-rules": [
+    "A custom function has replay status runtime_only; a definition function never does.",
+    "Complete replay requires a source snapshot."
+  ],
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "description": "Non-empty, case-sensitive string without surrounding whitespace."
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Non-empty free text."
+    },
+    "number": {
+      "type": "number",
+      "description": "JSON number converted once to finite IEEE binary64; booleans and strings are rejected."
+    },
+    "non_negative_number": {
+      "type": "number",
+      "minimum": 0
+    },
+    "positive_number": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "probability": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "positive_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 18446744073709551615
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Bare SHA-256 digest as 64 lowercase hexadecimal characters."
+    },
+    "content_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "Prefixed content identity: sha256 of the canonical JSON bytes."
+    },
+    "h3_cell": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{15}$",
+      "description": "H3 cell index as 15 lowercase hexadecimal characters."
+    },
+    "digest": {
+      "type": "object",
+      "description": "Domain-separated content digest of a canonical snapshot encoding.",
+      "additionalProperties": false,
+      "properties": {
+        "encoding": {
+          "$ref": "#/$defs/identifier",
+          "description": "Versioned encoding prefix included in the hash preimage, for example crc-array-f64le/1 or raw-bytes.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "ContentDigest::encoding: String"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "Digest of the encoded bytes.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "ContentDigest::sha256: [u8; 32]"
+        }
+      },
+      "required": [
+        "encoding",
+        "sha256"
+      ]
+    },
+    "snapshot": {
+      "type": "object",
+      "description": "Immutable snapshot reference. Hashing alone does not retain data.",
+      "additionalProperties": false,
+      "properties": {
+        "uri": {
+          "$ref": "#/$defs/identifier",
+          "description": "Location of the snapshot.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "SnapshotRef::uri: String"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Snapshot revision when versioned.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "SnapshotRef::revision: Option<String>",
+          "default": null
+        },
+        "content_sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "Digest of the snapshot bytes.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "SnapshotRef::content_sha256: [u8; 32]"
+        },
+        "retention": {
+          "type": "string",
+          "enum": [
+            "retained",
+            "external"
+          ],
+          "description": "retained: written by the workflow; external: the caller must preserve it.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "SnapshotRef::retention: Retention"
+        }
+      },
+      "required": [
+        "uri",
+        "content_sha256",
+        "retention"
+      ]
+    },
+    "selection": {
+      "type": "object",
+      "description": "Applied row, column and scenario selection.",
+      "additionalProperties": false,
+      "properties": {
+        "dataset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Dataset identity.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "Selection::dataset: Option<String>",
+          "default": null
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/identifier"
+          },
+          "description": "Selected columns.",
+          "x-crc-canonical": "array order preserved; always present in canonical form",
+          "x-crc-native": "Selection::columns: Vec<String>",
+          "default": []
+        },
+        "rows": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/text"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Row selection description.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "Selection::rows: Option<String>",
+          "default": null
+        },
+        "scenario": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Scenario.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "Selection::scenario: Option<String>",
+          "default": null
+        },
+        "horizon": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Horizon.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "Selection::horizon: Option<String>",
+          "default": null
+        }
+      },
+      "required": []
+    },
+    "context": {
+      "type": "object",
+      "description": "Registry resolution context. Every member is nullable and defaults to null; only context used by the resolved branch carries values in a frozen origin.",
+      "additionalProperties": false,
+      "properties": {
+        "cell": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/h3_cell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "H3 cell of the matched hazard row.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "ImpactContext::cell: Option<u64> (validated H3 index)",
+          "default": null
+        },
+        "country": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Country key, normalized only by the pinned registry manifest.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "ImpactContext::country: Option<String>",
+          "default": null
+        },
+        "continent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Continent key used by flood tables.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "ImpactContext::continent: Option<String>",
+          "default": null
+        },
+        "building_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Building type key used by flood, SPEI and baseline-relative tables.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "ImpactContext::building_type: Option<String>",
+          "default": null
+        },
+        "historic_mean": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Historical baseline exposure for baseline-relative factors.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; always present in canonical form",
+          "x-crc-native": "ImpactContext::historic_mean: Option<f64>",
+          "default": null
+        }
+      },
+      "required": []
+    },
+    "function_definition": {
+      "type": "object",
+      "description": "Function identified by an impact definition hash.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "definition",
+          "description": "Variant tag 'definition'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "FunctionIdentity::Definition"
+        },
+        "definition_hash": {
+          "$ref": "#/$defs/content_hash",
+          "description": "Definition identity.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "FunctionIdentity::Definition::definition_hash: DefinitionHash"
+        }
+      },
+      "required": [
+        "kind",
+        "definition_hash"
+      ]
+    },
+    "function_custom": {
+      "type": "object",
+      "description": "Runtime-only custom function; never claims serializable reproducibility.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "custom",
+          "description": "Variant tag 'custom'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "FunctionIdentity::Custom"
+        },
+        "module": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Python module when available.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "FunctionIdentity::Custom::module: Option<String>",
+          "default": null
+        },
+        "qualified_name": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Qualified name when available.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "FunctionIdentity::Custom::qualified_name: Option<String>",
+          "default": null
+        },
+        "type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Runtime type name when available.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "FunctionIdentity::Custom::type_name: Option<String>",
+          "default": null
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "settings_point": {
+      "type": "object",
+      "description": "Point evaluation settings.",
+      "additionalProperties": false,
+      "properties": {
+        "alignment": {
+          "type": "string",
+          "const": "event_aligned",
+          "description": "Exposures are event-aligned and never sorted.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "PointSettings::alignment"
+        },
+        "shape": {
+          "type": "string",
+          "const": "preserve",
+          "description": "Scalar/array form, shape and order are preserved.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "PointSettings::shape"
+        }
+      },
+      "required": [
+        "alignment",
+        "shape"
+      ]
+    },
+    "method_exact": {
+      "type": "object",
+      "description": "Exact integration.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "exact",
+          "description": "Variant tag 'exact'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "IntegrationMethod::Exact"
+        },
+        "version": {
+          "$ref": "#/$defs/identifier",
+          "description": "Versioned numerical method identity.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "IntegrationMethod::version: String"
+        }
+      },
+      "required": [
+        "kind",
+        "version"
+      ]
+    },
+    "method_gauss_kronrod": {
+      "type": "object",
+      "description": "Adaptive Gauss-Kronrod 15/7 quadrature on the probability interval.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "gauss_kronrod",
+          "description": "Variant tag 'gauss_kronrod'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "IntegrationMethod::GaussKronrod"
+        },
+        "version": {
+          "$ref": "#/$defs/identifier",
+          "description": "Versioned numerical method identity.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "IntegrationMethod::version: String"
+        },
+        "absolute_tolerance": {
+          "$ref": "#/$defs/positive_number",
+          "description": "Absolute error tolerance.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "GaussKronrodOptions::absolute_tolerance: f64"
+        },
+        "relative_tolerance": {
+          "$ref": "#/$defs/positive_number",
+          "description": "Relative error tolerance.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "GaussKronrodOptions::relative_tolerance: f64"
+        },
+        "max_evaluations": {
+          "$ref": "#/$defs/positive_count",
+          "description": "Maximum integrand evaluations.",
+          "x-crc-canonical": "JSON integer without fraction or exponent",
+          "x-crc-native": "GaussKronrodOptions::max_evaluations: u64"
+        }
+      },
+      "required": [
+        "kind",
+        "version",
+        "absolute_tolerance",
+        "relative_tolerance",
+        "max_evaluations"
+      ]
+    },
+    "settings_expected_value": {
+      "type": "object",
+      "description": "Expectation settings: E[f(X)], never f(E[X]).",
+      "additionalProperties": false,
+      "properties": {
+        "requested_method": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "exact",
+            "gauss_kronrod"
+          ],
+          "description": "Method requested by the caller.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "ExpectationSettings::requested: MethodRequest"
+        },
+        "method": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/method_exact"
+            },
+            {
+              "$ref": "#/$defs/method_gauss_kronrod"
+            }
+          ],
+          "description": "Resolved method with every effective default.",
+          "x-crc-canonical": "tagged object",
+          "x-crc-native": "ExpectationSettings::method: IntegrationMethod"
+        }
+      },
+      "required": [
+        "requested_method",
+        "method"
+      ],
+      "x-crc-rules": [
+        "A non-auto request equals the resolved method kind."
+      ]
+    },
+    "settings_transform_distribution": {
+      "type": "object",
+      "description": "Distribution pushforward settings.",
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "$ref": "#/$defs/identifier",
+          "description": "Exact pushforward algorithm identity, for example crc-pushforward/1.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "TransformSettings::algorithm: String"
+        }
+      },
+      "required": [
+        "algorithm"
+      ]
+    },
+    "settings_tabulate": {
+      "type": "object",
+      "description": "Explicit approximate tabulation of a distribution.",
+      "additionalProperties": false,
+      "properties": {
+        "probabilities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/probability"
+          },
+          "description": "Full probability grid.",
+          "x-crc-canonical": "array order preserved",
+          "x-crc-native": "TabulationSettings::probabilities: Vec<f64>"
+        },
+        "interpolation": {
+          "type": "string",
+          "enum": [
+            "linear_probability",
+            "log_return_period"
+          ],
+          "description": "Required interpolation choice.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "TabulationSettings::interpolation: Interpolation"
+        },
+        "approximate": {
+          "const": true,
+          "description": "The artifact is an approximation.",
+          "x-crc-canonical": "true",
+          "x-crc-native": "TabulationSettings::approximate"
+        }
+      },
+      "required": [
+        "probabilities",
+        "interpolation",
+        "approximate"
+      ],
+      "x-crc-rules": [
+        "probabilities strictly increase."
+      ]
+    },
+    "operation_point": {
+      "type": "object",
+      "description": "point operation.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "point",
+          "description": "Variant tag 'point'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Operation::point"
+        },
+        "settings": {
+          "$ref": "#/$defs/settings_point",
+          "description": "Typed operation settings.",
+          "x-crc-canonical": "object with sorted keys",
+          "x-crc-native": "Operation::point::settings"
+        }
+      },
+      "required": [
+        "kind",
+        "settings"
+      ]
+    },
+    "operation_expected_value": {
+      "type": "object",
+      "description": "expected_value operation.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "expected_value",
+          "description": "Variant tag 'expected_value'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Operation::expected_value"
+        },
+        "settings": {
+          "$ref": "#/$defs/settings_expected_value",
+          "description": "Typed operation settings.",
+          "x-crc-canonical": "object with sorted keys",
+          "x-crc-native": "Operation::expected_value::settings"
+        }
+      },
+      "required": [
+        "kind",
+        "settings"
+      ]
+    },
+    "operation_transform_distribution": {
+      "type": "object",
+      "description": "transform_distribution operation.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "transform_distribution",
+          "description": "Variant tag 'transform_distribution'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Operation::transform_distribution"
+        },
+        "settings": {
+          "$ref": "#/$defs/settings_transform_distribution",
+          "description": "Typed operation settings.",
+          "x-crc-canonical": "object with sorted keys",
+          "x-crc-native": "Operation::transform_distribution::settings"
+        }
+      },
+      "required": [
+        "kind",
+        "settings"
+      ]
+    },
+    "operation_tabulate": {
+      "type": "object",
+      "description": "tabulate operation.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "tabulate",
+          "description": "Variant tag 'tabulate'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Operation::tabulate"
+        },
+        "settings": {
+          "$ref": "#/$defs/settings_tabulate",
+          "description": "Typed operation settings.",
+          "x-crc-canonical": "object with sorted keys",
+          "x-crc-native": "Operation::tabulate::settings"
+        }
+      },
+      "required": [
+        "kind",
+        "settings"
+      ]
+    },
+    "engine": {
+      "type": "object",
+      "description": "Engine identity.",
+      "additionalProperties": false,
+      "properties": {
+        "framework_version": {
+          "$ref": "#/$defs/identifier",
+          "description": "Framework package version.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "EngineIdentity::framework_version: String"
+        },
+        "source_revision": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Source revision when known.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "EngineIdentity::source_revision: Option<String>",
+          "default": null
+        },
+        "build_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Build identity when available.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "EngineIdentity::build_id: Option<String>",
+          "default": null
+        },
+        "target": {
+          "$ref": "#/$defs/identifier",
+          "description": "Target platform triple.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "EngineIdentity::target: String"
+        },
+        "numerical_methods": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/identifier"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/identifier"
+          },
+          "description": "Numerical method name to version.",
+          "x-crc-canonical": "object with sorted keys",
+          "x-crc-native": "EngineIdentity::numerical_methods: BTreeMap<String, String>"
+        }
+      },
+      "required": [
+        "framework_version",
+        "target",
+        "numerical_methods"
+      ]
+    },
+    "curve_parameters": {
+      "type": "object",
+      "description": "Canonical CRC curve snapshot in the existing CurveParameters form.",
+      "additionalProperties": false,
+      "properties": {
+        "curve_kind": {
+          "type": "string",
+          "enum": [
+            "fitted",
+            "hurdle",
+            "point_mass",
+            "tabulated"
+          ],
+          "description": "Canonical curve kind; no-data rows are not exposure distributions.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "CurveParameters::curve_kind: String"
+        },
+        "curve_type": {
+          "$ref": "#/$defs/identifier",
+          "description": "Canonical curve type.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "CurveParameters::curve_type: String"
+        },
+        "curve_shape": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Canonical curve shape.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0 or null; always present in canonical form",
+          "x-crc-native": "CurveParameters::curve_shape: Option<f64>",
+          "default": null
+        },
+        "curve_location": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Canonical curve location.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0 or null; always present in canonical form",
+          "x-crc-native": "CurveParameters::curve_location: Option<f64>",
+          "default": null
+        },
+        "curve_scale": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Canonical curve scale.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0 or null; always present in canonical form",
+          "x-crc-native": "CurveParameters::curve_scale: Option<f64>",
+          "default": null
+        },
+        "curve_atom_probability": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Canonical curve atom_probability.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0 or null; always present in canonical form",
+          "x-crc-native": "CurveParameters::curve_atom_probability: Option<f64>",
+          "default": null
+        },
+        "curve_atom_location": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Canonical curve atom_location.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0 or null; always present in canonical form",
+          "x-crc-native": "CurveParameters::curve_atom_location: Option<f64>",
+          "default": null
+        },
+        "curve_probabilities": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/number"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Canonical curve probabilities.",
+          "x-crc-canonical": "array order preserved or null; always present in canonical form",
+          "x-crc-native": "CurveParameters::curve_probabilities: Option<Vec<f64>>",
+          "default": null
+        },
+        "curve_values": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/number"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Canonical curve values.",
+          "x-crc-canonical": "array order preserved or null; always present in canonical form",
+          "x-crc-native": "CurveParameters::curve_values: Option<Vec<f64>>",
+          "default": null
+        }
+      },
+      "required": [
+        "curve_kind",
+        "curve_type"
+      ],
+      "x-crc-rules": [
+        "Curve parameters must reconstruct a supported canonical CRC distribution.",
+        "Fitted/hurdle sources require a supported family, location, positive scale, and the family's required shape; Gumbel shape normalizes to null.",
+        "Fitted sources contain no atom parameters; hurdle sources require an atom location and probability strictly between zero and one.",
+        "Point masses require no shape, zero scale, probability one, and matching curve and atom locations.",
+        "Tabulated sources require linear_probability, no scalar parameters, equal knot arrays of length at least two, increasing probabilities in [0,1], and non-decreasing values.",
+        "The native reconstructor additionally checks that a hurdle's conditional tail is numerically viable."
+      ]
+    },
+    "source_point_array": {
+      "type": "object",
+      "description": "Event-aligned exposure array.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "point_array",
+          "description": "Variant tag 'point_array'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "SourceIdentity::PointArray"
+        },
+        "shape": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/count"
+          },
+          "description": "Array shape; empty for scalars.",
+          "x-crc-canonical": "array of integers",
+          "x-crc-native": "SourceIdentity::PointArray::shape: Vec<u64>"
+        },
+        "content_digest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Digest of the evaluated data in its canonical snapshot encoding.",
+          "x-crc-canonical": "always present in canonical form",
+          "x-crc-native": "SourceIdentity::content_digest: Option<ContentDigest>",
+          "default": null
+        },
+        "snapshot": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/snapshot"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Retained or external snapshot; required for complete replay.",
+          "x-crc-canonical": "always present in canonical form",
+          "x-crc-native": "SourceIdentity::snapshot: Option<SnapshotRef>",
+          "default": null
+        },
+        "selection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/selection"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Applied selection.",
+          "x-crc-canonical": "always present in canonical form",
+          "x-crc-native": "SourceIdentity::selection: Option<Selection>",
+          "default": null
+        }
+      },
+      "required": [
+        "kind",
+        "shape"
+      ]
+    },
+    "source_canonical_distribution": {
+      "type": "object",
+      "description": "Canonical CRC distribution.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "canonical_distribution",
+          "description": "Variant tag 'canonical_distribution'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "SourceIdentity::CanonicalDistribution"
+        },
+        "parameters": {
+          "$ref": "#/$defs/curve_parameters",
+          "description": "Curve snapshot.",
+          "x-crc-canonical": "object with all members present",
+          "x-crc-native": "SourceIdentity::CanonicalDistribution::parameters: CurveParameters"
+        },
+        "content_digest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Digest of the evaluated data in its canonical snapshot encoding.",
+          "x-crc-canonical": "always present in canonical form",
+          "x-crc-native": "SourceIdentity::content_digest: Option<ContentDigest>",
+          "default": null
+        },
+        "snapshot": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/snapshot"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Retained or external snapshot; required for complete replay.",
+          "x-crc-canonical": "always present in canonical form",
+          "x-crc-native": "SourceIdentity::snapshot: Option<SnapshotRef>",
+          "default": null
+        },
+        "selection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/selection"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Applied selection.",
+          "x-crc-canonical": "always present in canonical form",
+          "x-crc-native": "SourceIdentity::selection: Option<Selection>",
+          "default": null
+        }
+      },
+      "required": [
+        "kind",
+        "parameters"
+      ]
+    },
+    "source_histogram": {
+      "type": "object",
+      "description": "Caller-supplied uniform-within-bin histogram; edges and weights live in the snapshot.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "histogram",
+          "description": "Variant tag 'histogram'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "SourceIdentity::Histogram"
+        },
+        "interval_count": {
+          "$ref": "#/$defs/positive_count",
+          "description": "Number of intervals.",
+          "x-crc-canonical": "JSON integer without fraction or exponent",
+          "x-crc-native": "SourceIdentity::Histogram::interval_count: u64"
+        },
+        "within_bin": {
+          "type": "string",
+          "const": "uniform",
+          "description": "Within-bin interpretation.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "WithinBin::Uniform"
+        },
+        "original_mass_sum": {
+          "$ref": "#/$defs/positive_number",
+          "description": "Neumaier sum of weights in input-bin order before normalization.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "HistogramMass::original_sum: f64"
+        },
+        "normalization_factor": {
+          "$ref": "#/$defs/positive_number",
+          "description": "1 / original_mass_sum, reported for audit; weights are divided by original_mass_sum once.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "HistogramMass::normalization_factor: f64"
+        },
+        "content_digest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Digest of the evaluated data in its canonical snapshot encoding.",
+          "x-crc-canonical": "always present in canonical form",
+          "x-crc-native": "SourceIdentity::content_digest: Option<ContentDigest>",
+          "default": null
+        },
+        "snapshot": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/snapshot"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Retained or external snapshot; required for complete replay.",
+          "x-crc-canonical": "always present in canonical form",
+          "x-crc-native": "SourceIdentity::snapshot: Option<SnapshotRef>",
+          "default": null
+        },
+        "selection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/selection"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Applied selection.",
+          "x-crc-canonical": "always present in canonical form",
+          "x-crc-native": "SourceIdentity::selection: Option<Selection>",
+          "default": null
+        }
+      },
+      "required": [
+        "kind",
+        "interval_count",
+        "within_bin",
+        "original_mass_sum",
+        "normalization_factor"
+      ],
+      "x-crc-rules": [
+        "|original_mass_sum - 1| <= 1e-12.",
+        "normalization_factor equals binary64 1 / original_mass_sum."
+      ]
+    },
+    "source_untracked": {
+      "type": "object",
+      "description": "External data with no retained identity.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "untracked",
+          "description": "Variant tag 'untracked'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "SourceIdentity::Untracked"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/text"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Caller description.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "SourceIdentity::Untracked::description: Option<String>",
+          "default": null
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "preprocessing_step": {
+      "type": "object",
+      "description": "One explicit caller conversion or normalization, in application order.",
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "$ref": "#/$defs/identifier",
+          "description": "Operation identity, for example unit_conversion.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "PreprocessingStep::operation: String"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/text"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Description.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "PreprocessingStep::description: Option<String>",
+          "default": null
+        },
+        "parameters": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/identifier"
+          },
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "description": "Scalar operation parameters.",
+          "x-crc-canonical": "object with sorted keys; always present in canonical form",
+          "x-crc-native": "PreprocessingStep::parameters: BTreeMap<String, Scalar>",
+          "default": {}
+        },
+        "input_digest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Input data identity.",
+          "x-crc-canonical": "always present in canonical form",
+          "x-crc-native": "PreprocessingStep::input_digest: Option<ContentDigest>",
+          "default": null
+        },
+        "output_digest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Resulting data identity.",
+          "x-crc-canonical": "always present in canonical form",
+          "x-crc-native": "PreprocessingStep::output_digest: Option<ContentDigest>",
+          "default": null
+        }
+      },
+      "required": [
+        "operation"
+      ]
+    },
+    "resolution": {
+      "type": "object",
+      "description": "Registry resolution performed for this application.",
+      "additionalProperties": false,
+      "properties": {
+        "reference_hash": {
+          "$ref": "#/$defs/content_hash",
+          "description": "Registry reference identity.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Resolution::reference_hash: ReferenceHash"
+        },
+        "context": {
+          "$ref": "#/$defs/context",
+          "description": "Effective merged context.",
+          "x-crc-canonical": "object with all members present",
+          "x-crc-native": "Resolution::context: ImpactContext"
+        },
+        "context_hash": {
+          "$ref": "#/$defs/content_hash",
+          "description": "Identity of the canonical effective context.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Resolution::context_hash: ContentHash"
+        }
+      },
+      "required": [
+        "reference_hash",
+        "context",
+        "context_hash"
+      ],
+      "x-crc-rules": [
+        "context_hash equals the content hash of the canonical context."
+      ]
+    },
+    "component": {
+      "type": "object",
+      "description": "Exact or numerical subcomponent of a result.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "exact",
+            "numerical"
+          ],
+          "description": "Component method class.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Component::kind"
+        },
+        "value": {
+          "$ref": "#/$defs/number",
+          "description": "Component value.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "Component::value: f64"
+        },
+        "estimated_error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/non_negative_number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Estimated numerical error.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0 or null; always present in canonical form",
+          "x-crc-native": "Component::estimated_error: Option<f64>",
+          "default": null
+        },
+        "evaluations": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/count"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Integrand evaluations.",
+          "x-crc-canonical": "JSON integer without fraction or exponent or null; always present in canonical form",
+          "x-crc-native": "Component::evaluations: Option<u64>",
+          "default": null
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ]
+    },
+    "diagnostics": {
+      "type": "object",
+      "description": "Method diagnostics; no invented statistical confidence.",
+      "additionalProperties": false,
+      "properties": {
+        "exactness": {
+          "type": "string",
+          "enum": [
+            "direct",
+            "exact",
+            "numerical",
+            "mixed"
+          ],
+          "description": "direct point evaluation, exact integration, numerical integration, or a mix.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Diagnostics::exactness"
+        },
+        "estimated_error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/non_negative_number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Estimated numerical error.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0 or null; always present in canonical form",
+          "x-crc-native": "Diagnostics::estimated_error: Option<f64>",
+          "default": null
+        },
+        "evaluations": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/count"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Total integrand evaluations.",
+          "x-crc-canonical": "JSON integer without fraction or exponent or null; always present in canonical form",
+          "x-crc-native": "Diagnostics::evaluations: Option<u64>",
+          "default": null
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/component"
+          },
+          "description": "Exact and numerical subcomponents.",
+          "x-crc-canonical": "array order preserved; always present in canonical form",
+          "x-crc-native": "Diagnostics::components: Vec<Component>",
+          "default": []
+        }
+      },
+      "required": [
+        "exactness"
+      ]
+    },
+    "replay": {
+      "type": "object",
+      "description": "Replay completeness.",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "complete",
+            "missing_source_snapshot",
+            "runtime_only"
+          ],
+          "description": "Replay status.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Replay::status"
+        },
+        "missing_requirements": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "engine_build",
+              "function_definition",
+              "preprocessing_snapshot",
+              "registry_context_snapshot",
+              "source_snapshot"
+            ]
+          },
+          "description": "Requirements missing for complete replay.",
+          "x-crc-canonical": "sorted ascending, duplicate-free",
+          "x-crc-native": "Replay::missing_requirements: BTreeSet<ReplayRequirement>"
+        }
+      },
+      "required": [
+        "status",
+        "missing_requirements"
+      ],
+      "x-crc-rules": [
+        "complete if and only if missing_requirements is empty.",
+        "missing_source_snapshot lists source_snapshot."
+      ]
+    }
+  }
+}

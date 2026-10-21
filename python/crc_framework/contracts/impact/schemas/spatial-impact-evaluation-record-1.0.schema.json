@@ -1,0 +1,595 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.riskthinking.ai/crc/impact/1.0.0/spatial-impact-evaluation-record-1.0.schema.json",
+  "title": "CRC spatial impact evaluation record 1.0",
+  "type": "object",
+  "description": "Application record for a spatial combination. Never assigns a single function hash to an application that evaluated multiple definitions; function identities live in child records and the contributor snapshot.",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Spatial record format.",
+      "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+      "x-crc-native": "SpatialImpactEvaluationRecord::schema_version"
+    },
+    "policy": {
+      "$ref": "#/$defs/policy",
+      "description": "Canonical policy.",
+      "x-crc-canonical": "object with all members present",
+      "x-crc-native": "SpatialImpactEvaluationRecord::policy"
+    },
+    "policy_hash": {
+      "$ref": "#/$defs/content_hash",
+      "description": "Policy identity.",
+      "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+      "x-crc-native": "SpatialImpactEvaluationRecord::policy_hash"
+    },
+    "target": {
+      "$ref": "#/$defs/target",
+      "description": "Target identity.",
+      "x-crc-canonical": "object with all members present",
+      "x-crc-native": "SpatialImpactEvaluationRecord::target"
+    },
+    "contributors": {
+      "$ref": "#/$defs/snapshot",
+      "description": "Contributor snapshot mapping stable IDs to source, selection, alignment and function identities.",
+      "x-crc-canonical": "object",
+      "x-crc-native": "SpatialImpactEvaluationRecord::contributors: SnapshotRef"
+    },
+    "contributor_count": {
+      "$ref": "#/$defs/positive_count",
+      "description": "Number of contributors.",
+      "x-crc-canonical": "JSON integer without fraction or exponent",
+      "x-crc-native": "SpatialImpactEvaluationRecord::contributor_count: u64"
+    },
+    "geometry": {
+      "$ref": "#/$defs/geometry",
+      "description": "Geometry and coverage diagnostics.",
+      "x-crc-canonical": "object",
+      "x-crc-native": "SpatialImpactEvaluationRecord::geometry"
+    },
+    "weights": {
+      "$ref": "#/$defs/weights",
+      "description": "Weight snapshots.",
+      "x-crc-canonical": "object with all members present",
+      "x-crc-native": "SpatialImpactEvaluationRecord::weights"
+    },
+    "combined_exposure": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/digest"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Combined exposure identity for the exposure stage; null for the impact stage.",
+      "x-crc-canonical": "object or null",
+      "x-crc-native": "SpatialImpactEvaluationRecord::combined_exposure: Option<ContentDigest>"
+    },
+    "children": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/child"
+      },
+      "description": "Child evaluation records.",
+      "x-crc-canonical": "array order preserved",
+      "x-crc-native": "SpatialImpactEvaluationRecord::children: Vec<SpatialChild>"
+    },
+    "replay": {
+      "$ref": "#/$defs/replay",
+      "description": "Replay completeness.",
+      "x-crc-canonical": "object",
+      "x-crc-native": "SpatialImpactEvaluationRecord::replay: Replay"
+    }
+  },
+  "required": [
+    "schema_version",
+    "policy",
+    "policy_hash",
+    "target",
+    "contributors",
+    "contributor_count",
+    "geometry",
+    "weights",
+    "combined_exposure",
+    "children",
+    "replay"
+  ],
+  "x-crc-rules": [
+    "policy_hash equals the content hash of the canonical policy.",
+    "exposure stage: combined_exposure is present and children is one target child with null contributor_id.",
+    "impact stage: combined_exposure is null and children has one record per contributor with unique ids.",
+    "Provided weights require a weight unit."
+  ],
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "description": "Non-empty, case-sensitive string without surrounding whitespace."
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Non-empty free text."
+    },
+    "number": {
+      "type": "number",
+      "description": "JSON number converted once to finite IEEE binary64; booleans and strings are rejected."
+    },
+    "non_negative_number": {
+      "type": "number",
+      "minimum": 0
+    },
+    "positive_number": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "probability": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "positive_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 18446744073709551615
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Bare SHA-256 digest as 64 lowercase hexadecimal characters."
+    },
+    "content_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "Prefixed content identity: sha256 of the canonical JSON bytes."
+    },
+    "h3_cell": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{15}$",
+      "description": "H3 cell index as 15 lowercase hexadecimal characters."
+    },
+    "weights_intersection_area": {
+      "type": "object",
+      "description": "Weights are contributor intersection areas with the target.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "intersection_area",
+          "description": "Variant tag 'intersection_area'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "WeightBasis::IntersectionArea"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "weights_provided": {
+      "type": "object",
+      "description": "Caller-provided weights with a retained contributor-to-weight mapping.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "provided",
+          "description": "Variant tag 'provided'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "WeightBasis::Provided"
+        },
+        "meaning": {
+          "$ref": "#/$defs/text",
+          "description": "Declared meaning of the weights, for example asset_value.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "WeightBasis::Provided::meaning: String"
+        }
+      },
+      "required": [
+        "kind",
+        "meaning"
+      ]
+    },
+    "policy": {
+      "type": "object",
+      "description": "Canonical spatial combination policy.",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "type": "string",
+          "const": "1.0",
+          "description": "Policy wire format.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "SpatialCombinationPolicy::schema_version"
+        },
+        "semantics_version": {
+          "type": "string",
+          "const": "crc-spatial-combination/1",
+          "description": "Reducer and coverage semantics.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "SpatialCombinationPolicy::semantics_version"
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "exposure",
+            "impact"
+          ],
+          "description": "exposure: f(sum w_i x_i); impact: sum w_i f_i(x_i). No implicit choice.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "SpatialCombinationPolicy::stage: Stage"
+        },
+        "reducer": {
+          "type": "string",
+          "const": "weighted_mean",
+          "description": "Reducer; only weighted_mean in v1.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "SpatialCombinationPolicy::reducer: Reducer",
+          "default": "weighted_mean"
+        },
+        "weights": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/weights_intersection_area"
+            },
+            {
+              "$ref": "#/$defs/weights_provided"
+            }
+          ],
+          "description": "Weight basis; actual geometries and values are application data.",
+          "x-crc-canonical": "tagged object",
+          "x-crc-native": "SpatialCombinationPolicy::weights: WeightBasis"
+        },
+        "coverage": {
+          "type": "string",
+          "enum": [
+            "require_full",
+            "covered_only"
+          ],
+          "description": "require_full rejects uncovered area above 1e-9 of target area; covered_only normalizes over covered contributors and reports the uncovered fraction.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "SpatialCombinationPolicy::coverage: Coverage",
+          "default": "require_full"
+        }
+      },
+      "required": [
+        "schema_version",
+        "semantics_version",
+        "stage",
+        "weights"
+      ]
+    },
+    "digest": {
+      "type": "object",
+      "description": "Domain-separated content digest of a canonical snapshot encoding.",
+      "additionalProperties": false,
+      "properties": {
+        "encoding": {
+          "$ref": "#/$defs/identifier",
+          "description": "Versioned encoding prefix included in the hash preimage, for example crc-array-f64le/1 or raw-bytes.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "ContentDigest::encoding: String"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "Digest of the encoded bytes.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "ContentDigest::sha256: [u8; 32]"
+        }
+      },
+      "required": [
+        "encoding",
+        "sha256"
+      ]
+    },
+    "snapshot": {
+      "type": "object",
+      "description": "Immutable snapshot reference. Hashing alone does not retain data.",
+      "additionalProperties": false,
+      "properties": {
+        "uri": {
+          "$ref": "#/$defs/identifier",
+          "description": "Location of the snapshot.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "SnapshotRef::uri: String"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Snapshot revision when versioned.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "SnapshotRef::revision: Option<String>",
+          "default": null
+        },
+        "content_sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "Digest of the snapshot bytes.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "SnapshotRef::content_sha256: [u8; 32]"
+        },
+        "retention": {
+          "type": "string",
+          "enum": [
+            "retained",
+            "external"
+          ],
+          "description": "retained: written by the workflow; external: the caller must preserve it.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "SnapshotRef::retention: Retention"
+        }
+      },
+      "required": [
+        "uri",
+        "content_sha256",
+        "retention"
+      ]
+    },
+    "replay": {
+      "type": "object",
+      "description": "Replay completeness.",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "complete",
+            "missing_source_snapshot",
+            "runtime_only"
+          ],
+          "description": "Replay status.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Replay::status"
+        },
+        "missing_requirements": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "engine_build",
+              "function_definition",
+              "preprocessing_snapshot",
+              "registry_context_snapshot",
+              "source_snapshot"
+            ]
+          },
+          "description": "Requirements missing for complete replay.",
+          "x-crc-canonical": "sorted ascending, duplicate-free",
+          "x-crc-native": "Replay::missing_requirements: BTreeSet<ReplayRequirement>"
+        }
+      },
+      "required": [
+        "status",
+        "missing_requirements"
+      ],
+      "x-crc-rules": [
+        "complete if and only if missing_requirements is empty.",
+        "missing_source_snapshot lists source_snapshot."
+      ]
+    },
+    "target": {
+      "type": "object",
+      "description": "Target identity.",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier",
+          "description": "Stable target identifier.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "SpatialTarget::id: String"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "h3_cell",
+            "geometry"
+          ],
+          "description": "Target kind.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "SpatialTarget::kind"
+        },
+        "cell": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/h3_cell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "H3 target cell.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "SpatialTarget::cell: Option<u64>",
+          "default": null
+        },
+        "geometry_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Digest of the target geometry snapshot.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "SpatialTarget::geometry_sha256: Option<[u8; 32]>",
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "x-crc-rules": [
+        "h3_cell targets have a cell; geometry targets have a geometry digest."
+      ]
+    },
+    "geometry": {
+      "type": "object",
+      "description": "Geometry engine identity and measured coverage diagnostics.",
+      "additionalProperties": false,
+      "properties": {
+        "engine": {
+          "$ref": "#/$defs/identifier",
+          "description": "Geometry engine.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "GeometryDiagnostics::engine: String"
+        },
+        "engine_version": {
+          "$ref": "#/$defs/identifier",
+          "description": "Geometry engine version.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "GeometryDiagnostics::engine_version: String"
+        },
+        "crs": {
+          "$ref": "#/$defs/identifier",
+          "description": "Coordinate reference system.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "GeometryDiagnostics::crs: String"
+        },
+        "area_method": {
+          "$ref": "#/$defs/identifier",
+          "description": "Area measurement method.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "GeometryDiagnostics::area_method: String"
+        },
+        "target_area": {
+          "$ref": "#/$defs/positive_number",
+          "description": "Measured target area.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "GeometryDiagnostics::target_area: f64"
+        },
+        "covered_fraction": {
+          "$ref": "#/$defs/probability",
+          "description": "Union of contributor intersections over target area.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "GeometryDiagnostics::covered_fraction: f64"
+        },
+        "overlap_fraction": {
+          "$ref": "#/$defs/probability",
+          "description": "Positive-area overlap over target area.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "GeometryDiagnostics::overlap_fraction: f64"
+        },
+        "tolerance": {
+          "type": "number",
+          "const": 1e-09,
+          "description": "Fixed relative tolerance for crc-spatial-combination/1; a record cannot relax coverage or overlap policy.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "GeometryDiagnostics::tolerance: f64"
+        }
+      },
+      "required": [
+        "engine",
+        "engine_version",
+        "crs",
+        "area_method",
+        "target_area",
+        "covered_fraction",
+        "overlap_fraction",
+        "tolerance"
+      ],
+      "x-crc-rules": [
+        "overlap_fraction <= tolerance.",
+        "require_full: 1 - covered_fraction <= tolerance."
+      ]
+    },
+    "weights": {
+      "type": "object",
+      "description": "Raw and normalized weight snapshots in stable contributor-ID order.",
+      "additionalProperties": false,
+      "properties": {
+        "raw": {
+          "$ref": "#/$defs/snapshot",
+          "description": "Raw weight snapshot.",
+          "x-crc-canonical": "object",
+          "x-crc-native": "SpatialWeights::raw: SnapshotRef"
+        },
+        "normalized": {
+          "$ref": "#/$defs/snapshot",
+          "description": "Normalized weight snapshot.",
+          "x-crc-canonical": "object",
+          "x-crc-native": "SpatialWeights::normalized: SnapshotRef"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Common weight unit; required for provided weights.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "SpatialWeights::unit: Option<String>",
+          "default": null
+        }
+      },
+      "required": [
+        "raw",
+        "normalized"
+      ]
+    },
+    "child": {
+      "type": "object",
+      "description": "Child point-evaluation record reference.",
+      "additionalProperties": false,
+      "properties": {
+        "contributor_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Contributor for impact-stage children; null for the exposure-stage target child.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "SpatialChild::contributor_id: Option<String>",
+          "default": null
+        },
+        "record_hash": {
+          "$ref": "#/$defs/content_hash",
+          "description": "Child evaluation record identity.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "SpatialChild::record_hash: ContentHash"
+        },
+        "uri": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Child record location.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "SpatialChild::uri: Option<String>",
+          "default": null
+        }
+      },
+      "required": [
+        "record_hash"
+      ]
+    }
+  }
+}

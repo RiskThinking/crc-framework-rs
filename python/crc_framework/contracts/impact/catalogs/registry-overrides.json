@@ -1,0 +1,192 @@
+{
+  "resolver_semantics_version": "crc-impact-registry/1",
+  "factors": {
+    "daily_freezethaw_cycles": {
+      "overrides": {
+        "midpoint": {
+          "nullable": false
+        },
+        "steepness": {
+          "nullable": false
+        },
+        "minimum_damage": {
+          "nullable": false
+        },
+        "maximum_damage": {
+          "nullable": false
+        },
+        "zero_below": {
+          "nullable": true
+        }
+      },
+      "meaning": "minimum_damage and maximum_damage set curve levels (offset and offset + amplitude), not a final clamp."
+    },
+    "frost_days": {
+      "overrides": {
+        "midpoint": {
+          "nullable": false
+        },
+        "steepness": {
+          "nullable": false
+        },
+        "minimum_damage": {
+          "nullable": false
+        },
+        "maximum_damage": {
+          "nullable": false
+        },
+        "zero_below": {
+          "nullable": true
+        }
+      },
+      "meaning": "minimum_damage and maximum_damage set curve levels (offset and offset + amplitude), not a final clamp."
+    },
+    "rx1day": {
+      "overrides": {
+        "midpoint": {
+          "nullable": false
+        },
+        "steepness": {
+          "nullable": false
+        },
+        "minimum_damage": {
+          "nullable": false
+        },
+        "maximum_damage": {
+          "nullable": false
+        },
+        "zero_below": {
+          "nullable": true
+        }
+      },
+      "meaning": "minimum_damage and maximum_damage set curve levels (offset and offset + amplitude), not a final clamp."
+    },
+    "cyclone": {
+      "overrides": {
+        "midpoint": {
+          "nullable": false
+        },
+        "steepness": {
+          "nullable": false
+        },
+        "minimum_damage": {
+          "nullable": false
+        },
+        "maximum_damage": {
+          "nullable": false
+        },
+        "zero_below": {
+          "nullable": true
+        }
+      },
+      "meaning": "minimum_damage and maximum_damage set curve levels (offset and offset + amplitude), not a final clamp."
+    },
+    "wind_max_daily_max": {
+      "overrides": {
+        "midpoint": {
+          "nullable": false
+        },
+        "steepness": {
+          "nullable": false
+        },
+        "minimum_damage": {
+          "nullable": false
+        },
+        "maximum_damage": {
+          "nullable": false
+        },
+        "zero_below": {
+          "nullable": true
+        }
+      },
+      "meaning": "minimum_damage and maximum_damage set curve levels (offset and offset + amplitude), not a final clamp."
+    },
+    "fwi": {
+      "overrides": {
+        "midpoint": {
+          "nullable": false
+        },
+        "steepness": {
+          "nullable": false
+        },
+        "minimum_damage": {
+          "nullable": false
+        },
+        "maximum_damage": {
+          "nullable": false
+        },
+        "zero_below": {
+          "nullable": true
+        }
+      },
+      "meaning": "minimum_damage and maximum_damage set curve levels (offset and offset + amplitude), not a final clamp."
+    },
+    "hot_days": {
+      "overrides": {
+        "slope": {
+          "nullable": false
+        },
+        "intercept": {
+          "nullable": false
+        },
+        "minimum_damage": {
+          "nullable": true
+        },
+        "maximum_damage": {
+          "nullable": true
+        }
+      },
+      "meaning": "minimum_damage and maximum_damage set the final clamp; null clears a limit."
+    },
+    "cflood": {
+      "overrides": {
+        "maximum_damage": {
+          "nullable": false
+        }
+      },
+      "meaning": "maximum_damage scales table values; it is not a clamp."
+    },
+    "rflood": {
+      "overrides": {
+        "maximum_damage": {
+          "nullable": false
+        }
+      },
+      "meaning": "maximum_damage scales table values; it is not a clamp."
+    },
+    "inundation": {
+      "overrides": {
+        "maximum_damage": {
+          "nullable": false
+        }
+      },
+      "meaning": "maximum_damage scales table values; it is not a clamp."
+    },
+    "spei": {
+      "overrides": {
+        "water_unit_cost": {
+          "nullable": false
+        }
+      }
+    },
+    "cooling_degree_days": {
+      "overrides": {
+        "cooling_cost": {
+          "nullable": false
+        }
+      },
+      "branches": {
+        "non_agricultural": [
+          "cooling_cost"
+        ],
+        "agricultural": []
+      }
+    },
+    "maximum_consecutive_dry_days": {
+      "overrides": {},
+      "branches": {
+        "agricultural": []
+      }
+    }
+  }
+}

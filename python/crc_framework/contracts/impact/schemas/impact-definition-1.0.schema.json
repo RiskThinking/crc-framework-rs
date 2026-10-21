@@ -1,0 +1,1230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.riskthinking.ai/crc/impact/1.0.0/impact-definition-1.0.schema.json",
+  "title": "CRC impact definition 1.0",
+  "type": "object",
+  "description": "Immutable, self-contained impact function: model, calibration, final clamp and provenance. Contains no exposure data, aggregation, output or spatial settings. definition_hash is sha256 of the crc-canonical-json/1 encoding of the normalized definition and is never embedded in it.",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Wire format and validation rules.",
+      "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+      "x-crc-native": "ImpactDefinition::schema_version"
+    },
+    "semantics_version": {
+      "type": "string",
+      "const": "crc-impact/1",
+      "description": "Equations, fixed constants, boundary rules and normalization.",
+      "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+      "x-crc-native": "ImpactDefinition::semantics_version"
+    },
+    "calibration": {
+      "$ref": "#/$defs/calibration",
+      "description": "Declared units and meaning.",
+      "x-crc-canonical": "object with sorted keys",
+      "x-crc-native": "ImpactDefinition::calibration: Calibration"
+    },
+    "model": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/model_linear"
+        },
+        {
+          "$ref": "#/$defs/model_sigmoid"
+        },
+        {
+          "$ref": "#/$defs/model_tabulated"
+        },
+        {
+          "$ref": "#/$defs/model_binned"
+        },
+        {
+          "$ref": "#/$defs/model_spei"
+        },
+        {
+          "$ref": "#/$defs/model_cooling"
+        },
+        {
+          "$ref": "#/$defs/model_crop"
+        }
+      ],
+      "description": "Tagged numerical model containing every coefficient needed for evaluation.",
+      "x-crc-canonical": "tagged object with all defaults materialized",
+      "x-crc-native": "ImpactDefinition::model: ModelSpec"
+    },
+    "clamp": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/clamp"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Optional final clamp; omitted or null means no clamp.",
+      "x-crc-canonical": "null or object with both members; always present in canonical form",
+      "x-crc-native": "ImpactDefinition::clamp: Option<Clamp>",
+      "default": null
+    },
+    "provenance": {
+      "$ref": "#/$defs/provenance",
+      "description": "Origin, sources and parent definitions.",
+      "x-crc-canonical": "object with sorted keys",
+      "x-crc-native": "ImpactDefinition::provenance: Provenance"
+    }
+  },
+  "required": [
+    "schema_version",
+    "semantics_version",
+    "calibration",
+    "model",
+    "provenance"
+  ],
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "description": "Non-empty, case-sensitive string without surrounding whitespace."
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Non-empty free text."
+    },
+    "number": {
+      "type": "number",
+      "description": "JSON number converted once to finite IEEE binary64; booleans and strings are rejected."
+    },
+    "non_negative_number": {
+      "type": "number",
+      "minimum": 0
+    },
+    "positive_number": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "probability": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "positive_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 18446744073709551615
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Bare SHA-256 digest as 64 lowercase hexadecimal characters."
+    },
+    "content_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "Prefixed content identity: sha256 of the canonical JSON bytes."
+    },
+    "h3_cell": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{15}$",
+      "description": "H3 cell index as 15 lowercase hexadecimal characters."
+    },
+    "model_linear": {
+      "type": "object",
+      "description": "raw(x) = slope * x + intercept.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "linear",
+          "description": "Variant tag 'linear'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "ModelSpec::Linear"
+        },
+        "slope": {
+          "$ref": "#/$defs/number",
+          "description": "Slope; positive, zero or negative.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "LinearKernel::slope: f64"
+        },
+        "intercept": {
+          "$ref": "#/$defs/number",
+          "description": "Intercept.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; always present in canonical form",
+          "x-crc-native": "LinearKernel::intercept: f64",
+          "default": 0.0
+        }
+      },
+      "required": [
+        "kind",
+        "slope"
+      ]
+    },
+    "model_sigmoid": {
+      "type": "object",
+      "description": "raw(x) = offset + amplitude * (L(steepness * (x - midpoint)) - [L(-steepness * midpoint) if subtract_at_zero]); raw(x) = 0 when zero_below is present and x < zero_below.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "sigmoid",
+          "description": "Variant tag 'sigmoid'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "ModelSpec::Sigmoid"
+        },
+        "midpoint": {
+          "$ref": "#/$defs/number",
+          "description": "Logistic midpoint.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "SigmoidKernel::midpoint: f64"
+        },
+        "steepness": {
+          "$ref": "#/$defs/number",
+          "description": "Logistic steepness; zero gives a constant response.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "SigmoidKernel::steepness: f64"
+        },
+        "offset": {
+          "$ref": "#/$defs/number",
+          "description": "Lower curve level (legacy minimum).",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; always present in canonical form",
+          "x-crc-native": "SigmoidKernel::offset: f64",
+          "default": 0.0
+        },
+        "amplitude": {
+          "$ref": "#/$defs/non_negative_number",
+          "description": "Curve height (legacy maximum minus minimum).",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; always present in canonical form",
+          "x-crc-native": "SigmoidKernel::amplitude: f64",
+          "default": 1.0
+        },
+        "origin_adjustment": {
+          "type": "string",
+          "enum": [
+            "none",
+            "subtract_at_zero"
+          ],
+          "description": "subtract_at_zero subtracts the unit logistic at x = 0 without renormalizing the upper asymptote.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "SigmoidKernel::origin_adjustment: OriginAdjustment",
+          "default": "none"
+        },
+        "zero_below": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Strict threshold: x < zero_below gives raw response 0; equality evaluates the sigmoid.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0 or null; always present in canonical form",
+          "x-crc-native": "SigmoidKernel::zero_below: Option<f64>",
+          "default": null
+        }
+      },
+      "required": [
+        "kind",
+        "midpoint",
+        "steepness"
+      ]
+    },
+    "model_tabulated": {
+      "type": "object",
+      "description": "Response table with strictly increasing x knots. Between knots: linear interpolates, step_left returns y_i, step_right returns y_(i+1); every mode returns y_i at x_i.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "tabulated",
+          "description": "Variant tag 'tabulated'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "ModelSpec::Tabulated"
+        },
+        "points": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/point"
+          },
+          "description": "Ordered knots; order is preserved and never sorted.",
+          "x-crc-canonical": "array order preserved",
+          "x-crc-native": "TabulatedKernel::points: Arc<[Point]>"
+        },
+        "interpolation": {
+          "type": "string",
+          "enum": [
+            "linear",
+            "step_left",
+            "step_right"
+          ],
+          "description": "Interpolation between adjacent knots.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "TabulatedKernel::interpolation: TableInterpolation",
+          "default": "linear"
+        },
+        "outside_domain": {
+          "type": "string",
+          "enum": [
+            "clamp",
+            "error"
+          ],
+          "description": "Below or above the table domain: clamp returns the nearest endpoint response; error rejects the exposure.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "OutsideDomain",
+          "default": "clamp"
+        }
+      },
+      "required": [
+        "kind",
+        "points"
+      ],
+      "x-crc-rules": [
+        "Knot x values strictly increase."
+      ]
+    },
+    "point": {
+      "type": "object",
+      "description": "One tabulated knot.",
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "$ref": "#/$defs/number",
+          "description": "Exposure in the calibrated exposure unit.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "Point::x: f64"
+        },
+        "y": {
+          "$ref": "#/$defs/number",
+          "description": "Raw response at x.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "Point::y: f64"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ]
+    },
+    "model_binned": {
+      "type": "object",
+      "description": "Interval lookup over [edge_i, edge_(i+1)); the final interval includes the final edge and interior edges select the interval to their right.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "binned",
+          "description": "Variant tag 'binned'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "ModelSpec::Binned"
+        },
+        "bin_edges": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/number"
+          },
+          "description": "Strictly increasing interval edges.",
+          "x-crc-canonical": "array order preserved",
+          "x-crc-native": "BinnedKernel::edges: Arc<[f64]>"
+        },
+        "values": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/number"
+          },
+          "description": "One finite response per interval.",
+          "x-crc-canonical": "array order preserved",
+          "x-crc-native": "BinnedKernel::values: Arc<[f64]>"
+        },
+        "outside_domain": {
+          "type": "string",
+          "enum": [
+            "clamp",
+            "error"
+          ],
+          "description": "Below or above the table domain: clamp returns the nearest endpoint response; error rejects the exposure.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "OutsideDomain",
+          "default": "clamp"
+        }
+      },
+      "required": [
+        "kind",
+        "bin_edges",
+        "values"
+      ],
+      "x-crc-rules": [
+        "bin_edges strictly increase.",
+        "len(values) == len(bin_edges) - 1."
+      ]
+    },
+    "model_spei": {
+      "type": "object",
+      "description": "Registry snapshot: water-cost response with the fixed crc-impact/1 SPEI constants.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "spei",
+          "description": "Variant tag 'spei'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "ModelSpec::Spei"
+        },
+        "water_consumption_asset": {
+          "$ref": "#/$defs/non_negative_number",
+          "description": "Asset water consumption.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "SpeiKernel::water_consumption_asset: f64"
+        },
+        "original_water_unit_cost": {
+          "$ref": "#/$defs/non_negative_number",
+          "description": "Water unit cost before drought scaling.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "SpeiKernel::original_water_unit_cost: f64"
+        }
+      },
+      "required": [
+        "kind",
+        "water_consumption_asset",
+        "original_water_unit_cost"
+      ]
+    },
+    "model_cooling": {
+      "type": "object",
+      "description": "Registry snapshot: raw = 0 for x <= 1, else cooling_cost * x / (historic_mean * 10_000_000).",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "cooling",
+          "description": "Variant tag 'cooling'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "ModelSpec::Cooling"
+        },
+        "cooling_cost": {
+          "$ref": "#/$defs/non_negative_number",
+          "description": "Cooling cost coefficient.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "CoolingKernel::cooling_cost: f64"
+        },
+        "historic_mean": {
+          "$ref": "#/$defs/positive_number",
+          "description": "Historical baseline exposure.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "CoolingKernel::historic_mean: f64"
+        }
+      },
+      "required": [
+        "kind",
+        "cooling_cost",
+        "historic_mean"
+      ]
+    },
+    "model_crop": {
+      "type": "object",
+      "description": "Registry snapshot: weighted historical/future crop response with reference year 2010.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "crop",
+          "description": "Variant tag 'crop'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "ModelSpec::Crop"
+        },
+        "weights": {
+          "$ref": "#/$defs/crop_weights",
+          "description": "Non-negative crop weights with positive total; never renormalized.",
+          "x-crc-canonical": "object with sorted keys",
+          "x-crc-native": "CropKernel::weights: CropValues"
+        },
+        "country": {
+          "$ref": "#/$defs/crop_vector",
+          "description": "Country coefficients.",
+          "x-crc-canonical": "object with sorted keys",
+          "x-crc-native": "CropKernel::country: CropValues"
+        },
+        "yearly": {
+          "$ref": "#/$defs/crop_vector",
+          "description": "Yearly trend coefficients.",
+          "x-crc-canonical": "object with sorted keys",
+          "x-crc-native": "CropKernel::yearly: CropValues"
+        },
+        "index": {
+          "$ref": "#/$defs/crop_vector",
+          "description": "Exposure index coefficients.",
+          "x-crc-canonical": "object with sorted keys",
+          "x-crc-native": "CropKernel::index: CropValues"
+        },
+        "historic_mean": {
+          "$ref": "#/$defs/number",
+          "description": "Historical baseline exposure.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "CropKernel::historic_mean: f64"
+        }
+      },
+      "required": [
+        "kind",
+        "weights",
+        "country",
+        "yearly",
+        "index",
+        "historic_mean"
+      ],
+      "x-crc-rules": [
+        "The sum of crop weights is positive."
+      ]
+    },
+    "crop_vector": {
+      "type": "object",
+      "description": "Per-crop coefficient vector with exactly maize, rice and wheat.",
+      "additionalProperties": false,
+      "properties": {
+        "maize": {
+          "$ref": "#/$defs/number",
+          "description": "Maize coefficient.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "CropValues::maize: f64"
+        },
+        "rice": {
+          "$ref": "#/$defs/number",
+          "description": "Rice coefficient.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "CropValues::rice: f64"
+        },
+        "wheat": {
+          "$ref": "#/$defs/number",
+          "description": "Wheat coefficient.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "CropValues::wheat: f64"
+        }
+      },
+      "required": [
+        "maize",
+        "rice",
+        "wheat"
+      ]
+    },
+    "crop_weights": {
+      "type": "object",
+      "description": "Per-crop coefficient vector with exactly maize, rice and wheat.",
+      "additionalProperties": false,
+      "properties": {
+        "maize": {
+          "$ref": "#/$defs/non_negative_number",
+          "description": "Maize coefficient.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "CropValues::maize: f64"
+        },
+        "rice": {
+          "$ref": "#/$defs/non_negative_number",
+          "description": "Rice coefficient.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "CropValues::rice: f64"
+        },
+        "wheat": {
+          "$ref": "#/$defs/non_negative_number",
+          "description": "Wheat coefficient.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0",
+          "x-crc-native": "CropValues::wheat: f64"
+        }
+      },
+      "required": [
+        "maize",
+        "rice",
+        "wheat"
+      ]
+    },
+    "origin_user_defined": {
+      "type": "object",
+      "description": "Caller-authored coefficients.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "user_defined",
+          "description": "Variant tag 'user_defined'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Origin::UserDefined"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "origin_published": {
+      "type": "object",
+      "description": "Coefficients taken from a cited source.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "published",
+          "description": "Variant tag 'published'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Origin::Published"
+        },
+        "source_id": {
+          "$ref": "#/$defs/identifier",
+          "description": "Identifier of a source record in this definition.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Origin::source_id: String"
+        }
+      },
+      "required": [
+        "kind",
+        "source_id"
+      ],
+      "x-crc-rules": [
+        "source_id names a record in provenance.sources."
+      ]
+    },
+    "origin_imported": {
+      "type": "object",
+      "description": "Coefficients produced by an importer from a cited source.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "imported",
+          "description": "Variant tag 'imported'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Origin::Imported"
+        },
+        "source_id": {
+          "$ref": "#/$defs/identifier",
+          "description": "Identifier of a source record in this definition.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Origin::source_id: String"
+        },
+        "importer_name": {
+          "$ref": "#/$defs/identifier",
+          "description": "Importer name.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Origin::Imported::importer_name: String"
+        },
+        "importer_version": {
+          "$ref": "#/$defs/identifier",
+          "description": "Importer version.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Origin::Imported::importer_version: String"
+        },
+        "importer_build_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Importer build digest when known.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "Origin::Imported::importer_build_sha256: Option<[u8; 32]>",
+          "default": null
+        }
+      },
+      "required": [
+        "kind",
+        "source_id",
+        "importer_name",
+        "importer_version"
+      ],
+      "x-crc-rules": [
+        "source_id names a record in provenance.sources."
+      ]
+    },
+    "origin_derived": {
+      "type": "object",
+      "description": "Coefficients derived from parent definitions.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "derived",
+          "description": "Variant tag 'derived'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Origin::Derived"
+        },
+        "description": {
+          "$ref": "#/$defs/text",
+          "description": "Description of the derivation.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Origin::Derived::description: String"
+        }
+      },
+      "required": [
+        "kind",
+        "description"
+      ],
+      "x-crc-rules": [
+        "provenance.derived_from contains at least one parent."
+      ]
+    },
+    "origin_registry": {
+      "type": "object",
+      "description": "Complete registry resolution trace. Contains only context used to construct the function, never evaluated exposures.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "registry",
+          "description": "Variant tag 'registry'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Origin::Registry"
+        },
+        "registry_id": {
+          "$ref": "#/$defs/identifier",
+          "description": "Registry identity.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "RegistryOrigin::registry_id: String"
+        },
+        "registry_revision": {
+          "$ref": "#/$defs/identifier",
+          "description": "Pinned registry revision; never 'latest' by omission.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "RegistryOrigin::registry_revision: String"
+        },
+        "registry_manifest_sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "Digest of the pinned registry manifest; resolution rejects a different manifest.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "RegistryOrigin::registry_manifest_sha256: [u8; 32]"
+        },
+        "resolver_semantics_version": {
+          "type": "string",
+          "const": "crc-impact-registry/1",
+          "description": "Resolver semantics: override catalog, context precedence, fallbacks and key normalization.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "RegistryOrigin::resolver_semantics_version: ResolverSemantics"
+        },
+        "factor": {
+          "type": "string",
+          "enum": [
+            "daily_freezethaw_cycles",
+            "frost_days",
+            "rx1day",
+            "cyclone",
+            "wind_max_daily_max",
+            "fwi",
+            "hot_days",
+            "cflood",
+            "rflood",
+            "inundation",
+            "spei",
+            "cooling_degree_days",
+            "maximum_consecutive_dry_days"
+          ],
+          "description": "Registry factor.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "RegistryOrigin::factor: RegistryFactor"
+        },
+        "context": {
+          "$ref": "#/$defs/context",
+          "description": "Effective context used by the resolved branch; unused members are null.",
+          "x-crc-canonical": "object with all members present",
+          "x-crc-native": "RegistryOrigin::context: ImpactContext"
+        },
+        "overrides": {
+          "$ref": "#/$defs/overrides",
+          "description": "Supplied override keys after type normalization; resolved defaults are not listed.",
+          "x-crc-canonical": "object with sorted keys; absent keys omitted",
+          "x-crc-native": "RegistryOrigin::overrides: RegistryOverrides"
+        },
+        "fallback_policy": {
+          "type": "string",
+          "enum": [
+            "error",
+            "legacy_defaults"
+          ],
+          "description": "Fallback policy used during resolution.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "RegistryOrigin::fallback_policy: FallbackPolicy"
+        },
+        "lookups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/lookup"
+          },
+          "description": "Every table lookup in resolution order.",
+          "x-crc-canonical": "array order preserved",
+          "x-crc-native": "RegistryOrigin::lookups: Vec<RegistryLookup>"
+        }
+      },
+      "required": [
+        "kind",
+        "registry_id",
+        "registry_revision",
+        "registry_manifest_sha256",
+        "resolver_semantics_version",
+        "factor",
+        "context",
+        "overrides",
+        "fallback_policy",
+        "lookups"
+      ],
+      "x-crc-rules": [
+        "A fallback lookup requires fallback_policy legacy_defaults."
+      ]
+    },
+    "context": {
+      "type": "object",
+      "description": "Registry resolution context. Every member is nullable and defaults to null; only context used by the resolved branch carries values in a frozen origin.",
+      "additionalProperties": false,
+      "properties": {
+        "cell": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/h3_cell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "H3 cell of the matched hazard row.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "ImpactContext::cell: Option<u64> (validated H3 index)",
+          "default": null
+        },
+        "country": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Country key, normalized only by the pinned registry manifest.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "ImpactContext::country: Option<String>",
+          "default": null
+        },
+        "continent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Continent key used by flood tables.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "ImpactContext::continent: Option<String>",
+          "default": null
+        },
+        "building_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Building type key used by flood, SPEI and baseline-relative tables.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "ImpactContext::building_type: Option<String>",
+          "default": null
+        },
+        "historic_mean": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Historical baseline exposure for baseline-relative factors.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; always present in canonical form",
+          "x-crc-native": "ImpactContext::historic_mean: Option<f64>",
+          "default": null
+        }
+      },
+      "required": []
+    },
+    "overrides": {
+      "type": "object",
+      "description": "Typed registry overrides. Absent keys use the pinned registry default and are never materialized.",
+      "additionalProperties": false,
+      "properties": {
+        "cooling_cost": {
+          "$ref": "#/$defs/number",
+          "description": "Cooling cost for non-agricultural cooling-degree-days branches.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; present only when supplied",
+          "x-crc-native": "RegistryOverrides::cooling_cost: Override<f64>",
+          "x-crc-absent": "Absence is meaningful: the pinned registry default applies."
+        },
+        "intercept": {
+          "$ref": "#/$defs/number",
+          "description": "Hot-days linear intercept.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; present only when supplied",
+          "x-crc-native": "RegistryOverrides::intercept: Override<f64>",
+          "x-crc-absent": "Absence is meaningful: the pinned registry default applies."
+        },
+        "maximum_damage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Sigmoid upper curve level (offset + amplitude), hot-days upper clamp (nullable), or flood table scale factor.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; present only when supplied",
+          "x-crc-native": "RegistryOverrides::maximum_damage: Override<f64>",
+          "x-crc-absent": "Absence is meaningful: the pinned registry default applies."
+        },
+        "midpoint": {
+          "$ref": "#/$defs/number",
+          "description": "Sigmoid midpoint for sigmoid registry factors.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; present only when supplied",
+          "x-crc-native": "RegistryOverrides::midpoint: Override<f64>",
+          "x-crc-absent": "Absence is meaningful: the pinned registry default applies."
+        },
+        "minimum_damage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Sigmoid lower curve level (maps to offset), or the hot-days lower clamp; null clears the hot-days clamp.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; present only when supplied",
+          "x-crc-native": "RegistryOverrides::minimum_damage: Override<f64>",
+          "x-crc-absent": "Absence is meaningful: the pinned registry default applies."
+        },
+        "slope": {
+          "$ref": "#/$defs/number",
+          "description": "Hot-days linear slope.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; present only when supplied",
+          "x-crc-native": "RegistryOverrides::slope: Override<f64>",
+          "x-crc-absent": "Absence is meaningful: the pinned registry default applies."
+        },
+        "steepness": {
+          "$ref": "#/$defs/number",
+          "description": "Sigmoid steepness for sigmoid registry factors.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; present only when supplied",
+          "x-crc-native": "RegistryOverrides::steepness: Override<f64>",
+          "x-crc-absent": "Absence is meaningful: the pinned registry default applies."
+        },
+        "water_unit_cost": {
+          "$ref": "#/$defs/number",
+          "description": "SPEI original water unit cost.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; present only when supplied",
+          "x-crc-native": "RegistryOverrides::water_unit_cost: Override<f64>",
+          "x-crc-absent": "Absence is meaningful: the pinned registry default applies."
+        },
+        "zero_below": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Strict sigmoid threshold below which the response is zero; null clears it.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; present only when supplied",
+          "x-crc-native": "RegistryOverrides::zero_below: Override<f64>",
+          "x-crc-absent": "Absence is meaningful: the pinned registry default applies."
+        }
+      },
+      "required": [],
+      "x-crc-rules": [
+        "Keys must be accepted for the selected factor (see catalogs/registry-overrides.json); otherwise inapplicable_override.",
+        "Explicit null is accepted only where the catalog marks the key nullable for the factor; otherwise invalid_value.",
+        "After context resolution, keys must also be accepted for the resolved branch."
+      ]
+    },
+    "lookup": {
+      "type": "object",
+      "description": "One registry table lookup performed during resolution.",
+      "additionalProperties": false,
+      "properties": {
+        "table_id": {
+          "$ref": "#/$defs/identifier",
+          "description": "Manifest table identifier.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "RegistryLookup::table_id: String"
+        },
+        "table_sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "Digest of the table content in the pinned manifest.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "RegistryLookup::table_sha256: [u8; 32]"
+        },
+        "requested_key": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "object",
+              "minProperties": 1,
+              "propertyNames": {
+                "$ref": "#/$defs/identifier"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/identifier"
+              }
+            }
+          ],
+          "description": "Key requested after manifest normalization; composite keys use named string fields.",
+          "x-crc-canonical": "string, or object with sorted keys",
+          "x-crc-native": "RegistryLookup::requested_key: LookupKey"
+        },
+        "resolved_key": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "object",
+              "minProperties": 1,
+              "propertyNames": {
+                "$ref": "#/$defs/identifier"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/identifier"
+              }
+            }
+          ],
+          "description": "Key actually used; differs from requested_key only for fallbacks.",
+          "x-crc-canonical": "string, or object with sorted keys",
+          "x-crc-native": "RegistryLookup::resolved_key: LookupKey"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "exact",
+            "fallback"
+          ],
+          "description": "Whether the requested key was found or a documented fallback applied.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "RegistryLookup::status: LookupStatus"
+        }
+      },
+      "required": [
+        "table_id",
+        "table_sha256",
+        "requested_key",
+        "resolved_key",
+        "status"
+      ]
+    },
+    "calibration": {
+      "type": "object",
+      "description": "Units and meaning of the function's argument and response. Never selects a kernel or implies a clamp.",
+      "additionalProperties": false,
+      "properties": {
+        "exposure_variable": {
+          "$ref": "#/$defs/identifier",
+          "description": "Exposure variable, preferably a canonical hazard or quantity identifier.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Calibration::exposure_variable: String"
+        },
+        "exposure_unit": {
+          "$ref": "#/$defs/identifier",
+          "description": "Declared exposure unit token; raw arrays are interpreted in this unit.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Calibration::exposure_unit: String"
+        },
+        "impact_metric": {
+          "$ref": "#/$defs/identifier",
+          "description": "Response metric.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Calibration::impact_metric: String"
+        },
+        "impact_unit": {
+          "$ref": "#/$defs/identifier",
+          "description": "Declared response unit token.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "Calibration::impact_unit: String"
+        }
+      },
+      "required": [
+        "exposure_variable",
+        "exposure_unit",
+        "impact_metric",
+        "impact_unit"
+      ]
+    },
+    "clamp": {
+      "type": "object",
+      "description": "Final numerical limits applied once after the raw model and its thresholds.",
+      "additionalProperties": false,
+      "properties": {
+        "minimum": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Lower limit.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0 or null; always present in canonical form when the clamp is not null",
+          "x-crc-native": "Clamp::minimum: Option<f64>",
+          "default": null
+        },
+        "maximum": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Upper limit.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0 or null; always present in canonical form when the clamp is not null",
+          "x-crc-native": "Clamp::maximum: Option<f64>",
+          "default": null
+        }
+      },
+      "required": [],
+      "x-crc-rules": [
+        "minimum <= maximum when both are present.",
+        "A clamp with both members null normalizes to null."
+      ]
+    },
+    "source": {
+      "type": "object",
+      "description": "Citation or evidence record.",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier",
+          "description": "Identifier unique within the definition.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "SourceRecord::id: String"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "publication",
+            "dataset",
+            "code",
+            "definition"
+          ],
+          "description": "Source category.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "SourceRecord::kind: SourceKind"
+        },
+        "uri": {
+          "$ref": "#/$defs/identifier",
+          "description": "Citation URI; a URI alone is not immutable evidence.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "SourceRecord::uri: String"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Source revision when known.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "SourceRecord::revision: Option<String>",
+          "default": null
+        },
+        "content_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Digest of the cited content when retained.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "SourceRecord::content_sha256: Option<[u8; 32]>",
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "uri"
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "description": "Definition origin, evidence and parents. Audit-only: never changes evaluation, always changes identity.",
+      "additionalProperties": false,
+      "properties": {
+        "origin": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/origin_user_defined"
+            },
+            {
+              "$ref": "#/$defs/origin_published"
+            },
+            {
+              "$ref": "#/$defs/origin_imported"
+            },
+            {
+              "$ref": "#/$defs/origin_derived"
+            },
+            {
+              "$ref": "#/$defs/origin_registry"
+            }
+          ],
+          "description": "Tagged origin of the coefficients.",
+          "x-crc-canonical": "tagged object with all variant members present",
+          "x-crc-native": "Provenance::origin: Origin"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/source"
+          },
+          "description": "Citation and evidence records.",
+          "x-crc-canonical": "array order preserved; always present in canonical form",
+          "x-crc-native": "Provenance::sources: Arc<[SourceRecord]>",
+          "default": []
+        },
+        "derived_from": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/content_hash"
+          },
+          "description": "Parent definition hashes; audit references that evaluation never retrieves.",
+          "x-crc-canonical": "sorted ascending, duplicate-free; always present in canonical form",
+          "x-crc-native": "Provenance::derived_from: BTreeSet<DefinitionHash>",
+          "default": []
+        }
+      },
+      "required": [
+        "origin"
+      ],
+      "x-crc-rules": [
+        "Source ids are unique.",
+        "derived_from contains no duplicates."
+      ]
+    }
+  }
+}

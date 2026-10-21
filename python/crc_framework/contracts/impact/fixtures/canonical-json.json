@@ -1,0 +1,345 @@
+{
+  "profile": "crc-canonical-json/1",
+  "description": "Number vectors: input JSON number text, its binary64 bits (big-endian hex) and the canonical text. String vectors: the canonical JSON string literal and its UTF-8 bytes.",
+  "numbers": [
+    {
+      "name": "0",
+      "input": "0",
+      "bits": "0000000000000000",
+      "canonical": "0.0"
+    },
+    {
+      "name": "-0",
+      "input": "-0",
+      "bits": "0000000000000000",
+      "canonical": "0.0"
+    },
+    {
+      "name": "0.0",
+      "input": "0.0",
+      "bits": "0000000000000000",
+      "canonical": "0.0"
+    },
+    {
+      "name": "-0.0",
+      "input": "-0.0",
+      "bits": "0000000000000000",
+      "canonical": "0.0"
+    },
+    {
+      "name": "1",
+      "input": "1",
+      "bits": "3ff0000000000000",
+      "canonical": "1.0"
+    },
+    {
+      "name": "1.0",
+      "input": "1.0",
+      "bits": "3ff0000000000000",
+      "canonical": "1.0"
+    },
+    {
+      "name": "1E0",
+      "input": "1E0",
+      "bits": "3ff0000000000000",
+      "canonical": "1.0"
+    },
+    {
+      "name": "10e-1",
+      "input": "10e-1",
+      "bits": "3ff0000000000000",
+      "canonical": "1.0"
+    },
+    {
+      "name": "-1",
+      "input": "-1",
+      "bits": "bff0000000000000",
+      "canonical": "-1.0"
+    },
+    {
+      "name": "0.1",
+      "input": "0.1",
+      "bits": "3fb999999999999a",
+      "canonical": "0.1"
+    },
+    {
+      "name": "0.30000000000000004",
+      "input": "0.30000000000000004",
+      "bits": "3fd3333333333334",
+      "canonical": "0.30000000000000004"
+    },
+    {
+      "name": "1e-5",
+      "input": "1e-5",
+      "bits": "3ee4f8b588e368f1",
+      "canonical": "0.00001"
+    },
+    {
+      "name": "0.00001",
+      "input": "0.00001",
+      "bits": "3ee4f8b588e368f1",
+      "canonical": "0.00001"
+    },
+    {
+      "name": "1e-6",
+      "input": "1e-6",
+      "bits": "3eb0c6f7a0b5ed8d",
+      "canonical": "1e-6"
+    },
+    {
+      "name": "1e-7",
+      "input": "1e-7",
+      "bits": "3e7ad7f29abcaf48",
+      "canonical": "1e-7"
+    },
+    {
+      "name": "1.5e-7",
+      "input": "1.5e-7",
+      "bits": "3e8421f5f40d8376",
+      "canonical": "1.5e-7"
+    },
+    {
+      "name": "123.456",
+      "input": "123.456",
+      "bits": "405edd2f1a9fbe77",
+      "canonical": "123.456"
+    },
+    {
+      "name": "1e15",
+      "input": "1e15",
+      "bits": "430c6bf526340000",
+      "canonical": "1000000000000000.0"
+    },
+    {
+      "name": "1e16",
+      "input": "1e16",
+      "bits": "4341c37937e08000",
+      "canonical": "1e+16"
+    },
+    {
+      "name": "1e+16",
+      "input": "1e+16",
+      "bits": "4341c37937e08000",
+      "canonical": "1e+16"
+    },
+    {
+      "name": "1e+16 ",
+      "input": "1e+16 ",
+      "bits": "4341c37937e08000",
+      "canonical": "1e+16"
+    },
+    {
+      "name": "1.5e16",
+      "input": "1.5e16",
+      "bits": "434aa535d3d0c000",
+      "canonical": "1.5e+16"
+    },
+    {
+      "name": "12345678901234567",
+      "input": "12345678901234567",
+      "bits": "4345ee2a2eb5a5c4",
+      "canonical": "1.2345678901234568e+16"
+    },
+    {
+      "name": "9007199254740993",
+      "input": "9007199254740993",
+      "bits": "4340000000000000",
+      "canonical": "9007199254740992.0"
+    },
+    {
+      "name": "123456789012345678901",
+      "input": "123456789012345678901",
+      "bits": "441ac53a7e04bcda",
+      "canonical": "1.2345678901234568e+20"
+    },
+    {
+      "name": "1e21",
+      "input": "1e21",
+      "bits": "444b1ae4d6e2ef50",
+      "canonical": "1e+21"
+    },
+    {
+      "name": "1e22",
+      "input": "1e22",
+      "bits": "4480f0cf064dd592",
+      "canonical": "1e+22"
+    },
+    {
+      "name": "1e23",
+      "input": "1e23",
+      "bits": "44b52d02c7e14af6",
+      "canonical": "1e+23"
+    },
+    {
+      "name": "1.7976931348623157e308",
+      "input": "1.7976931348623157e308",
+      "bits": "7fefffffffffffff",
+      "canonical": "1.7976931348623157e+308"
+    },
+    {
+      "name": "2.2250738585072014e-308",
+      "input": "2.2250738585072014e-308",
+      "bits": "0010000000000000",
+      "canonical": "2.2250738585072014e-308"
+    },
+    {
+      "name": "2.225073858507201e-308",
+      "input": "2.225073858507201e-308",
+      "bits": "000fffffffffffff",
+      "canonical": "2.225073858507201e-308"
+    },
+    {
+      "name": "5e-324",
+      "input": "5e-324",
+      "bits": "0000000000000001",
+      "canonical": "5e-324"
+    },
+    {
+      "name": "4.9e-324",
+      "input": "4.9e-324",
+      "bits": "0000000000000001",
+      "canonical": "5e-324"
+    },
+    {
+      "name": "1e-400",
+      "input": "1e-400",
+      "bits": "0000000000000000",
+      "canonical": "0.0"
+    },
+    {
+      "name": "0.1e1",
+      "input": "0.1e1",
+      "bits": "3ff0000000000000",
+      "canonical": "1.0"
+    },
+    {
+      "name": "100",
+      "input": "100",
+      "bits": "4059000000000000",
+      "canonical": "100.0"
+    },
+    {
+      "name": "1e2",
+      "input": "1e2",
+      "bits": "4059000000000000",
+      "canonical": "100.0"
+    },
+    {
+      "name": "33.333333333333336",
+      "input": "33.333333333333336",
+      "bits": "4040aaaaaaaaaaab",
+      "canonical": "33.333333333333336"
+    },
+    {
+      "name": "-2.5e-10",
+      "input": "-2.5e-10",
+      "bits": "bdf12e0be826d695",
+      "canonical": "-2.5e-10"
+    },
+    {
+      "name": "6.02214076e23",
+      "input": "6.02214076e23",
+      "bits": "44dfe185ca57c517",
+      "canonical": "6.02214076e+23"
+    },
+    {
+      "name": "299792458",
+      "input": "299792458",
+      "bits": "41b1de784a000000",
+      "canonical": "299792458.0"
+    }
+  ],
+  "strings": [
+    {
+      "name": "plain",
+      "value": "flood_depth",
+      "canonical": "\"flood_depth\"",
+      "utf8_hex": "22666c6f6f645f646570746822"
+    },
+    {
+      "name": "quote-backslash",
+      "value": "a\"b\\c",
+      "canonical": "\"a\\\"b\\\\c\"",
+      "utf8_hex": "22615c22625c5c6322"
+    },
+    {
+      "name": "short-escapes",
+      "value": "\b\f\n\r\t",
+      "canonical": "\"\\b\\f\\n\\r\\t\"",
+      "utf8_hex": "225c625c665c6e5c725c7422"
+    },
+    {
+      "name": "control",
+      "value": "\u0000\u0001\u001f",
+      "canonical": "\"\\u0000\\u0001\\u001f\"",
+      "utf8_hex": "225c75303030305c75303030315c753030316622"
+    },
+    {
+      "name": "delete-unescaped",
+      "value": "",
+      "canonical": "\"\"",
+      "utf8_hex": "227f22"
+    },
+    {
+      "name": "non-ascii-raw",
+      "value": "é€²",
+      "canonical": "\"é€²\"",
+      "utf8_hex": "22c3a9e282acc2b222"
+    },
+    {
+      "name": "line-separator-raw",
+      "value": "  ",
+      "canonical": "\"  \"",
+      "utf8_hex": "22e280a8e280a922"
+    },
+    {
+      "name": "astral-raw",
+      "value": "😀",
+      "canonical": "\"😀\"",
+      "utf8_hex": "22f09f988022"
+    },
+    {
+      "name": "slash-unescaped",
+      "value": "a/b",
+      "canonical": "\"a/b\"",
+      "utf8_hex": "22612f6222"
+    }
+  ],
+  "rejected": [
+    {
+      "name": "leading-bom",
+      "input": "﻿0",
+      "error": "invalid_json"
+    },
+    {
+      "name": "nan",
+      "input": "NaN",
+      "error": "non_finite_number"
+    },
+    {
+      "name": "infinity",
+      "input": "Infinity",
+      "error": "non_finite_number"
+    },
+    {
+      "name": "negative-infinity",
+      "input": "-Infinity",
+      "error": "non_finite_number"
+    },
+    {
+      "name": "binary64-overflow",
+      "input": "1e400",
+      "error": "number_overflow"
+    },
+    {
+      "name": "unpaired-surrogate",
+      "input": "\"\\ud800\"",
+      "error": "invalid_json"
+    },
+    {
+      "name": "duplicate-key",
+      "input": "{\"a\": 1, \"a\": 2}",
+      "error": "duplicate_key"
+    }
+  ]
+}

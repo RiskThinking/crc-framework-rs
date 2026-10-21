@@ -1,0 +1,26 @@
+{
+  "supported": [
+    "canonical_json"
+  ],
+  "required_fixture_families": {
+    "canonical_json": [
+      "numbers",
+      "strings"
+    ]
+  },
+  "native_parser_rejections": [
+    "leading-bom",
+    "nan",
+    "infinity",
+    "negative-infinity",
+    "binary64-overflow",
+    "unpaired-surrogate"
+  ],
+  "future_families": [
+    "strict_duplicate_key_parser",
+    "point_evaluations",
+    "monotonicity",
+    "operations",
+    "registry"
+  ]
+}
