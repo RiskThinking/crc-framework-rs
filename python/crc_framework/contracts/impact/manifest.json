@@ -77,8 +77,8 @@
     },
     {
       "path": "fixtures/monotonicity.json",
-      "sha256": "c31dd9bc2f08dea0a36937e7e9293d5f17ae093d5637e6117815a304f4c798f0",
-      "bytes": 24137
+      "sha256": "f38a9e1f8bf0c4f27514517aaacf2d43b54cebb473fe2f5c6f83641279dd0dff",
+      "bytes": 24163
     },
     {
       "path": "fixtures/operations.json",
