@@ -1,0 +1,142 @@
+{
+  "contract": "spatial_combination_policy",
+  "schema": "schemas/spatial-combination-policy-1.0.schema.json",
+  "identity": "policy_hash",
+  "description": "Accepted cases record exact canonical UTF-8 text and content_hash = 'sha256:' + hex(sha256(canonical bytes)). Rejected cases contain exactly one defect and record its error code and JSON Pointer path. schema_valid records whether the JSON Schema alone accepts the input (null when the text is not strict JSON); semantic rules beyond JSON Schema are listed in x-crc-rules.",
+  "accepted": [
+    {
+      "name": "plan-example",
+      "description": "Section 8.3 example.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-spatial-combination/1\",\"stage\":\"impact\",\"reducer\":\"weighted_mean\",\"weights\":{\"kind\":\"intersection_area\"},\"coverage\":\"require_full\"}",
+      "canonical_json": "{\"coverage\":\"require_full\",\"reducer\":\"weighted_mean\",\"schema_version\":\"1.0\",\"semantics_version\":\"crc-spatial-combination/1\",\"stage\":\"impact\",\"weights\":{\"kind\":\"intersection_area\"}}",
+      "content_hash": "sha256:42656d514b3a0c92172c2f8aa51dc163a7b01647d23895794703c1ca56c0e911",
+      "schema_valid": true
+    },
+    {
+      "name": "exposure-stage",
+      "description": "Before-impact combination; differs from plan-example only by stage.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-spatial-combination/1\",\"stage\":\"exposure\",\"reducer\":\"weighted_mean\",\"weights\":{\"kind\":\"intersection_area\"},\"coverage\":\"require_full\"}",
+      "canonical_json": "{\"coverage\":\"require_full\",\"reducer\":\"weighted_mean\",\"schema_version\":\"1.0\",\"semantics_version\":\"crc-spatial-combination/1\",\"stage\":\"exposure\",\"weights\":{\"kind\":\"intersection_area\"}}",
+      "content_hash": "sha256:f6c620e3db37ff684e6fe5e51c0f155ca58c4c5377b0b9032e44f99bcec19c23",
+      "schema_valid": true
+    },
+    {
+      "name": "provided-defaults",
+      "description": "Provided weights; reducer and coverage defaults materialize.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-spatial-combination/1\",\"stage\":\"impact\",\"weights\":{\"kind\":\"provided\",\"meaning\":\"asset_value\"}}",
+      "canonical_json": "{\"coverage\":\"require_full\",\"reducer\":\"weighted_mean\",\"schema_version\":\"1.0\",\"semantics_version\":\"crc-spatial-combination/1\",\"stage\":\"impact\",\"weights\":{\"kind\":\"provided\",\"meaning\":\"asset_value\"}}",
+      "content_hash": "sha256:e6be6de76fb845516991a8fe7bf3d008f6298269a4d8eacbdbac66bfa344b6fb",
+      "schema_valid": true
+    },
+    {
+      "name": "covered-only",
+      "description": "Explicit covered-only normalization.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-spatial-combination/1\",\"stage\":\"impact\",\"reducer\":\"weighted_mean\",\"weights\":{\"kind\":\"intersection_area\"},\"coverage\":\"covered_only\"}",
+      "canonical_json": "{\"coverage\":\"covered_only\",\"reducer\":\"weighted_mean\",\"schema_version\":\"1.0\",\"semantics_version\":\"crc-spatial-combination/1\",\"stage\":\"impact\",\"weights\":{\"kind\":\"intersection_area\"}}",
+      "content_hash": "sha256:2331e61e8a1e4b6e7655fabb15943453d17c94d7cecff6bfc6d25072a87b98ac",
+      "schema_valid": true
+    }
+  ],
+  "rejected": [
+    {
+      "name": "missing-stage",
+      "description": "No implicit stage for multiple contributors.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-spatial-combination/1\",\"reducer\":\"weighted_mean\",\"weights\":{\"kind\":\"intersection_area\"},\"coverage\":\"require_full\"}",
+      "error": {
+        "code": "missing_field",
+        "path": "/stage"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "auto-stage",
+      "description": "No implicit stage.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-spatial-combination/1\",\"stage\":\"auto\",\"reducer\":\"weighted_mean\",\"weights\":{\"kind\":\"intersection_area\"},\"coverage\":\"require_full\"}",
+      "error": {
+        "code": "unsupported_value",
+        "path": "/stage"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "sum-reducer",
+      "description": "Only weighted_mean in v1.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-spatial-combination/1\",\"stage\":\"impact\",\"reducer\":\"sum\",\"weights\":{\"kind\":\"intersection_area\"},\"coverage\":\"require_full\"}",
+      "error": {
+        "code": "unsupported_value",
+        "path": "/reducer"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "quantile-pairing",
+      "description": "Quantile pairing is deferred.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-spatial-combination/1\",\"stage\":\"impact\",\"reducer\":\"quantile_mean\",\"weights\":{\"kind\":\"intersection_area\"},\"coverage\":\"require_full\"}",
+      "error": {
+        "code": "unsupported_value",
+        "path": "/reducer"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "missing-weights",
+      "description": "Weight basis is required.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-spatial-combination/1\",\"stage\":\"impact\",\"reducer\":\"weighted_mean\",\"coverage\":\"require_full\"}",
+      "error": {
+        "code": "missing_field",
+        "path": "/weights"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "provided-without-meaning",
+      "description": "Provided weights declare their meaning.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-spatial-combination/1\",\"stage\":\"impact\",\"reducer\":\"weighted_mean\",\"weights\":{\"kind\":\"provided\"},\"coverage\":\"require_full\"}",
+      "error": {
+        "code": "missing_field",
+        "path": "/weights/meaning"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "unknown-weight-kind",
+      "description": "Unknown weight basis.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-spatial-combination/1\",\"stage\":\"impact\",\"reducer\":\"weighted_mean\",\"weights\":{\"kind\":\"population\"},\"coverage\":\"require_full\"}",
+      "error": {
+        "code": "unsupported_kind",
+        "path": "/weights/kind"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "coverage",
+      "description": "Unknown coverage treatment.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-spatial-combination/1\",\"stage\":\"impact\",\"reducer\":\"weighted_mean\",\"weights\":{\"kind\":\"intersection_area\"},\"coverage\":\"zero_fill\"}",
+      "error": {
+        "code": "unsupported_value",
+        "path": "/coverage"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "distribution-aggregation",
+      "description": "Source-distribution aggregation is not part of the policy.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-spatial-combination/1\",\"stage\":\"impact\",\"reducer\":\"weighted_mean\",\"weights\":{\"kind\":\"intersection_area\"},\"coverage\":\"require_full\",\"aggregate_distributions\":true}",
+      "error": {
+        "code": "unknown_field",
+        "path": "/aggregate_distributions"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "semantics-version",
+      "description": "Unsupported spatial semantics.",
+      "input_json": "{\"schema_version\":\"1.0\",\"semantics_version\":\"crc-spatial-combination/2\",\"stage\":\"impact\",\"reducer\":\"weighted_mean\",\"weights\":{\"kind\":\"intersection_area\"},\"coverage\":\"require_full\"}",
+      "error": {
+        "code": "unsupported_semantics_version",
+        "path": "/semantics_version"
+      },
+      "schema_valid": false
+    }
+  ]
+}

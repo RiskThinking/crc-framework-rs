@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.riskthinking.ai/crc/impact/1.0.0/spatial-combination-policy-1.0.schema.json",
+  "title": "CRC spatial combination policy 1.0",
+  "type": "object",
+  "description": "Application-layer weighted-mean combination of aligned point exposures. Never part of an impact definition or its hash; policy_hash uses the canonical profile.",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Policy wire format.",
+      "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+      "x-crc-native": "SpatialCombinationPolicy::schema_version"
+    },
+    "semantics_version": {
+      "type": "string",
+      "const": "crc-spatial-combination/1",
+      "description": "Reducer and coverage semantics.",
+      "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+      "x-crc-native": "SpatialCombinationPolicy::semantics_version"
+    },
+    "stage": {
+      "type": "string",
+      "enum": [
+        "exposure",
+        "impact"
+      ],
+      "description": "exposure: f(sum w_i x_i); impact: sum w_i f_i(x_i). No implicit choice.",
+      "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+      "x-crc-native": "SpatialCombinationPolicy::stage: Stage"
+    },
+    "reducer": {
+      "type": "string",
+      "const": "weighted_mean",
+      "description": "Reducer; only weighted_mean in v1.",
+      "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+      "x-crc-native": "SpatialCombinationPolicy::reducer: Reducer",
+      "default": "weighted_mean"
+    },
+    "weights": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/weights_intersection_area"
+        },
+        {
+          "$ref": "#/$defs/weights_provided"
+        }
+      ],
+      "description": "Weight basis; actual geometries and values are application data.",
+      "x-crc-canonical": "tagged object",
+      "x-crc-native": "SpatialCombinationPolicy::weights: WeightBasis"
+    },
+    "coverage": {
+      "type": "string",
+      "enum": [
+        "require_full",
+        "covered_only"
+      ],
+      "description": "require_full rejects uncovered area above 1e-9 of target area; covered_only normalizes over covered contributors and reports the uncovered fraction.",
+      "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+      "x-crc-native": "SpatialCombinationPolicy::coverage: Coverage",
+      "default": "require_full"
+    }
+  },
+  "required": [
+    "schema_version",
+    "semantics_version",
+    "stage",
+    "weights"
+  ],
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "description": "Non-empty, case-sensitive string without surrounding whitespace."
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Non-empty free text."
+    },
+    "number": {
+      "type": "number",
+      "description": "JSON number converted once to finite IEEE binary64; booleans and strings are rejected."
+    },
+    "non_negative_number": {
+      "type": "number",
+      "minimum": 0
+    },
+    "positive_number": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "probability": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "positive_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 18446744073709551615
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Bare SHA-256 digest as 64 lowercase hexadecimal characters."
+    },
+    "content_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "Prefixed content identity: sha256 of the canonical JSON bytes."
+    },
+    "h3_cell": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{15}$",
+      "description": "H3 cell index as 15 lowercase hexadecimal characters."
+    },
+    "weights_intersection_area": {
+      "type": "object",
+      "description": "Weights are contributor intersection areas with the target.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "intersection_area",
+          "description": "Variant tag 'intersection_area'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "WeightBasis::IntersectionArea"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "weights_provided": {
+      "type": "object",
+      "description": "Caller-provided weights with a retained contributor-to-weight mapping.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "provided",
+          "description": "Variant tag 'provided'.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "WeightBasis::Provided"
+        },
+        "meaning": {
+          "$ref": "#/$defs/text",
+          "description": "Declared meaning of the weights, for example asset_value.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+          "x-crc-native": "WeightBasis::Provided::meaning: String"
+        }
+      },
+      "required": [
+        "kind",
+        "meaning"
+      ]
+    }
+  }
+}

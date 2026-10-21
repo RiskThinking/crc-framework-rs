@@ -1,0 +1,156 @@
+{
+  "semantics_version": "crc-impact/1",
+  "constants": [
+    {
+      "id": "impact-semantics-version",
+      "value": "crc-impact/1",
+      "owner": "ImpactDefinition.semantics_version",
+      "fixtures": [
+        "definition:plan-example-tabulated"
+      ]
+    },
+    {
+      "id": "canonical-profile",
+      "value": "crc-canonical-json/1",
+      "owner": "canonical_json",
+      "fixtures": [
+        "number:1e+16"
+      ]
+    },
+    {
+      "id": "spei-ln-199",
+      "formula": "ln(199)",
+      "owner": "SpeiImpact",
+      "fixtures": [
+        "point:snapshot-spei"
+      ]
+    },
+    {
+      "id": "spei-drought-multiplier",
+      "value": 10,
+      "owner": "SpeiImpact",
+      "fixtures": [
+        "point:snapshot-spei"
+      ]
+    },
+    {
+      "id": "economic-normalizer",
+      "value": 10000000,
+      "owner": "SpeiImpact,CoolingImpact",
+      "fixtures": [
+        "point:snapshot-spei",
+        "point:snapshot-cooling"
+      ]
+    },
+    {
+      "id": "crop-reference-year",
+      "value": 2010,
+      "owner": "CropImpact",
+      "fixtures": [
+        "point:snapshot-crop"
+      ]
+    },
+    {
+      "id": "sigmoid-threshold-strict",
+      "rule": "x < zero_below",
+      "owner": "SigmoidImpact",
+      "fixtures": [
+        "point:sigmoid-origin-threshold"
+      ]
+    },
+    {
+      "id": "cooling-threshold-inclusive",
+      "rule": "x <= 1",
+      "owner": "CoolingImpact",
+      "fixtures": [
+        "point:snapshot-cooling"
+      ]
+    },
+    {
+      "id": "binned-right-edge",
+      "rule": "interior edge selects right interval",
+      "owner": "BinnedImpact",
+      "fixtures": [
+        "point:binned-flood"
+      ]
+    },
+    {
+      "id": "histogram-mass-tolerance",
+      "value": 1e-12,
+      "owner": "histogram_mass",
+      "fixtures": [
+        "operation:histogram-normalization",
+        "operation:histogram-mass-mismatch"
+      ]
+    },
+    {
+      "id": "quadrature-absolute-tolerance",
+      "value": 1e-10,
+      "owner": "expectation",
+      "fixtures": [
+        "operation:linear-gumbel-mean"
+      ]
+    },
+    {
+      "id": "quadrature-relative-tolerance",
+      "value": 1e-08,
+      "owner": "expectation",
+      "fixtures": [
+        "operation:linear-gumbel-mean"
+      ]
+    },
+    {
+      "id": "resolver-semantics-version",
+      "value": "crc-impact-registry/1",
+      "owner": "RegistryImpactReference",
+      "fixtures": [
+        "registry-reference:minimal"
+      ]
+    },
+    {
+      "id": "spatial-semantics-version",
+      "value": "crc-spatial-combination/1",
+      "owner": "SpatialCombinationPolicy",
+      "fixtures": [
+        "spatial-policy:plan-example"
+      ]
+    },
+    {
+      "id": "h3-wire-length",
+      "value": 15,
+      "owner": "ImpactContext.cell",
+      "fixtures": [
+        "definition:origin-registry-legacy-fallback",
+        "definition:registry-cell-padded",
+        "spatial-record:h3-target-padded"
+      ]
+    },
+    {
+      "id": "spatial-geometry-tolerance",
+      "value": 1e-09,
+      "owner": "SpatialImpactEvaluationRecord.geometry",
+      "fixtures": [
+        "spatial-record:overlap",
+        "spatial-record:relaxed-tolerance"
+      ]
+    },
+    {
+      "id": "native-u64-maximum",
+      "value": 18446744073709551615,
+      "owner": "integer metadata",
+      "fixtures": [
+        "evaluation-record:u64-max-shape",
+        "evaluation-record:shape-u64-overflow"
+      ]
+    },
+    {
+      "id": "override-catalog",
+      "rule": "factor override keys and nullability",
+      "owner": "ImpactRegistry",
+      "fixtures": [
+        "definition:registry-null-override",
+        "registry-reference:no-override-factor"
+      ]
+    }
+  ]
+}

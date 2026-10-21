@@ -1,0 +1,326 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.riskthinking.ai/crc/impact/1.0.0/registry-impact-reference-1.0.schema.json",
+  "title": "CRC registry impact reference 1.0",
+  "type": "object",
+  "description": "Pinned recipe that resolves to a self-contained impact definition. reference_hash uses the definition canonicalization and hashing rules and is never embedded in the payload.",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Reference wire format.",
+      "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+      "x-crc-native": "RegistryImpactReference::schema_version"
+    },
+    "registry_id": {
+      "$ref": "#/$defs/identifier",
+      "description": "Registry identity.",
+      "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+      "x-crc-native": "RegistryImpactReference::registry_id: String"
+    },
+    "registry_revision": {
+      "$ref": "#/$defs/identifier",
+      "description": "Pinned registry revision; never 'latest' by omission.",
+      "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+      "x-crc-native": "RegistryImpactReference::registry_revision: String"
+    },
+    "registry_manifest_sha256": {
+      "$ref": "#/$defs/sha256",
+      "description": "Digest of the pinned registry manifest; resolution rejects a different manifest.",
+      "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+      "x-crc-native": "RegistryImpactReference::registry_manifest_sha256: [u8; 32]"
+    },
+    "resolver_semantics_version": {
+      "type": "string",
+      "const": "crc-impact-registry/1",
+      "description": "Resolver semantics: override catalog, context precedence, fallbacks and key normalization.",
+      "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+      "x-crc-native": "RegistryImpactReference::resolver_semantics_version: ResolverSemantics"
+    },
+    "factor": {
+      "type": "string",
+      "enum": [
+        "daily_freezethaw_cycles",
+        "frost_days",
+        "rx1day",
+        "cyclone",
+        "wind_max_daily_max",
+        "fwi",
+        "hot_days",
+        "cflood",
+        "rflood",
+        "inundation",
+        "spei",
+        "cooling_degree_days",
+        "maximum_consecutive_dry_days"
+      ],
+      "description": "Registry factor.",
+      "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
+      "x-crc-native": "RegistryImpactReference::factor: RegistryFactor"
+    },
+    "overrides": {
+      "$ref": "#/$defs/overrides",
+      "description": "Typed overrides; absent keys use pinned registry defaults.",
+      "x-crc-canonical": "object with sorted keys; absent keys omitted; always present in canonical form",
+      "x-crc-native": "RegistryImpactReference::overrides: RegistryOverrides",
+      "default": {}
+    },
+    "context_defaults": {
+      "$ref": "#/$defs/context",
+      "description": "Lowest-precedence context values.",
+      "x-crc-canonical": "object with all members present; always present in canonical form",
+      "x-crc-native": "RegistryImpactReference::context_defaults: ImpactContext",
+      "default": {}
+    },
+    "fallback_policy": {
+      "type": "string",
+      "enum": [
+        "error",
+        "legacy_defaults"
+      ],
+      "description": "error rejects missing table keys; legacy_defaults permits and records documented fallbacks.",
+      "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+      "x-crc-native": "RegistryImpactReference::fallback_policy: FallbackPolicy",
+      "default": "error"
+    }
+  },
+  "required": [
+    "schema_version",
+    "registry_id",
+    "registry_revision",
+    "registry_manifest_sha256",
+    "resolver_semantics_version",
+    "factor"
+  ],
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "description": "Non-empty, case-sensitive string without surrounding whitespace."
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Non-empty free text."
+    },
+    "number": {
+      "type": "number",
+      "description": "JSON number converted once to finite IEEE binary64; booleans and strings are rejected."
+    },
+    "non_negative_number": {
+      "type": "number",
+      "minimum": 0
+    },
+    "positive_number": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "probability": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "positive_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 18446744073709551615
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Bare SHA-256 digest as 64 lowercase hexadecimal characters."
+    },
+    "content_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "Prefixed content identity: sha256 of the canonical JSON bytes."
+    },
+    "h3_cell": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{15}$",
+      "description": "H3 cell index as 15 lowercase hexadecimal characters."
+    },
+    "context": {
+      "type": "object",
+      "description": "Registry resolution context. Every member is nullable and defaults to null; only context used by the resolved branch carries values in a frozen origin.",
+      "additionalProperties": false,
+      "properties": {
+        "cell": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/h3_cell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "H3 cell of the matched hazard row.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "ImpactContext::cell: Option<u64> (validated H3 index)",
+          "default": null
+        },
+        "country": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Country key, normalized only by the pinned registry manifest.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "ImpactContext::country: Option<String>",
+          "default": null
+        },
+        "continent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Continent key used by flood tables.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "ImpactContext::continent: Option<String>",
+          "default": null
+        },
+        "building_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Building type key used by flood, SPEI and baseline-relative tables.",
+          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
+          "x-crc-native": "ImpactContext::building_type: Option<String>",
+          "default": null
+        },
+        "historic_mean": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Historical baseline exposure for baseline-relative factors.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; always present in canonical form",
+          "x-crc-native": "ImpactContext::historic_mean: Option<f64>",
+          "default": null
+        }
+      },
+      "required": []
+    },
+    "overrides": {
+      "type": "object",
+      "description": "Typed registry overrides. Absent keys use the pinned registry default and are never materialized.",
+      "additionalProperties": false,
+      "properties": {
+        "cooling_cost": {
+          "$ref": "#/$defs/number",
+          "description": "Cooling cost for non-agricultural cooling-degree-days branches.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; present only when supplied",
+          "x-crc-native": "RegistryOverrides::cooling_cost: Override<f64>",
+          "x-crc-absent": "Absence is meaningful: the pinned registry default applies."
+        },
+        "intercept": {
+          "$ref": "#/$defs/number",
+          "description": "Hot-days linear intercept.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; present only when supplied",
+          "x-crc-native": "RegistryOverrides::intercept: Override<f64>",
+          "x-crc-absent": "Absence is meaningful: the pinned registry default applies."
+        },
+        "maximum_damage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Sigmoid upper curve level (offset + amplitude), hot-days upper clamp (nullable), or flood table scale factor.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; present only when supplied",
+          "x-crc-native": "RegistryOverrides::maximum_damage: Override<f64>",
+          "x-crc-absent": "Absence is meaningful: the pinned registry default applies."
+        },
+        "midpoint": {
+          "$ref": "#/$defs/number",
+          "description": "Sigmoid midpoint for sigmoid registry factors.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; present only when supplied",
+          "x-crc-native": "RegistryOverrides::midpoint: Override<f64>",
+          "x-crc-absent": "Absence is meaningful: the pinned registry default applies."
+        },
+        "minimum_damage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Sigmoid lower curve level (maps to offset), or the hot-days lower clamp; null clears the hot-days clamp.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; present only when supplied",
+          "x-crc-native": "RegistryOverrides::minimum_damage: Override<f64>",
+          "x-crc-absent": "Absence is meaningful: the pinned registry default applies."
+        },
+        "slope": {
+          "$ref": "#/$defs/number",
+          "description": "Hot-days linear slope.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; present only when supplied",
+          "x-crc-native": "RegistryOverrides::slope: Override<f64>",
+          "x-crc-absent": "Absence is meaningful: the pinned registry default applies."
+        },
+        "steepness": {
+          "$ref": "#/$defs/number",
+          "description": "Sigmoid steepness for sigmoid registry factors.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; present only when supplied",
+          "x-crc-native": "RegistryOverrides::steepness: Override<f64>",
+          "x-crc-absent": "Absence is meaningful: the pinned registry default applies."
+        },
+        "water_unit_cost": {
+          "$ref": "#/$defs/number",
+          "description": "SPEI original water unit cost.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; present only when supplied",
+          "x-crc-native": "RegistryOverrides::water_unit_cost: Override<f64>",
+          "x-crc-absent": "Absence is meaningful: the pinned registry default applies."
+        },
+        "zero_below": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Strict sigmoid threshold below which the response is zero; null clears it.",
+          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; present only when supplied",
+          "x-crc-native": "RegistryOverrides::zero_below: Override<f64>",
+          "x-crc-absent": "Absence is meaningful: the pinned registry default applies."
+        }
+      },
+      "required": [],
+      "x-crc-rules": [
+        "Keys must be accepted for the selected factor (see catalogs/registry-overrides.json); otherwise inapplicable_override.",
+        "Explicit null is accepted only where the catalog marks the key nullable for the factor; otherwise invalid_value.",
+        "After context resolution, keys must also be accepted for the resolved branch."
+      ]
+    }
+  }
+}

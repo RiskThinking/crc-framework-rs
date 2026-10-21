@@ -1,0 +1,933 @@
+{
+  "description": "Certified monotonicity of the full function including thresholds and clamp. reference is the most specific class proven by the reference; an implementation must return a member of acceptable.",
+  "fixtures": [
+    {
+      "name": "linear-increasing",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "linear",
+          "slope": 2.0,
+          "intercept": 0.0
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:d95e0868c104ed4a006a59dd87fef5c051c85f450886fdcfebb08d9b85f81d4c",
+      "reference": "non_decreasing",
+      "acceptable": [
+        "non_decreasing",
+        "unknown"
+      ]
+    },
+    {
+      "name": "linear-decreasing-clamped",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "linear",
+          "slope": -2.0,
+          "intercept": 0.0
+        },
+        "clamp": {
+          "minimum": 0.0,
+          "maximum": null
+        },
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:1e235daa05cfdd23b6a91703cf9ffd60b9319b09d2b8e47a20cb546b11239dbe",
+      "reference": "non_increasing",
+      "acceptable": [
+        "non_increasing",
+        "unknown"
+      ]
+    },
+    {
+      "name": "linear-zero",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "linear",
+          "slope": 0.0,
+          "intercept": 0.0
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:b147abe1ee3089c228b64f1a72308c9fd718a971d315aa474910ba6b020f7c1e",
+      "reference": "constant",
+      "acceptable": [
+        "constant",
+        "non_decreasing",
+        "non_increasing",
+        "unknown"
+      ]
+    },
+    {
+      "name": "linear-equal-clamp",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "linear",
+          "slope": 3.0,
+          "intercept": 0.0
+        },
+        "clamp": {
+          "minimum": 1.0,
+          "maximum": 1.0
+        },
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:3570ef0ee423f1e64f74acfd26f13c4ea21272ea173270c6e30bac1ff28e833d",
+      "reference": "constant",
+      "acceptable": [
+        "constant",
+        "non_decreasing",
+        "unknown"
+      ]
+    },
+    {
+      "name": "sigmoid-increasing",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "sigmoid",
+          "midpoint": 1.0,
+          "steepness": 2.0,
+          "offset": 0.0,
+          "amplitude": 1.0,
+          "origin_adjustment": "none",
+          "zero_below": null
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:976ba06c1d4636be9fc383ed0d435335c397b1d04465ad5be098374ba0cd9bef",
+      "reference": "non_decreasing",
+      "acceptable": [
+        "non_decreasing",
+        "unknown"
+      ]
+    },
+    {
+      "name": "sigmoid-decreasing",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "sigmoid",
+          "midpoint": 1.0,
+          "steepness": -2.0,
+          "offset": 0.0,
+          "amplitude": 1.0,
+          "origin_adjustment": "none",
+          "zero_below": null
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:d5c551e0ffb1e020d7445cd6d08a0ba82791dff8f68fe179aba3c43bba635531",
+      "reference": "non_increasing",
+      "acceptable": [
+        "non_increasing",
+        "unknown"
+      ]
+    },
+    {
+      "name": "sigmoid-zero-amplitude",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "sigmoid",
+          "midpoint": 1.0,
+          "steepness": 2.0,
+          "offset": 0.0,
+          "amplitude": 0.0,
+          "origin_adjustment": "none",
+          "zero_below": null
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:95e4392810facac6474ae8ec6d93b81a2b0d5f3a6c5a9ee9292ab348910fd0ee",
+      "reference": "constant",
+      "acceptable": [
+        "constant",
+        "non_decreasing",
+        "non_increasing",
+        "unknown"
+      ]
+    },
+    {
+      "name": "sigmoid-threshold-rising-jump",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "sigmoid",
+          "midpoint": 1.0,
+          "steepness": 2.0,
+          "offset": 0.0,
+          "amplitude": 1.0,
+          "origin_adjustment": "none",
+          "zero_below": 0.5
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:e1f225d974632d5a3d08b8fb2135b4471aa8485241b786b4bbfd7fd5efebe311",
+      "reference": "non_decreasing",
+      "acceptable": [
+        "non_decreasing",
+        "unknown"
+      ]
+    },
+    {
+      "name": "sigmoid-threshold-breaks-decreasing",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "sigmoid",
+          "midpoint": 1.0,
+          "steepness": -2.0,
+          "offset": 0.0,
+          "amplitude": 1.0,
+          "origin_adjustment": "none",
+          "zero_below": 0.5
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:c74b6b34bdf2a9c4d80f5db44ffd7f71025e71cd56ff9d630f41586d1b5661f6",
+      "reference": "non_monotone",
+      "acceptable": [
+        "non_monotone",
+        "unknown"
+      ]
+    },
+    {
+      "name": "sigmoid-threshold-negative-jump",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "sigmoid",
+          "midpoint": 1.0,
+          "steepness": 2.0,
+          "offset": -1.0,
+          "amplitude": 0.5,
+          "origin_adjustment": "none",
+          "zero_below": 0.5
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:b8d3972e40d7a6e7bd48c7fb933f511e5001899fe758b6938bcc16c540d55ce4",
+      "reference": "non_monotone",
+      "acceptable": [
+        "non_monotone",
+        "unknown"
+      ]
+    },
+    {
+      "name": "sigmoid-threshold-hidden-by-clamp",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "sigmoid",
+          "midpoint": 1.0,
+          "steepness": 2.0,
+          "offset": -1.0,
+          "amplitude": 2.0,
+          "origin_adjustment": "none",
+          "zero_below": 0.5
+        },
+        "clamp": {
+          "minimum": 0.0,
+          "maximum": null
+        },
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:36a41ce426e0141b6ac1e0685a4330ee7f303df1e78c28e303aff602b25ff328",
+      "reference": "non_decreasing",
+      "acceptable": [
+        "non_decreasing",
+        "unknown"
+      ]
+    },
+    {
+      "name": "sigmoid-origin-subtraction-threshold",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "sigmoid",
+          "midpoint": 2.0,
+          "steepness": 1.0,
+          "offset": 0.0,
+          "amplitude": 1.0,
+          "origin_adjustment": "subtract_at_zero",
+          "zero_below": 1.0
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:c403658c7207411ed7639cba73d53fa2f378dd01ac436ed7a04b2ff46b9b6ae7",
+      "reference": "non_decreasing",
+      "acceptable": [
+        "non_decreasing",
+        "unknown"
+      ]
+    },
+    {
+      "name": "tabulated-decreasing",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "tabulated",
+          "points": [
+            {
+              "x": 0.0,
+              "y": 1.0
+            },
+            {
+              "x": 1.0,
+              "y": 1.0
+            },
+            {
+              "x": 2.0,
+              "y": 0.0
+            }
+          ],
+          "interpolation": "linear",
+          "outside_domain": "clamp"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:0f04f9660dae86aa60dea236036c794d2fdde3233c3fe942f657641a691b72ef",
+      "reference": "non_increasing",
+      "acceptable": [
+        "non_increasing",
+        "unknown"
+      ]
+    },
+    {
+      "name": "tabulated-non-monotone",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "tabulated",
+          "points": [
+            {
+              "x": 0.0,
+              "y": 0.0
+            },
+            {
+              "x": 0.5,
+              "y": 1.0
+            },
+            {
+              "x": 1.0,
+              "y": 0.0
+            }
+          ],
+          "interpolation": "linear",
+          "outside_domain": "clamp"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:34b5c0fbb850245b76fdc8aeea829b557dc6ea86ebb501137f1074e176b8273a",
+      "reference": "non_monotone",
+      "acceptable": [
+        "non_monotone",
+        "unknown"
+      ]
+    },
+    {
+      "name": "tabulated-non-monotone-clamped-flat",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "tabulated",
+          "points": [
+            {
+              "x": 0.0,
+              "y": 2.0
+            },
+            {
+              "x": 0.5,
+              "y": 3.0
+            },
+            {
+              "x": 1.0,
+              "y": 2.5
+            }
+          ],
+          "interpolation": "linear",
+          "outside_domain": "clamp"
+        },
+        "clamp": {
+          "minimum": null,
+          "maximum": 1.0
+        },
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:ca1fc0fe413b0d66bdf8baa7078dc70d603271ff0ec05dc335003826e2bb61ba",
+      "reference": "constant",
+      "acceptable": [
+        "constant",
+        "non_decreasing",
+        "non_increasing",
+        "unknown"
+      ]
+    },
+    {
+      "name": "binned-step-up",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "binned",
+          "bin_edges": [
+            0.0,
+            5.0,
+            10.0
+          ],
+          "values": [
+            0.0,
+            1.0
+          ],
+          "outside_domain": "clamp"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:c6a8396d3b235e2fefcacf8220f317a9b8d518ab83e9ab0ff1aa213d6a2a7a81",
+      "reference": "non_decreasing",
+      "acceptable": [
+        "non_decreasing",
+        "unknown"
+      ]
+    },
+    {
+      "name": "binned-constant",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "binned",
+          "bin_edges": [
+            0.0,
+            5.0,
+            10.0
+          ],
+          "values": [
+            0.4,
+            0.4
+          ],
+          "outside_domain": "clamp"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:23d78486bd61bb1475f428cce2d87a5d824ba31dc2c6734ad78b9d58e6321cff",
+      "reference": "constant",
+      "acceptable": [
+        "constant",
+        "non_decreasing",
+        "non_increasing",
+        "unknown"
+      ]
+    },
+    {
+      "name": "spei",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "spei",
+          "exposure_unit": "1",
+          "impact_metric": "normalized_water_cost",
+          "impact_unit": "crc-legacy-normalized-cost"
+        },
+        "model": {
+          "kind": "spei",
+          "water_consumption_asset": 1250000.5,
+          "original_water_unit_cost": 2.9809
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:e510a75eb5f259ba354ec2a04c58141f62aeec6e16ce744f532b37e2b43e16e6",
+      "reference": "non_increasing",
+      "acceptable": [
+        "non_increasing",
+        "unknown"
+      ]
+    },
+    {
+      "name": "cooling",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "cooling_degree_days",
+          "exposure_unit": "K.d",
+          "impact_metric": "normalized_cooling_cost",
+          "impact_unit": "crc-legacy-normalized-cost"
+        },
+        "model": {
+          "kind": "cooling",
+          "cooling_cost": 52000000.0,
+          "historic_mean": 410.5
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:c8e06890a599b4c5b10ebc2736f5f7119913c40ea655efe2f2a4909ebb129cec",
+      "reference": "non_decreasing",
+      "acceptable": [
+        "non_decreasing",
+        "unknown"
+      ]
+    },
+    {
+      "name": "crop-same-sign",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "cooling_degree_days",
+          "exposure_unit": "K.d",
+          "impact_metric": "crop_yield_change",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "crop",
+          "weights": {
+            "maize": 0.5,
+            "rice": 0.3,
+            "wheat": 0.25
+          },
+          "country": {
+            "maize": 1.2,
+            "rice": 0.8,
+            "wheat": 1.1
+          },
+          "yearly": {
+            "maize": 0.0004,
+            "rice": 0.0002,
+            "wheat": 0.0003
+          },
+          "index": {
+            "maize": -0.002,
+            "rice": -0.001,
+            "wheat": -0.0015
+          },
+          "historic_mean": 150.0
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:98613d6e46d5edf6a99786eb9185ff592d87c5459d9103e54eea64c7fe46408f",
+      "reference": "non_decreasing",
+      "acceptable": [
+        "non_decreasing",
+        "unknown"
+      ]
+    },
+    {
+      "name": "crop-underflowing-derivative-product",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "crop",
+          "weights": {
+            "maize": 1e-200,
+            "rice": 0.0,
+            "wheat": 0.0
+          },
+          "country": {
+            "maize": 0.0,
+            "rice": 0.0,
+            "wheat": 0.0
+          },
+          "yearly": {
+            "maize": 0.0,
+            "rice": 0.0,
+            "wheat": 0.0
+          },
+          "index": {
+            "maize": 1e-200,
+            "rice": 0.0,
+            "wheat": 0.0
+          },
+          "historic_mean": 0.0
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:92cfff85a831e5203aca2605864448fca1af43483349a1494cd3ffdf72db10d4",
+      "reference": "non_increasing",
+      "acceptable": [
+        "non_increasing",
+        "unknown"
+      ]
+    },
+    {
+      "name": "crop-mixed-sign-equal-clamp",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "crop",
+          "weights": {
+            "maize": 0.5,
+            "rice": 0.3,
+            "wheat": 0.25
+          },
+          "country": {
+            "maize": 1.2,
+            "rice": 0.8,
+            "wheat": 1.1
+          },
+          "yearly": {
+            "maize": 0.0004,
+            "rice": 0.0002,
+            "wheat": 0.0003
+          },
+          "index": {
+            "maize": -0.002,
+            "rice": 0.004,
+            "wheat": 0.0
+          },
+          "historic_mean": 150.0
+        },
+        "clamp": {
+          "minimum": 1.0,
+          "maximum": 1.0
+        },
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:d5128eba731339d472de47e3980ee68e0c52af82255318dbfad421c257e8b19b",
+      "reference": "constant",
+      "acceptable": [
+        "constant",
+        "non_decreasing",
+        "non_increasing",
+        "unknown"
+      ]
+    },
+    {
+      "name": "crop-mixed-sign",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "cooling_degree_days",
+          "exposure_unit": "K.d",
+          "impact_metric": "crop_yield_change",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "crop",
+          "weights": {
+            "maize": 0.5,
+            "rice": 0.3,
+            "wheat": 0.25
+          },
+          "country": {
+            "maize": 1.2,
+            "rice": 0.8,
+            "wheat": 1.1
+          },
+          "yearly": {
+            "maize": 0.0004,
+            "rice": 0.0002,
+            "wheat": 0.0003
+          },
+          "index": {
+            "maize": -0.002,
+            "rice": 0.004,
+            "wheat": 0.0
+          },
+          "historic_mean": 150.0
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:76175b02aaaa90d209e6071815d17ac587d10262ba182c565f528d50f026e190",
+      "reference": "unknown",
+      "acceptable": [
+        "non_monotone",
+        "unknown"
+      ]
+    }
+  ]
+}

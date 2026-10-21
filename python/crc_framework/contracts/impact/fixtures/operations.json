@@ -1,0 +1,1761 @@
+{
+  "description": "Conformance vectors for impact operations. Source encodings here are fixture inputs, not persisted contracts. resolved_method 'any' accepts exact or numerical paths within tolerance.",
+  "policies": {
+    "exposure": {
+      "schema_version": "1.0",
+      "semantics_version": "crc-spatial-combination/1",
+      "stage": "exposure",
+      "reducer": "weighted_mean",
+      "weights": {
+        "kind": "intersection_area"
+      },
+      "coverage": "require_full"
+    },
+    "impact": {
+      "schema_version": "1.0",
+      "semantics_version": "crc-spatial-combination/1",
+      "stage": "impact",
+      "reducer": "weighted_mean",
+      "weights": {
+        "kind": "intersection_area"
+      },
+      "coverage": "require_full"
+    }
+  },
+  "expected_value": [
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "flood_depth",
+          "exposure_unit": "m",
+          "impact_metric": "damage_ratio",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "binned",
+          "bin_edges": [
+            0.0,
+            0.1,
+            0.5,
+            1.5,
+            4.0
+          ],
+          "values": [
+            0.0,
+            0.05,
+            0.35,
+            0.9
+          ],
+          "outside_domain": "clamp"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:06548a7d39380e7ee0ccd67e57e8e221577027b7ba753bea20c066db6d5f0e30",
+      "name": "flood-aligned-histogram",
+      "source": {
+        "kind": "histogram",
+        "bin_edges": [
+          0.0,
+          0.1,
+          0.5,
+          1.5,
+          4.0
+        ],
+        "weights": [
+          0.5,
+          0.25,
+          0.2,
+          0.05
+        ],
+        "within_bin": "uniform"
+      },
+      "method": "auto",
+      "resolved_method": "exact",
+      "expected": 0.1275,
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "derivation": "0.5*0 + 0.25*0.05 + 0.2*0.35 + 0.05*0.9"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "binned",
+          "bin_edges": [
+            0.0,
+            0.5,
+            2.0
+          ],
+          "values": [
+            0.0,
+            1.0
+          ],
+          "outside_domain": "clamp"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:e1c08d84341c99c30cdec2c4a633e32c093fb3413ca48d766ab15e64261da3a0",
+      "name": "uniform-bin-threshold",
+      "source": {
+        "kind": "histogram",
+        "bin_edges": [
+          0.0,
+          2.0
+        ],
+        "weights": [
+          1.0
+        ],
+        "within_bin": "uniform"
+      },
+      "method": "exact",
+      "resolved_method": "exact",
+      "expected": 0.75,
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "derivation": "uniform [0,2]; response 0 below 0.5 and 1 above: (2 - 0.5) / 2"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "binned",
+          "bin_edges": [
+            0.0,
+            0.5,
+            2.0
+          ],
+          "values": [
+            0.0,
+            1.0
+          ],
+          "outside_domain": "clamp"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:e1c08d84341c99c30cdec2c4a633e32c093fb3413ca48d766ab15e64261da3a0",
+      "name": "misaligned-bins",
+      "source": {
+        "kind": "histogram",
+        "bin_edges": [
+          0.0,
+          1.0,
+          2.0
+        ],
+        "weights": [
+          0.5,
+          0.5
+        ],
+        "within_bin": "uniform"
+      },
+      "method": "auto",
+      "resolved_method": "exact",
+      "expected": 0.75,
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "derivation": "split at 0.5: 0.5*(0.5*0 + 0.5*1) + 0.5*1"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "linear",
+          "slope": 2.0,
+          "intercept": 1.0
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:9ceba0baf443826d719192ed22b5877ee7587bff201259b48c82f4dc8f69cd1b",
+      "name": "linear-histogram",
+      "source": {
+        "kind": "histogram",
+        "bin_edges": [
+          0.0,
+          1.0,
+          3.0
+        ],
+        "weights": [
+          0.5,
+          0.5
+        ],
+        "within_bin": "uniform"
+      },
+      "method": "auto",
+      "resolved_method": "exact",
+      "expected": 3.5,
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "derivation": "2*E[X] + 1 with E[X] = 0.5*0.5 + 0.5*2"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "tabulated",
+          "points": [
+            {
+              "x": 0.0,
+              "y": 0.0
+            },
+            {
+              "x": 1.0,
+              "y": 1.0
+            },
+            {
+              "x": 2.0,
+              "y": 1.0
+            }
+          ],
+          "interpolation": "linear",
+          "outside_domain": "clamp"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:d77d4d8e9d17d580c1e238b7bf34c0578fec625521ef3192dd5bb786970b5260",
+      "name": "knot-inside-bin",
+      "source": {
+        "kind": "histogram",
+        "bin_edges": [
+          0.0,
+          2.0
+        ],
+        "weights": [
+          1.0
+        ],
+        "within_bin": "uniform"
+      },
+      "method": "auto",
+      "resolved_method": "exact",
+      "expected": 0.75,
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "derivation": "(integral of min(x,1) on [0,2]) / 2 = (0.5 + 1) / 2"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "linear",
+          "slope": 1.0,
+          "intercept": -0.5
+        },
+        "clamp": {
+          "minimum": 0.0,
+          "maximum": null
+        },
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:c9afd4be9f56bbd4dd5576dcd958d7cc9ec3730233b90333750d118d79dd141e",
+      "name": "linear-clamp-inside-bin",
+      "source": {
+        "kind": "histogram",
+        "bin_edges": [
+          0.0,
+          2.0
+        ],
+        "weights": [
+          1.0
+        ],
+        "within_bin": "uniform"
+      },
+      "method": "exact",
+      "resolved_method": "exact",
+      "expected": 0.5625,
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "derivation": "integral of max(x-0.5,0) on [0,2], divided by 2: 1.5**2 / 4 = 9/16"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "tabulated",
+          "points": [
+            {
+              "x": 0.0,
+              "y": 0.0
+            },
+            {
+              "x": 2.0,
+              "y": 2.0
+            }
+          ],
+          "interpolation": "linear",
+          "outside_domain": "clamp"
+        },
+        "clamp": {
+          "minimum": null,
+          "maximum": 0.5
+        },
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:5339161d55affe0951a53ce95f6933bc7cb8353c2aa0d7924f4f019892308eea",
+      "name": "tabulated-clamp-inside-bin",
+      "source": {
+        "kind": "histogram",
+        "bin_edges": [
+          0.0,
+          2.0
+        ],
+        "weights": [
+          1.0
+        ],
+        "within_bin": "uniform"
+      },
+      "method": "exact",
+      "resolved_method": "exact",
+      "expected": 0.4375,
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "derivation": "integral of min(x,0.5) on [0,2], divided by 2: (0.125+0.75)/2 = 7/16"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "binned",
+          "bin_edges": [
+            0.0,
+            0.5,
+            2.0
+          ],
+          "values": [
+            0.0,
+            1.0
+          ],
+          "outside_domain": "clamp"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:e1c08d84341c99c30cdec2c4a633e32c093fb3413ca48d766ab15e64261da3a0",
+      "name": "atom-on-bin-edge",
+      "source": {
+        "kind": "canonical_distribution",
+        "parameters": {
+          "curve_kind": "point_mass",
+          "curve_type": "point_mass",
+          "curve_location": 0.5,
+          "curve_scale": 0.0,
+          "curve_atom_probability": 1.0,
+          "curve_atom_location": 0.5
+        }
+      },
+      "method": "auto",
+      "resolved_method": "exact",
+      "expected": 1.0,
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "derivation": "interior edges select the interval to their right"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "sigmoid",
+          "midpoint": 0.5,
+          "steepness": 10.0,
+          "offset": 0.0,
+          "amplitude": 1.0,
+          "origin_adjustment": "none",
+          "zero_below": 0.5
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:8742b47a1c568f9df7b73d6f9ddb286de77c851d94e33b0ca7a489ef230558b9",
+      "name": "atom-on-threshold",
+      "source": {
+        "kind": "canonical_distribution",
+        "parameters": {
+          "curve_kind": "point_mass",
+          "curve_type": "point_mass",
+          "curve_location": 0.5,
+          "curve_scale": 0.0,
+          "curve_atom_probability": 1.0,
+          "curve_atom_location": 0.5
+        }
+      },
+      "method": "auto",
+      "resolved_method": "exact",
+      "expected": 0.5,
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "derivation": "threshold equality evaluates the sigmoid: L(0) = 0.5"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "linear",
+          "slope": 2.0,
+          "intercept": 0.0
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:d95e0868c104ed4a006a59dd87fef5c051c85f450886fdcfebb08d9b85f81d4c",
+      "name": "discrete-weighted-sum",
+      "source": {
+        "kind": "discrete",
+        "support": [
+          0.0,
+          1.0,
+          3.0
+        ],
+        "probabilities": [
+          0.2,
+          0.5,
+          0.3
+        ]
+      },
+      "method": "auto",
+      "resolved_method": "exact",
+      "expected": 2.8,
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "derivation": "2 * (0.5*1 + 0.3*3)"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "binned",
+          "bin_edges": [
+            0.0,
+            1.0,
+            2.0
+          ],
+          "values": [
+            0.0,
+            1.0
+          ],
+          "outside_domain": "clamp"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:3ee29cd44e9e09446d865c2ea305ed5839a6544e949272c770a423048fa6a326",
+      "name": "histogram-normalization",
+      "source": {
+        "kind": "histogram",
+        "bin_edges": [
+          0.0,
+          1.0,
+          2.0
+        ],
+        "weights": [
+          0.5,
+          0.5000000000004
+        ],
+        "within_bin": "uniform"
+      },
+      "method": "exact",
+      "resolved_method": "exact",
+      "expected": 0.5000000000002,
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "source_diagnostics": {
+        "original_mass_sum": 1.0000000000004001,
+        "normalization_factor": 0.9999999999995999
+      },
+      "derivation": "Neumaier sum in bin order; weights divided by the sum once"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "linear",
+          "slope": 2.0,
+          "intercept": 0.0
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:d95e0868c104ed4a006a59dd87fef5c051c85f450886fdcfebb08d9b85f81d4c",
+      "name": "linear-gumbel-mean",
+      "source": {
+        "kind": "canonical_distribution",
+        "parameters": {
+          "curve_kind": "fitted",
+          "curve_type": "gumbel_r",
+          "curve_shape": null,
+          "curve_location": 1.0,
+          "curve_scale": 0.8
+        }
+      },
+      "method": "auto",
+      "resolved_method": "any",
+      "expected": 2.9235450638424525,
+      "tolerance": {
+        "absolute": 1e-10,
+        "relative": 1e-08
+      },
+      "derivation": "2 * (location + scale * Euler-Mascheroni); unclamped linear with finite first moment"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "linear",
+          "slope": 1.0,
+          "intercept": 0.0
+        },
+        "clamp": {
+          "minimum": null,
+          "maximum": 1.0
+        },
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:c6c37748367d8431cc87348c1baf432c7282977cb503366aebff36af0f521701",
+      "name": "clamped-heavy-tail",
+      "source": {
+        "kind": "canonical_distribution",
+        "parameters": {
+          "curve_kind": "fitted",
+          "curve_type": "genpareto",
+          "curve_shape": 1.0,
+          "curve_location": 0.0,
+          "curve_scale": 1.0
+        }
+      },
+      "method": "auto",
+      "resolved_method": "any",
+      "expected": 0.6931471805599453,
+      "tolerance": {
+        "absolute": 1e-10,
+        "relative": 1e-08
+      },
+      "derivation": "E[min(X,1)] = integral_0^1 1/(1+x) dx for genpareto c=1"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "linear",
+          "slope": 2.0,
+          "intercept": 0.0
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:d95e0868c104ed4a006a59dd87fef5c051c85f450886fdcfebb08d9b85f81d4c",
+      "name": "heavy-tail-divergent",
+      "source": {
+        "kind": "canonical_distribution",
+        "parameters": {
+          "curve_kind": "fitted",
+          "curve_type": "genpareto",
+          "curve_shape": 1.0,
+          "curve_location": 0.0,
+          "curve_scale": 1.0
+        }
+      },
+      "method": "auto",
+      "error": "not_integrable",
+      "derivation": "genpareto c=1 has no finite mean; quadrature convergence is not proof"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "binned",
+          "bin_edges": [
+            0.0,
+            0.5,
+            2.0
+          ],
+          "values": [
+            0.0,
+            1.0
+          ],
+          "outside_domain": "clamp"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:e1c08d84341c99c30cdec2c4a633e32c093fb3413ca48d766ab15e64261da3a0",
+      "name": "incomplete-support",
+      "source": {
+        "kind": "canonical_distribution",
+        "parameters": {
+          "curve_kind": "tabulated",
+          "curve_type": "linear_probability",
+          "curve_probabilities": [
+            0.1,
+            0.9
+          ],
+          "curve_values": [
+            0.0,
+            1.0
+          ]
+        }
+      },
+      "method": "auto",
+      "error": "missing_probability_support",
+      "derivation": "tails are never silently omitted or renormalized"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "binned",
+          "bin_edges": [
+            0.0,
+            0.5,
+            2.0
+          ],
+          "values": [
+            0.0,
+            1.0
+          ],
+          "outside_domain": "clamp"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:e1c08d84341c99c30cdec2c4a633e32c093fb3413ca48d766ab15e64261da3a0",
+      "name": "histogram-mass-mismatch",
+      "source": {
+        "kind": "histogram",
+        "bin_edges": [
+          0.0,
+          1.0,
+          2.0
+        ],
+        "weights": [
+          0.5,
+          0.6
+        ],
+        "within_bin": "uniform"
+      },
+      "method": "auto",
+      "error": "invalid_histogram",
+      "derivation": "total mass 1.1 is outside 1e-12 of one"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "binned",
+          "bin_edges": [
+            0.0,
+            0.5,
+            2.0
+          ],
+          "values": [
+            0.0,
+            1.0
+          ],
+          "outside_domain": "clamp"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:e1c08d84341c99c30cdec2c4a633e32c093fb3413ca48d766ab15e64261da3a0",
+      "name": "histogram-negative-weight",
+      "source": {
+        "kind": "histogram",
+        "bin_edges": [
+          0.0,
+          1.0,
+          2.0
+        ],
+        "weights": [
+          1.5,
+          -0.5
+        ],
+        "within_bin": "uniform"
+      },
+      "method": "auto",
+      "error": "invalid_histogram",
+      "derivation": "weights are non-negative"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "sigmoid",
+          "midpoint": 0.0,
+          "steepness": 1.0,
+          "offset": 0.0,
+          "amplitude": 1.0,
+          "origin_adjustment": "none",
+          "zero_below": null
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:eace0827e37ccc4a6d7c25a26c14cabecd93e34e84433733443db83ee0b7657f",
+      "name": "exact-unavailable",
+      "source": {
+        "kind": "canonical_distribution",
+        "parameters": {
+          "curve_kind": "fitted",
+          "curve_type": "skewnorm",
+          "curve_shape": 0.0,
+          "curve_location": 0.0,
+          "curve_scale": 1.0
+        }
+      },
+      "method": "exact",
+      "error": "exact_method_unavailable",
+      "derivation": "sigmoid of a normal has no implemented exact path"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "sigmoid",
+          "midpoint": 0.0,
+          "steepness": 1.0,
+          "offset": 0.0,
+          "amplitude": 1.0,
+          "origin_adjustment": "none",
+          "zero_below": null
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:eace0827e37ccc4a6d7c25a26c14cabecd93e34e84433733443db83ee0b7657f",
+      "name": "quadrature-budget",
+      "source": {
+        "kind": "canonical_distribution",
+        "parameters": {
+          "curve_kind": "fitted",
+          "curve_type": "skewnorm",
+          "curve_shape": 0.0,
+          "curve_location": 0.0,
+          "curve_scale": 1.0
+        }
+      },
+      "method": {
+        "kind": "gauss_kronrod",
+        "absolute_tolerance": 1e-300,
+        "relative_tolerance": 1e-300,
+        "max_evaluations": 15
+      },
+      "error": "convergence_failed",
+      "derivation": "tolerance unreachable within one 15-point rule"
+    }
+  ],
+  "transform_distribution": [
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "linear",
+          "slope": -1.0,
+          "intercept": 10.0
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:4806ce7981673666fe38b05790540adfd73de29fd5291845e7e39dbdc299e7a2",
+      "name": "decreasing-uniform",
+      "source": {
+        "kind": "canonical_distribution",
+        "parameters": {
+          "curve_kind": "tabulated",
+          "curve_type": "linear_probability",
+          "curve_probabilities": [
+            0.0,
+            1.0
+          ],
+          "curve_values": [
+            0.0,
+            10.0
+          ]
+        }
+      },
+      "probabilities": [
+        0.1,
+        0.5,
+        0.8
+      ],
+      "quantiles": [
+        1.0,
+        5.0,
+        8.0
+      ],
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "derivation": "Q_Y(p) = 10 - Q_X(1 - p) = 10p"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "binned",
+          "bin_edges": [
+            0.0,
+            5.0,
+            10.0
+          ],
+          "values": [
+            0.0,
+            1.0
+          ],
+          "outside_domain": "clamp"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:c6a8396d3b235e2fefcacf8220f317a9b8d518ab83e9ab0ff1aa213d6a2a7a81",
+      "name": "binary-threshold",
+      "source": {
+        "kind": "canonical_distribution",
+        "parameters": {
+          "curve_kind": "tabulated",
+          "curve_type": "linear_probability",
+          "curve_probabilities": [
+            0.0,
+            1.0
+          ],
+          "curve_values": [
+            0.0,
+            10.0
+          ]
+        }
+      },
+      "probabilities": [
+        0.25,
+        0.5,
+        0.75
+      ],
+      "quantiles": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "atoms": [
+        {
+          "value": 0.0,
+          "probability": 0.5
+        },
+        {
+          "value": 1.0,
+          "probability": 0.5
+        }
+      ],
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "derivation": "only responses 0 and 1; generalized inverse at the tie returns 0"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "binned",
+          "bin_edges": [
+            0.0,
+            5.0,
+            10.0
+          ],
+          "values": [
+            1.0,
+            0.0
+          ],
+          "outside_domain": "clamp"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:93ecbdbff827c0896731ea80ccc7bdd6f246d5a2148ade653759f23f25ed95bc",
+      "name": "decreasing-step",
+      "source": {
+        "kind": "canonical_distribution",
+        "parameters": {
+          "curve_kind": "tabulated",
+          "curve_type": "linear_probability",
+          "curve_probabilities": [
+            0.0,
+            1.0
+          ],
+          "curve_values": [
+            0.0,
+            10.0
+          ]
+        }
+      },
+      "probabilities": [
+        0.25,
+        0.5,
+        0.75
+      ],
+      "quantiles": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "atoms": [
+        {
+          "value": 0.0,
+          "probability": 0.5
+        },
+        {
+          "value": 1.0,
+          "probability": 0.5
+        }
+      ],
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "derivation": "decreasing step: P(Y = 0) = P(X >= 5)"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "tabulated",
+          "points": [
+            {
+              "x": 0.0,
+              "y": 0.0
+            },
+            {
+              "x": 2.0,
+              "y": 1.0
+            },
+            {
+              "x": 8.0,
+              "y": 1.0
+            },
+            {
+              "x": 10.0,
+              "y": 2.0
+            }
+          ],
+          "interpolation": "linear",
+          "outside_domain": "clamp"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:4632ebbb9cf49339a1b03f1c20573cb943e2636869789d2258ea16f8a5eed9a1",
+      "name": "flat-segment",
+      "source": {
+        "kind": "canonical_distribution",
+        "parameters": {
+          "curve_kind": "tabulated",
+          "curve_type": "linear_probability",
+          "curve_probabilities": [
+            0.0,
+            1.0
+          ],
+          "curve_values": [
+            0.0,
+            10.0
+          ]
+        }
+      },
+      "probabilities": [
+        0.1,
+        0.2,
+        0.5,
+        0.95
+      ],
+      "quantiles": [
+        0.5,
+        1.0,
+        1.0,
+        1.5
+      ],
+      "atoms": [
+        {
+          "value": 1.0,
+          "probability": 0.6
+        }
+      ],
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "derivation": "flat between x = 2 and 8 creates an atom of mass 0.6 at 1"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "binned",
+          "bin_edges": [
+            0.0,
+            5.0,
+            10.0
+          ],
+          "values": [
+            0.0,
+            1.0
+          ],
+          "outside_domain": "clamp"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:c6a8396d3b235e2fefcacf8220f317a9b8d518ab83e9ab0ff1aa213d6a2a7a81",
+      "name": "atom-on-edge",
+      "source": {
+        "kind": "canonical_distribution",
+        "parameters": {
+          "curve_kind": "point_mass",
+          "curve_type": "point_mass",
+          "curve_location": 5.0,
+          "curve_scale": 0.0,
+          "curve_atom_probability": 1.0,
+          "curve_atom_location": 5.0
+        }
+      },
+      "probabilities": [
+        0.0,
+        0.5,
+        1.0
+      ],
+      "quantiles": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "atoms": [
+        {
+          "value": 1.0,
+          "probability": 1.0
+        }
+      ],
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "derivation": "an atom exactly on an interior edge maps to the right interval"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "tabulated",
+          "points": [
+            {
+              "x": 0.0,
+              "y": 0.0
+            },
+            {
+              "x": 5.0,
+              "y": 1.0
+            },
+            {
+              "x": 10.0,
+              "y": 0.0
+            }
+          ],
+          "interpolation": "linear",
+          "outside_domain": "clamp"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:229c1035dae9a6a99364fca7cda9ef517714b06f362b9e2b3b989a4db5f9bbad",
+      "name": "non-monotone",
+      "source": {
+        "kind": "canonical_distribution",
+        "parameters": {
+          "curve_kind": "tabulated",
+          "curve_type": "linear_probability",
+          "curve_probabilities": [
+            0.0,
+            1.0
+          ],
+          "curve_values": [
+            0.0,
+            10.0
+          ]
+        }
+      },
+      "error": "monotonicity_required",
+      "derivation": "pushforward requires a certified monotone function"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "sigmoid",
+          "midpoint": 1.0,
+          "steepness": -2.0,
+          "offset": 0.0,
+          "amplitude": 1.0,
+          "origin_adjustment": "none",
+          "zero_below": 0.5
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:c74b6b34bdf2a9c4d80f5db44ffd7f71025e71cd56ff9d630f41586d1b5661f6",
+      "name": "threshold-breaks-monotonicity",
+      "source": {
+        "kind": "canonical_distribution",
+        "parameters": {
+          "curve_kind": "tabulated",
+          "curve_type": "linear_probability",
+          "curve_probabilities": [
+            0.0,
+            1.0
+          ],
+          "curve_values": [
+            0.0,
+            10.0
+          ]
+        }
+      },
+      "error": "monotonicity_required",
+      "derivation": "a decreasing sigmoid with a zero threshold is non-monotone"
+    },
+    {
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "linear",
+          "slope": 1.0,
+          "intercept": 0.0
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:b1d879fc61af593dff15715b014304af9ea2e9ec2aa15450390d6182d3d8c2ee",
+      "name": "partial-support",
+      "source": {
+        "kind": "canonical_distribution",
+        "parameters": {
+          "curve_kind": "tabulated",
+          "curve_type": "linear_probability",
+          "curve_probabilities": [
+            0.1,
+            0.9
+          ],
+          "curve_values": [
+            0.0,
+            1.0
+          ]
+        }
+      },
+      "error": "missing_probability_support",
+      "derivation": "partial quantile curves are not full distributions"
+    }
+  ],
+  "spatial_combination": [
+    {
+      "name": "square",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "tabulated",
+          "points": [
+            {
+              "x": 0.0,
+              "y": 0.0
+            },
+            {
+              "x": 0.5,
+              "y": 0.25
+            },
+            {
+              "x": 1.0,
+              "y": 1.0
+            }
+          ],
+          "interpolation": "linear",
+          "outside_domain": "clamp"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:c9462de30676e69752cc260e999c41511e62b1c8fa1a945029afcfeaad98df22",
+      "contributors": [
+        {
+          "id": "a",
+          "weight": 1.0,
+          "exposure": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "id": "b",
+          "weight": 1.0,
+          "exposure": [
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "results": {
+        "exposure": {
+          "policy_hash": "sha256:f6c620e3db37ff684e6fe5e51c0f155ca58c4c5377b0b9032e44f99bcec19c23",
+          "values": [
+            0.25,
+            0.25
+          ]
+        },
+        "impact": {
+          "policy_hash": "sha256:42656d514b3a0c92172c2f8aa51dc163a7b01647d23895794703c1ca56c0e911",
+          "values": [
+            0.5,
+            0.5
+          ]
+        }
+      },
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "derivation": "equal weights; event arrays are combined elementwise and never reordered"
+    },
+    {
+      "name": "decreasing-square",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "tabulated",
+          "points": [
+            {
+              "x": 0.0,
+              "y": 1.0
+            },
+            {
+              "x": 0.5,
+              "y": 0.75
+            },
+            {
+              "x": 1.0,
+              "y": 0.0
+            }
+          ],
+          "interpolation": "linear",
+          "outside_domain": "clamp"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:b9b48f33f944f8ccb8107e6e73a5dce48429dbb539c21d7acf3717c98a842487",
+      "contributors": [
+        {
+          "id": "a",
+          "weight": 1.0,
+          "exposure": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "id": "b",
+          "weight": 1.0,
+          "exposure": [
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "results": {
+        "exposure": {
+          "policy_hash": "sha256:f6c620e3db37ff684e6fe5e51c0f155ca58c4c5377b0b9032e44f99bcec19c23",
+          "values": [
+            0.75,
+            0.75
+          ]
+        },
+        "impact": {
+          "policy_hash": "sha256:42656d514b3a0c92172c2f8aa51dc163a7b01647d23895794703c1ca56c0e911",
+          "values": [
+            0.5,
+            0.5
+          ]
+        }
+      },
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "derivation": "equal weights; event arrays are combined elementwise and never reordered"
+    },
+    {
+      "name": "non-monotone",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "tabulated",
+          "points": [
+            {
+              "x": 0.0,
+              "y": 0.0
+            },
+            {
+              "x": 0.5,
+              "y": 1.0
+            },
+            {
+              "x": 1.0,
+              "y": 0.0
+            }
+          ],
+          "interpolation": "linear",
+          "outside_domain": "clamp"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:34b5c0fbb850245b76fdc8aeea829b557dc6ea86ebb501137f1074e176b8273a",
+      "contributors": [
+        {
+          "id": "a",
+          "weight": 1.0,
+          "exposure": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "id": "b",
+          "weight": 1.0,
+          "exposure": [
+            1.0,
+            0.0
+          ]
+        }
+      ],
+      "results": {
+        "exposure": {
+          "policy_hash": "sha256:f6c620e3db37ff684e6fe5e51c0f155ca58c4c5377b0b9032e44f99bcec19c23",
+          "values": [
+            1.0,
+            1.0
+          ]
+        },
+        "impact": {
+          "policy_hash": "sha256:42656d514b3a0c92172c2f8aa51dc163a7b01647d23895794703c1ca56c0e911",
+          "values": [
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "derivation": "equal weights; event arrays are combined elementwise and never reordered"
+    }
+  ]
+}

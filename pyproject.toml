@@ -34,7 +34,7 @@ Repository = "https://github.com/RiskThinking/crc-framework-rs"
 Issues = "https://github.com/RiskThinking/crc-framework-rs/issues"
 
 [project.optional-dependencies]
-test = ["mypy", "pytest"]
+test = ["jsonschema>=4.18", "mypy", "pytest"]
 
 [tool.maturin]
 module-name = "crc_framework._core"

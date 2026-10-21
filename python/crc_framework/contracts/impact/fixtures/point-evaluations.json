@@ -1,0 +1,1371 @@
+{
+  "description": "Point evaluations of normalized definitions. A case has expected or error; x_special is a non-finite exposure that JSON cannot spell. Compare with |actual - expected| <= absolute + relative * |expected|.",
+  "fixtures": [
+    {
+      "name": "tabulated-linear",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "flood_depth",
+          "exposure_unit": "m",
+          "impact_metric": "damage_ratio",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "tabulated",
+          "points": [
+            {
+              "x": 0.0,
+              "y": 0.0
+            },
+            {
+              "x": 0.3,
+              "y": 0.08
+            },
+            {
+              "x": 1.0,
+              "y": 0.45
+            },
+            {
+              "x": 2.0,
+              "y": 1.0
+            }
+          ],
+          "interpolation": "linear",
+          "outside_domain": "clamp"
+        },
+        "clamp": {
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": -1.0,
+          "expected": 0.0
+        },
+        {
+          "x": 0.0,
+          "expected": 0.0
+        },
+        {
+          "x": 5e-324,
+          "expected": 0.0
+        },
+        {
+          "x": 0.15,
+          "expected": 0.04
+        },
+        {
+          "x": 0.3,
+          "expected": 0.08
+        },
+        {
+          "x": 0.29999999999999993,
+          "expected": 0.07999999999999999
+        },
+        {
+          "x": 0.30000000000000004,
+          "expected": 0.08000000000000003
+        },
+        {
+          "x": 1.0,
+          "expected": 0.45
+        },
+        {
+          "x": 1.5,
+          "expected": 0.7250000000000001
+        },
+        {
+          "x": 2.0,
+          "expected": 1.0
+        },
+        {
+          "x": 2.0000000000000004,
+          "expected": 1.0
+        },
+        {
+          "x": 3.0,
+          "expected": 1.0
+        },
+        {
+          "x_special": "NaN",
+          "error": "non_finite_exposure"
+        },
+        {
+          "x_special": "Infinity",
+          "error": "non_finite_exposure"
+        },
+        {
+          "x_special": "-Infinity",
+          "error": "non_finite_exposure"
+        }
+      ]
+    },
+    {
+      "name": "tabulated-step-left",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "tabulated",
+          "points": [
+            {
+              "x": 0.0,
+              "y": 1.0
+            },
+            {
+              "x": 1.0,
+              "y": 0.5
+            },
+            {
+              "x": 2.0,
+              "y": 0.0
+            }
+          ],
+          "interpolation": "step_left",
+          "outside_domain": "error"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:2afb3f6a4cbdae987989aaf6f3e3aa0fb70f48473342a6e5b1dd34bb5385d529",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": 0.0,
+          "expected": 1.0
+        },
+        {
+          "x": 0.5,
+          "expected": 1.0
+        },
+        {
+          "x": 0.9999999999999999,
+          "expected": 1.0
+        },
+        {
+          "x": 1.0,
+          "expected": 0.5
+        },
+        {
+          "x": 1.0000000000000002,
+          "expected": 0.5
+        },
+        {
+          "x": 2.0,
+          "expected": 0.0
+        },
+        {
+          "x": -5e-324,
+          "error": "out_of_domain"
+        },
+        {
+          "x": 2.0000000000000004,
+          "error": "out_of_domain"
+        }
+      ]
+    },
+    {
+      "name": "tabulated-step-right",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "tabulated",
+          "points": [
+            {
+              "x": 0.0,
+              "y": 0.0
+            },
+            {
+              "x": 0.5,
+              "y": 1.0
+            },
+            {
+              "x": 1.0,
+              "y": 0.0
+            }
+          ],
+          "interpolation": "step_right",
+          "outside_domain": "clamp"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:4c422fc78837b22492265abd185e6252a136896f2e4244206e597d68183dace3",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": -5.0,
+          "expected": 0.0
+        },
+        {
+          "x": 0.0,
+          "expected": 0.0
+        },
+        {
+          "x": 0.25,
+          "expected": 1.0
+        },
+        {
+          "x": 0.49999999999999994,
+          "expected": 1.0
+        },
+        {
+          "x": 0.5,
+          "expected": 1.0
+        },
+        {
+          "x": 0.75,
+          "expected": 0.0
+        },
+        {
+          "x": 1.0,
+          "expected": 0.0
+        },
+        {
+          "x": 7.0,
+          "expected": 0.0
+        }
+      ]
+    },
+    {
+      "name": "binned-flood",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "flood_depth",
+          "exposure_unit": "m",
+          "impact_metric": "damage_ratio",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "binned",
+          "bin_edges": [
+            0.0,
+            0.1,
+            0.5,
+            1.5,
+            4.0
+          ],
+          "values": [
+            0.0,
+            0.05,
+            0.35,
+            0.9
+          ],
+          "outside_domain": "clamp"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:06548a7d39380e7ee0ccd67e57e8e221577027b7ba753bea20c066db6d5f0e30",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": -1.0,
+          "expected": 0.0
+        },
+        {
+          "x": 0.0,
+          "expected": 0.0
+        },
+        {
+          "x": 0.09999999999999999,
+          "expected": 0.0
+        },
+        {
+          "x": 0.1,
+          "expected": 0.05
+        },
+        {
+          "x": 0.3,
+          "expected": 0.05
+        },
+        {
+          "x": 0.5,
+          "expected": 0.35
+        },
+        {
+          "x": 1.5,
+          "expected": 0.9
+        },
+        {
+          "x": 3.9999999999999996,
+          "expected": 0.9
+        },
+        {
+          "x": 4.0,
+          "expected": 0.9
+        },
+        {
+          "x": 9.0,
+          "expected": 0.9
+        }
+      ]
+    },
+    {
+      "name": "binned-single-error",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "binned",
+          "bin_edges": [
+            0.0,
+            1.0
+          ],
+          "values": [
+            -2.5
+          ],
+          "outside_domain": "error"
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:205dead77c8e3350a565e81804712b429d70730e0cab145ee8d523ea766b1a5e",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": 0.0,
+          "expected": -2.5
+        },
+        {
+          "x": 0.5,
+          "expected": -2.5
+        },
+        {
+          "x": 1.0,
+          "expected": -2.5
+        },
+        {
+          "x": -5e-324,
+          "error": "out_of_domain"
+        },
+        {
+          "x": 1.0000000000000002,
+          "error": "out_of_domain"
+        }
+      ]
+    },
+    {
+      "name": "linear-clamped",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "linear",
+          "slope": 0.00022273972602739726,
+          "intercept": 0.0
+        },
+        "clamp": {
+          "minimum": 0.0,
+          "maximum": null
+        },
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:018fb9fc47b9ec80fb8a237f3defba75968be8c41ff8fc32f46f7e75ddd47277",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": -10.0,
+          "expected": 0.0
+        },
+        {
+          "x": 0.0,
+          "expected": 0.0
+        },
+        {
+          "x": 30.0,
+          "expected": 0.006682191780821918
+        },
+        {
+          "x": 365.0,
+          "expected": 0.0813
+        }
+      ]
+    },
+    {
+      "name": "linear-negative-slope",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "linear",
+          "slope": -1.5,
+          "intercept": 3.0
+        },
+        "clamp": {
+          "minimum": null,
+          "maximum": 1.0
+        },
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:9083ef20a50461d8295c99e8bf5456ee5f2a2f3188288b55ce42c140a4a4791d",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": 0.0,
+          "expected": 1.0
+        },
+        {
+          "x": 1.3333333333333333,
+          "expected": 1.0
+        },
+        {
+          "x": 2.0,
+          "expected": 0.0
+        },
+        {
+          "x": 10.0,
+          "expected": -12.0
+        }
+      ]
+    },
+    {
+      "name": "linear-equal-clamp",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "linear",
+          "slope": 1.0,
+          "intercept": 0.0
+        },
+        "clamp": {
+          "minimum": 0.5,
+          "maximum": 0.5
+        },
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:7f22eb40ff87d39c722e268d06f0d94d67f58782c07e4b8a70b98102b326e7b0",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": -1e+300,
+          "expected": 0.5
+        },
+        {
+          "x": 0.0,
+          "expected": 0.5
+        },
+        {
+          "x": 1e+300,
+          "expected": 0.5
+        }
+      ]
+    },
+    {
+      "name": "linear-overflow",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "linear",
+          "slope": 1e+308,
+          "intercept": 0.0
+        },
+        "clamp": {
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:099c3cc23f77f82f73470bd5db54c6f40610db686c8d90bcd9a41e132172eefa",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": 0.5,
+          "expected": 1.0
+        },
+        {
+          "x": 10.0,
+          "error": "non_finite_result"
+        }
+      ],
+      "note": "A final clamp must not conceal an overflow in the raw response."
+    },
+    {
+      "name": "sigmoid-plain",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "sigmoid",
+          "midpoint": 35.65,
+          "steepness": 0.2051873853077659,
+          "offset": 0.0,
+          "amplitude": 1.0,
+          "origin_adjustment": "none",
+          "zero_below": null
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:b32a7f8c7c272b0335158be7bd6c38e2414995f8ea102a16d3ee48414f27e164",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": -1000000.0,
+          "expected": 0.0
+        },
+        {
+          "x": 0.0,
+          "expected": 0.0006650850753962535
+        },
+        {
+          "x": 35.65,
+          "expected": 0.5
+        },
+        {
+          "x": 50.0,
+          "expected": 0.9500000000000001
+        },
+        {
+          "x": 1000000.0,
+          "expected": 1.0
+        },
+        {
+          "x_special": "NaN",
+          "error": "non_finite_exposure"
+        },
+        {
+          "x_special": "Infinity",
+          "error": "non_finite_exposure"
+        },
+        {
+          "x_special": "-Infinity",
+          "error": "non_finite_exposure"
+        }
+      ]
+    },
+    {
+      "name": "sigmoid-negative-steepness",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "sigmoid",
+          "midpoint": 2.0,
+          "steepness": -3.0,
+          "offset": 0.1,
+          "amplitude": 0.5,
+          "origin_adjustment": "none",
+          "zero_below": null
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:e060d83345a18b5524cec65ccc26ac5fba248a12fa2f1d61d81fdffd9486ceee",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": -100.0,
+          "expected": 0.6
+        },
+        {
+          "x": 0.0,
+          "expected": 0.5987636884216827
+        },
+        {
+          "x": 2.0,
+          "expected": 0.35
+        },
+        {
+          "x": 5.0,
+          "expected": 0.10006169728799312
+        }
+      ]
+    },
+    {
+      "name": "sigmoid-zero-steepness",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "sigmoid",
+          "midpoint": 4.0,
+          "steepness": 0.0,
+          "offset": -0.1,
+          "amplitude": 0.6,
+          "origin_adjustment": "none",
+          "zero_below": null
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:35a811abe3675e2559e766e97f2feec7212f97871a822fc91d357353c84ae95d",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": -3.0,
+          "expected": 0.19999999999999998
+        },
+        {
+          "x": 4.0,
+          "expected": 0.19999999999999998
+        },
+        {
+          "x": 1000000000.0,
+          "expected": 0.19999999999999998
+        }
+      ]
+    },
+    {
+      "name": "sigmoid-constant-extreme",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "sigmoid",
+          "midpoint": -1e+308,
+          "steepness": 0.0,
+          "offset": 0.0,
+          "amplitude": 1.0,
+          "origin_adjustment": "none",
+          "zero_below": null
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:77e267ac8401d1a6bc9790dc99f0a29876c84b1992b9fbce1498b6de089e416b",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": -1e+308,
+          "expected": 0.5
+        },
+        {
+          "x": 1e+308,
+          "expected": 0.5
+        }
+      ],
+      "note": "Zero steepness remains constant when x - midpoint would overflow."
+    },
+    {
+      "name": "sigmoid-zero-amplitude-extreme",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "sigmoid",
+          "midpoint": -1e+308,
+          "steepness": 0.0,
+          "offset": 0.3,
+          "amplitude": 0.0,
+          "origin_adjustment": "none",
+          "zero_below": null
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:0f5d82f9aba13534f60f1afcf0239b146fcaf2d788959b81edffbb3d3c99fdec",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": -1e+308,
+          "expected": 0.3
+        },
+        {
+          "x": 1e+308,
+          "expected": 0.3
+        }
+      ],
+      "note": "Zero amplitude returns offset without evaluating an indeterminate argument."
+    },
+    {
+      "name": "sigmoid-origin-threshold",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "sigmoid",
+          "midpoint": 2.0,
+          "steepness": 1.25,
+          "offset": 0.1,
+          "amplitude": 0.9,
+          "origin_adjustment": "subtract_at_zero",
+          "zero_below": 0.5
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:240ae330f08c1ac99a7e3ffa416ab7eaa93a7c1a96126417c74576168fafd920",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": -2.0,
+          "expected": 0.0
+        },
+        {
+          "x": 0.0,
+          "expected": 0.0
+        },
+        {
+          "x": 0.49999999999999994,
+          "expected": 0.0
+        },
+        {
+          "x": 0.5,
+          "expected": 0.1513954541589271
+        },
+        {
+          "x": 2.0,
+          "expected": 0.4817276379808808
+        },
+        {
+          "x": 40.0,
+          "expected": 0.9317276379808808
+        }
+      ]
+    },
+    {
+      "name": "sigmoid-origin-negative-exposure",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "sigmoid",
+          "midpoint": 2.0,
+          "steepness": 1.25,
+          "offset": 0.1,
+          "amplitude": 0.9,
+          "origin_adjustment": "subtract_at_zero",
+          "zero_below": null
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:3428e8ea19e0e79c6911c3d6ac4a4eaf55e684e6a261a5cbbe234a8bec0d3ab7",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": -5.0,
+          "expected": 0.031870230578073075
+        },
+        {
+          "x": -1.0,
+          "expected": 0.052407270899903845
+        },
+        {
+          "x": 0.0,
+          "expected": 0.1
+        },
+        {
+          "x": 1.0,
+          "expected": 0.23215776292365875
+        }
+      ],
+      "note": "Origin subtraction returns offset at zero and can go below offset for negative exposures."
+    },
+    {
+      "name": "sigmoid-clamp-order",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "sigmoid",
+          "midpoint": 2.0,
+          "steepness": 1.25,
+          "offset": -0.2,
+          "amplitude": 1.5,
+          "origin_adjustment": "none",
+          "zero_below": 1.0
+        },
+        "clamp": {
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:3dce1375af393be863e0404435ec19aa30c96aca2e3a447b06ed8a57720d28aa",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": 0.0,
+          "expected": 0.0
+        },
+        {
+          "x": 1.0,
+          "expected": 0.13405020823796326
+        },
+        {
+          "x": 2.0,
+          "expected": 0.55
+        },
+        {
+          "x": 10.0,
+          "expected": 1.0
+        }
+      ],
+      "note": "Threshold first, then a single final clamp."
+    },
+    {
+      "name": "snapshot-cyclone-f32",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "wind_speed",
+          "exposure_unit": "m/s",
+          "impact_metric": "damage_ratio",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "sigmoid",
+          "midpoint": 74.69999694824219,
+          "steepness": 0.11457369476556778,
+          "offset": 0.0,
+          "amplitude": 0.8,
+          "origin_adjustment": "subtract_at_zero",
+          "zero_below": 28.5
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "registry",
+            "registry_id": "crc-climate-impacts",
+            "registry_revision": "2026.10.0",
+            "registry_manifest_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+            "resolver_semantics_version": "crc-impact-registry/1",
+            "factor": "cyclone",
+            "context": {
+              "cell": null,
+              "country": "PHL",
+              "continent": null,
+              "building_type": null,
+              "historic_mean": null
+            },
+            "overrides": {
+              "maximum_damage": 0.8
+            },
+            "fallback_policy": "error",
+            "lookups": [
+              {
+                "table_id": "wind.cyclone_params",
+                "table_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "requested_key": "PHL",
+                "resolved_key": "PHL",
+                "status": "exact"
+              }
+            ]
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:0e052a65e9260393ef4bc3f702ff6471966eb55b62433fc406694e19c5a9834b",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": 0.0,
+          "expected": 0.0
+        },
+        {
+          "x": 28.0,
+          "expected": 0.0
+        },
+        {
+          "x": 28.5,
+          "expected": 0.003846529533339103
+        },
+        {
+          "x": 74.7,
+          "expected": 0.3998465975682708
+        },
+        {
+          "x": 120.0,
+          "expected": 0.7954144542403201
+        }
+      ]
+    },
+    {
+      "name": "snapshot-spei",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "spei",
+          "exposure_unit": "1",
+          "impact_metric": "normalized_water_cost",
+          "impact_unit": "crc-legacy-normalized-cost"
+        },
+        "model": {
+          "kind": "spei",
+          "water_consumption_asset": 1250000.5,
+          "original_water_unit_cost": 2.9809
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:e510a75eb5f259ba354ec2a04c58141f62aeec6e16ce744f532b37e2b43e16e6",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": -3.0,
+          "expected": 2.8678896522045285
+        },
+        {
+          "x": -1.0,
+          "expected": 0.39124328149725
+        },
+        {
+          "x": -5e-324,
+          "expected": 0.37354464157340017
+        },
+        {
+          "x": 0.0,
+          "expected": 0.37261264904499997
+        },
+        {
+          "x": 2.0,
+          "expected": 0.37261264904499997
+        }
+      ],
+      "note": "The SPEI drought branch applies strictly below zero."
+    },
+    {
+      "name": "snapshot-cooling",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "cooling_degree_days",
+          "exposure_unit": "K.d",
+          "impact_metric": "normalized_cooling_cost",
+          "impact_unit": "crc-legacy-normalized-cost"
+        },
+        "model": {
+          "kind": "cooling",
+          "cooling_cost": 52000000.0,
+          "historic_mean": 410.5
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:c8e06890a599b4c5b10ebc2736f5f7119913c40ea655efe2f2a4909ebb129cec",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": 0.0,
+          "expected": 0.0
+        },
+        {
+          "x": 1.0,
+          "expected": 0.0
+        },
+        {
+          "x": 1.0000000000000002,
+          "expected": 0.012667478684531063
+        },
+        {
+          "x": 410.5,
+          "expected": 5.2
+        },
+        {
+          "x": 900.0,
+          "expected": 11.400730816077953
+        }
+      ]
+    },
+    {
+      "name": "snapshot-crop",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "cooling_degree_days",
+          "exposure_unit": "K.d",
+          "impact_metric": "crop_yield_change",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "crop",
+          "weights": {
+            "maize": 0.5,
+            "rice": 0.3,
+            "wheat": 0.25
+          },
+          "country": {
+            "maize": 1.2,
+            "rice": 0.8,
+            "wheat": 1.1
+          },
+          "yearly": {
+            "maize": 0.0004,
+            "rice": 0.0002,
+            "wheat": 0.0003
+          },
+          "index": {
+            "maize": -0.002,
+            "rice": -0.001,
+            "wheat": -0.0015
+          },
+          "historic_mean": 150.0
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:98613d6e46d5edf6a99786eb9185ff592d87c5459d9103e54eea64c7fe46408f",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": 0.0,
+          "expected": -0.2865603556544526
+        },
+        {
+          "x": 150.0,
+          "expected": 0.0
+        },
+        {
+          "x": 300.0,
+          "expected": 0.22174944204177954
+        },
+        {
+          "x": 1000.0,
+          "expected": 0.7605760163336628
+        }
+      ]
+    },
+    {
+      "name": "snapshot-crop-overflow",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "cooling_degree_days",
+          "exposure_unit": "K.d",
+          "impact_metric": "crop_yield_change",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "crop",
+          "weights": {
+            "maize": 0.5,
+            "rice": 0.3,
+            "wheat": 0.25
+          },
+          "country": {
+            "maize": 1.2,
+            "rice": 0.8,
+            "wheat": 1.1
+          },
+          "yearly": {
+            "maize": 0.0004,
+            "rice": 0.0002,
+            "wheat": 0.0003
+          },
+          "index": {
+            "maize": 1.0,
+            "rice": 0.0,
+            "wheat": 0.0
+          },
+          "historic_mean": 150.0
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:6bc6c101a9f28d65d2c78a8fbecc7902e01fd05693d454f13db445521b362c4a",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": 0.0,
+          "expected": 0.5
+        },
+        {
+          "x": 800.0,
+          "error": "non_finite_result"
+        }
+      ],
+      "note": "exp overflow in the future term is an error."
+    }
+  ]
+}

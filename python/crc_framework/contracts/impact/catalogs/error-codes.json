@@ -1,0 +1,148 @@
+{
+  "codes": {
+    "invalid_json": {
+      "stage": "parse",
+      "meaning": "Malformed JSON text, a byte order mark, or an unpaired surrogate."
+    },
+    "duplicate_key": {
+      "stage": "parse",
+      "meaning": "An object repeats a key; reported at the repeated key."
+    },
+    "non_finite_number": {
+      "stage": "parse",
+      "meaning": "NaN or Infinity tokens."
+    },
+    "number_overflow": {
+      "stage": "parse",
+      "meaning": "A numeric literal overflows binary64."
+    },
+    "unknown_field": {
+      "stage": "validate",
+      "meaning": "A field not defined by the schema at that level."
+    },
+    "missing_field": {
+      "stage": "validate",
+      "meaning": "A required field is absent."
+    },
+    "invalid_type": {
+      "stage": "validate",
+      "meaning": "A value has the wrong JSON type, including booleans or strings in numeric fields and fractional integers."
+    },
+    "unsupported_schema_version": {
+      "stage": "validate",
+      "meaning": "The schema_version is not readable by this implementation."
+    },
+    "unsupported_semantics_version": {
+      "stage": "validate",
+      "meaning": "A numerical or resolver semantics version is not supported."
+    },
+    "unsupported_kind": {
+      "stage": "validate",
+      "meaning": "A tagged-union kind is not supported."
+    },
+    "unsupported_value": {
+      "stage": "validate",
+      "meaning": "An enumerated value is not supported."
+    },
+    "invalid_value": {
+      "stage": "validate",
+      "meaning": "A value violates a documented constraint."
+    },
+    "invalid_reference": {
+      "stage": "validate",
+      "meaning": "A reference does not resolve within the document."
+    },
+    "duplicate_identifier": {
+      "stage": "validate",
+      "meaning": "An identifier or set member is repeated."
+    },
+    "unknown_override": {
+      "stage": "validate",
+      "meaning": "An override key is not in the override catalog."
+    },
+    "inapplicable_override": {
+      "stage": "resolve",
+      "meaning": "An override key is not accepted for the factor or resolved branch."
+    },
+    "missing_context": {
+      "stage": "resolve",
+      "meaning": "Required resolution context is missing after merging."
+    },
+    "registry_unavailable": {
+      "stage": "resolve",
+      "meaning": "The requested registry revision is not installed."
+    },
+    "registry_manifest_mismatch": {
+      "stage": "resolve",
+      "meaning": "The installed manifest digest differs from the pinned digest."
+    },
+    "fallback_required": {
+      "stage": "resolve",
+      "meaning": "A table key is missing and the fallback policy is error."
+    },
+    "non_finite_exposure": {
+      "stage": "evaluate",
+      "meaning": "An exposure value is NaN or infinite."
+    },
+    "non_finite_result": {
+      "stage": "evaluate",
+      "meaning": "The raw or final response is not finite."
+    },
+    "out_of_domain": {
+      "stage": "evaluate",
+      "meaning": "Exposure outside a table domain with outside_domain error."
+    },
+    "invalid_histogram": {
+      "stage": "operation",
+      "meaning": "Histogram edges or weights violate the histogram contract."
+    },
+    "missing_probability_support": {
+      "stage": "operation",
+      "meaning": "The source does not define the full probability interval."
+    },
+    "not_integrable": {
+      "stage": "operation",
+      "meaning": "Integrability of the response cannot be established."
+    },
+    "convergence_failed": {
+      "stage": "operation",
+      "meaning": "Numerical integration did not reach its tolerance."
+    },
+    "exact_method_unavailable": {
+      "stage": "operation",
+      "meaning": "An explicitly requested exact method is not implemented for the case."
+    },
+    "monotonicity_required": {
+      "stage": "operation",
+      "meaning": "The operation requires a certified monotone function."
+    },
+    "ambiguous_contributors": {
+      "stage": "spatial",
+      "meaning": "Multiple contributors without a spatial combination policy."
+    },
+    "overlapping_contributors": {
+      "stage": "spatial",
+      "meaning": "Positive-area overlap or competing coverage."
+    },
+    "incomplete_coverage": {
+      "stage": "spatial",
+      "meaning": "Uncovered target area under require_full."
+    },
+    "invalid_weights": {
+      "stage": "spatial",
+      "meaning": "Weights are missing, negative, non-finite or sum to zero."
+    },
+    "incompatible_contributors": {
+      "stage": "spatial",
+      "meaning": "Contributors disagree on quantity, unit, scenario, horizon or metric."
+    },
+    "unaligned_contributors": {
+      "stage": "spatial",
+      "meaning": "Contributors lack a justified common event identity."
+    },
+    "unsupported_combination": {
+      "stage": "spatial",
+      "meaning": "Source-distribution or quantile combination is not supported."
+    }
+  }
+}

@@ -1,0 +1,540 @@
+{
+  "contract": "impact_evaluation_record",
+  "schema": "schemas/impact-evaluation-record-1.0.schema.json",
+  "identity": "record_hash",
+  "description": "Accepted cases record exact canonical UTF-8 text and content_hash = 'sha256:' + hex(sha256(canonical bytes)). Rejected cases contain exactly one defect and record its error code and JSON Pointer path. schema_valid records whether the JSON Schema alone accepts the input (null when the text is not strict JSON); semantic rules beyond JSON Schema are listed in x-crc-rules.",
+  "accepted": [
+    {
+      "name": "point-complete",
+      "description": "Point evaluation with a retained array snapshot.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[3,2],\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"},\"selection\":{\"dataset\":\"jrc-flood\",\"columns\":[\"depth_rp100\"],\"rows\":\"asset_id in portfolio\",\"scenario\":\"ssp245\",\"horizon\":\"2050\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "canonical_json": "{\"diagnostics\":{\"components\":[],\"estimated_error\":null,\"evaluations\":null,\"exactness\":\"direct\"},\"engine\":{\"build_id\":null,\"framework_version\":\"0.5.0\",\"numerical_methods\":{\"point\":\"crc-impact/1\"},\"source_revision\":\"1288d99\",\"target\":\"x86_64-unknown-linux-gnu\"},\"function\":{\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\",\"kind\":\"definition\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"preprocessing\":[],\"replay\":{\"missing_requirements\":[],\"status\":\"complete\"},\"resolution\":null,\"schema_version\":\"1.0\",\"source\":{\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"kind\":\"point_array\",\"selection\":{\"columns\":[\"depth_rp100\"],\"dataset\":\"jrc-flood\",\"horizon\":\"2050\",\"rows\":\"asset_id in portfolio\",\"scenario\":\"ssp245\"},\"shape\":[3,2],\"snapshot\":{\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\",\"revision\":null,\"uri\":\"file:///data/exposure.parquet\"}}}",
+      "content_hash": "sha256:a7200a6ffb5f9b273862ecdd49ce01f9611eb252e55239befdbf3dc6f04504e1",
+      "schema_valid": true
+    },
+    {
+      "name": "point-missing-snapshot",
+      "description": "In-memory array with a digest but no retained snapshot; preprocessing converted millimetres to metres.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[],\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"}},\"preprocessing\":[{\"operation\":\"unit_conversion\",\"description\":\"mm to m\",\"parameters\":{\"from_unit\":\"mm\",\"to_unit\":\"m\",\"factor\":0.001,\"exact\":true,\"note\":null},\"input_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"output_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"}}],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"missing_source_snapshot\",\"missing_requirements\":[\"source_snapshot\"]}}",
+      "canonical_json": "{\"diagnostics\":{\"components\":[],\"estimated_error\":null,\"evaluations\":null,\"exactness\":\"direct\"},\"engine\":{\"build_id\":null,\"framework_version\":\"0.5.0\",\"numerical_methods\":{\"point\":\"crc-impact/1\"},\"source_revision\":\"1288d99\",\"target\":\"x86_64-unknown-linux-gnu\"},\"function\":{\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\",\"kind\":\"definition\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"preprocessing\":[{\"description\":\"mm to m\",\"input_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"operation\":\"unit_conversion\",\"output_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"parameters\":{\"exact\":true,\"factor\":0.001,\"from_unit\":\"mm\",\"note\":null,\"to_unit\":\"m\"}}],\"replay\":{\"missing_requirements\":[\"source_snapshot\"],\"status\":\"missing_source_snapshot\"},\"resolution\":null,\"schema_version\":\"1.0\",\"source\":{\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"kind\":\"point_array\",\"selection\":null,\"shape\":[],\"snapshot\":null}}",
+      "content_hash": "sha256:de3af597367a4a2a219688d6633c83225bbe073ff5b7cb0402bfd277d20893d0",
+      "schema_valid": true
+    },
+    {
+      "name": "expected-histogram-exact",
+      "description": "Exact histogram expectation with recorded mass normalization and components.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:06548a7d39380e7ee0ccd67e57e8e221577027b7ba753bea20c066db6d5f0e30\"},\"operation\":{\"kind\":\"expected_value\",\"settings\":{\"requested_method\":\"auto\",\"method\":{\"kind\":\"exact\",\"version\":\"crc-exact-piecewise/1\"}}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"histogram\",\"interval_count\":4,\"within_bin\":\"uniform\",\"original_mass_sum\":1.0000000000002,\"normalization_factor\":0.9999999999997999,\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"exact\",\"estimated_error\":0.0,\"evaluations\":0,\"components\":[{\"kind\":\"exact\",\"value\":0.1275}]},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "canonical_json": "{\"diagnostics\":{\"components\":[{\"estimated_error\":null,\"evaluations\":null,\"kind\":\"exact\",\"value\":0.1275}],\"estimated_error\":0.0,\"evaluations\":0,\"exactness\":\"exact\"},\"engine\":{\"build_id\":null,\"framework_version\":\"0.5.0\",\"numerical_methods\":{\"point\":\"crc-impact/1\"},\"source_revision\":\"1288d99\",\"target\":\"x86_64-unknown-linux-gnu\"},\"function\":{\"definition_hash\":\"sha256:06548a7d39380e7ee0ccd67e57e8e221577027b7ba753bea20c066db6d5f0e30\",\"kind\":\"definition\"},\"operation\":{\"kind\":\"expected_value\",\"settings\":{\"method\":{\"kind\":\"exact\",\"version\":\"crc-exact-piecewise/1\"},\"requested_method\":\"auto\"}},\"preprocessing\":[],\"replay\":{\"missing_requirements\":[],\"status\":\"complete\"},\"resolution\":null,\"schema_version\":\"1.0\",\"source\":{\"content_digest\":null,\"interval_count\":4,\"kind\":\"histogram\",\"normalization_factor\":0.9999999999997999,\"original_mass_sum\":1.0000000000002,\"selection\":null,\"snapshot\":{\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\",\"revision\":null,\"uri\":\"file:///data/exposure.parquet\"},\"within_bin\":\"uniform\"}}",
+      "content_hash": "sha256:4950218476fb63c82f1448360401bf72d248dbc19845c5c3f9fc36bf4e6cb04f",
+      "schema_valid": true
+    },
+    {
+      "name": "expected-curve-quadrature",
+      "description": "Auto request resolved to Gauss-Kronrod with every effective default.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"expected_value\",\"settings\":{\"requested_method\":\"auto\",\"method\":{\"kind\":\"gauss_kronrod\",\"version\":\"crc-gk15/1\",\"absolute_tolerance\":1e-10,\"relative_tolerance\":1e-08,\"max_evaluations\":100000}}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"quadrature\":\"crc-gk15/1\",\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_kind\":\"fitted\",\"curve_type\":\"gumbel_r\",\"curve_location\":1.0,\"curve_scale\":0.8},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"numerical\",\"estimated_error\":3.2e-12,\"evaluations\":465,\"components\":[{\"kind\":\"numerical\",\"value\":2.92354,\"estimated_error\":3.2e-12,\"evaluations\":465}]},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "canonical_json": "{\"diagnostics\":{\"components\":[{\"estimated_error\":3.2e-12,\"evaluations\":465,\"kind\":\"numerical\",\"value\":2.92354}],\"estimated_error\":3.2e-12,\"evaluations\":465,\"exactness\":\"numerical\"},\"engine\":{\"build_id\":null,\"framework_version\":\"0.5.0\",\"numerical_methods\":{\"point\":\"crc-impact/1\",\"quadrature\":\"crc-gk15/1\"},\"source_revision\":\"1288d99\",\"target\":\"x86_64-unknown-linux-gnu\"},\"function\":{\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\",\"kind\":\"definition\"},\"operation\":{\"kind\":\"expected_value\",\"settings\":{\"method\":{\"absolute_tolerance\":1e-10,\"kind\":\"gauss_kronrod\",\"max_evaluations\":100000,\"relative_tolerance\":1e-8,\"version\":\"crc-gk15/1\"},\"requested_method\":\"auto\"}},\"preprocessing\":[],\"replay\":{\"missing_requirements\":[],\"status\":\"complete\"},\"resolution\":null,\"schema_version\":\"1.0\",\"source\":{\"content_digest\":null,\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_atom_location\":null,\"curve_atom_probability\":null,\"curve_kind\":\"fitted\",\"curve_location\":1.0,\"curve_probabilities\":null,\"curve_scale\":0.8,\"curve_shape\":null,\"curve_type\":\"gumbel_r\",\"curve_values\":null},\"selection\":null,\"snapshot\":{\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\",\"revision\":null,\"uri\":\"file:///data/exposure.parquet\"}}}",
+      "content_hash": "sha256:7f92cda5285c88d93aefef2a9935fb36a48231f643ba1d2191d58edb156b8d0e",
+      "schema_valid": true
+    },
+    {
+      "name": "transform-registry-resolution",
+      "description": "Distribution transform of a registry-resolved definition with its effective context identity.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:0e052a65e9260393ef4bc3f702ff6471966eb55b62433fc406694e19c5a9834b\"},\"operation\":{\"kind\":\"transform_distribution\",\"settings\":{\"algorithm\":\"crc-pushforward/1\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_kind\":\"tabulated\",\"curve_type\":\"linear_probability\",\"curve_probabilities\":[0.0,1.0],\"curve_values\":[0.0,10.0]},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":{\"reference_hash\":\"sha256:758c8bb469383b4d9b3670ac82fcc3c10817ad077c0c5b79aa4c2164a4bdce3b\",\"context\":{\"country\":\"PHL\"},\"context_hash\":\"sha256:321606dd9513d149859956deed7f2adf0ce52b004016912636b4225de461acfd\"},\"diagnostics\":{\"exactness\":\"exact\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "canonical_json": "{\"diagnostics\":{\"components\":[],\"estimated_error\":null,\"evaluations\":null,\"exactness\":\"exact\"},\"engine\":{\"build_id\":null,\"framework_version\":\"0.5.0\",\"numerical_methods\":{\"point\":\"crc-impact/1\"},\"source_revision\":\"1288d99\",\"target\":\"x86_64-unknown-linux-gnu\"},\"function\":{\"definition_hash\":\"sha256:0e052a65e9260393ef4bc3f702ff6471966eb55b62433fc406694e19c5a9834b\",\"kind\":\"definition\"},\"operation\":{\"kind\":\"transform_distribution\",\"settings\":{\"algorithm\":\"crc-pushforward/1\"}},\"preprocessing\":[],\"replay\":{\"missing_requirements\":[],\"status\":\"complete\"},\"resolution\":{\"context\":{\"building_type\":null,\"cell\":null,\"continent\":null,\"country\":\"PHL\",\"historic_mean\":null},\"context_hash\":\"sha256:321606dd9513d149859956deed7f2adf0ce52b004016912636b4225de461acfd\",\"reference_hash\":\"sha256:758c8bb469383b4d9b3670ac82fcc3c10817ad077c0c5b79aa4c2164a4bdce3b\"},\"schema_version\":\"1.0\",\"source\":{\"content_digest\":null,\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_atom_location\":null,\"curve_atom_probability\":null,\"curve_kind\":\"tabulated\",\"curve_location\":null,\"curve_probabilities\":[0.0,1.0],\"curve_scale\":null,\"curve_shape\":null,\"curve_type\":\"linear_probability\",\"curve_values\":[0.0,10.0]},\"selection\":null,\"snapshot\":{\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\",\"revision\":null,\"uri\":\"file:///data/exposure.parquet\"}}}",
+      "content_hash": "sha256:6e52b3f31126098a1851f1543a7380c54485e5ef59e4b81ff70189c5f2eb1f54",
+      "schema_valid": true
+    },
+    {
+      "name": "tabulate-approximation",
+      "description": "Explicit approximate tabulation with its full probability grid.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"tabulate\",\"settings\":{\"probabilities\":[0.0,0.5,0.9,0.99,1.0],\"interpolation\":\"linear_probability\",\"approximate\":true}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_kind\":\"point_mass\",\"curve_type\":\"point_mass\",\"curve_location\":0.5,\"curve_scale\":0,\"curve_atom_probability\":1,\"curve_atom_location\":0.5},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"external\",\"revision\":\"v3\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"exact\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "canonical_json": "{\"diagnostics\":{\"components\":[],\"estimated_error\":null,\"evaluations\":null,\"exactness\":\"exact\"},\"engine\":{\"build_id\":null,\"framework_version\":\"0.5.0\",\"numerical_methods\":{\"point\":\"crc-impact/1\"},\"source_revision\":\"1288d99\",\"target\":\"x86_64-unknown-linux-gnu\"},\"function\":{\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\",\"kind\":\"definition\"},\"operation\":{\"kind\":\"tabulate\",\"settings\":{\"approximate\":true,\"interpolation\":\"linear_probability\",\"probabilities\":[0.0,0.5,0.9,0.99,1.0]}},\"preprocessing\":[],\"replay\":{\"missing_requirements\":[],\"status\":\"complete\"},\"resolution\":null,\"schema_version\":\"1.0\",\"source\":{\"content_digest\":null,\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_atom_location\":0.5,\"curve_atom_probability\":1.0,\"curve_kind\":\"point_mass\",\"curve_location\":0.5,\"curve_probabilities\":null,\"curve_scale\":0.0,\"curve_shape\":null,\"curve_type\":\"point_mass\",\"curve_values\":null},\"selection\":null,\"snapshot\":{\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"external\",\"revision\":\"v3\",\"uri\":\"file:///data/exposure.parquet\"}}}",
+      "content_hash": "sha256:a1e096e411ccc9690d2930d39c4299b5919eefd35196bbe341849c1566c422d1",
+      "schema_valid": true
+    },
+    {
+      "name": "custom-runtime-only",
+      "description": "Custom callable with untracked source and its available runtime identity.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"custom\",\"module\":\"portfolio.impacts\",\"qualified_name\":\"DepthDamage.evaluate\",\"type\":\"DepthDamage\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"untracked\",\"description\":\"caller-held numpy array\"},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"runtime_only\",\"missing_requirements\":[\"source_snapshot\",\"function_definition\"]}}",
+      "canonical_json": "{\"diagnostics\":{\"components\":[],\"estimated_error\":null,\"evaluations\":null,\"exactness\":\"direct\"},\"engine\":{\"build_id\":null,\"framework_version\":\"0.5.0\",\"numerical_methods\":{\"point\":\"crc-impact/1\"},\"source_revision\":\"1288d99\",\"target\":\"x86_64-unknown-linux-gnu\"},\"function\":{\"kind\":\"custom\",\"module\":\"portfolio.impacts\",\"qualified_name\":\"DepthDamage.evaluate\",\"type\":\"DepthDamage\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"preprocessing\":[],\"replay\":{\"missing_requirements\":[\"function_definition\",\"source_snapshot\"],\"status\":\"runtime_only\"},\"resolution\":null,\"schema_version\":\"1.0\",\"source\":{\"description\":\"caller-held numpy array\",\"kind\":\"untracked\"}}",
+      "content_hash": "sha256:35897cd6e0ef77475cbad33871c3c62162607364c244226459fb297514c37c97",
+      "schema_valid": true
+    },
+    {
+      "name": "custom-anonymous-minimal",
+      "description": "Custom identity unavailable; optional engine, source and preprocessing members materialize as null or empty.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"custom\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"target\":\"aarch64-apple-darwin\",\"numerical_methods\":{}},\"source\":{\"kind\":\"untracked\"},\"preprocessing\":[{\"operation\":\"fill_missing\"}],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"runtime_only\",\"missing_requirements\":[\"function_definition\",\"source_snapshot\",\"engine_build\"]}}",
+      "canonical_json": "{\"diagnostics\":{\"components\":[],\"estimated_error\":null,\"evaluations\":null,\"exactness\":\"direct\"},\"engine\":{\"build_id\":null,\"framework_version\":\"0.5.0\",\"numerical_methods\":{},\"source_revision\":null,\"target\":\"aarch64-apple-darwin\"},\"function\":{\"kind\":\"custom\",\"module\":null,\"qualified_name\":null,\"type\":null},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"preprocessing\":[{\"description\":null,\"input_digest\":null,\"operation\":\"fill_missing\",\"output_digest\":null,\"parameters\":{}}],\"replay\":{\"missing_requirements\":[\"engine_build\",\"function_definition\",\"source_snapshot\"],\"status\":\"runtime_only\"},\"resolution\":null,\"schema_version\":\"1.0\",\"source\":{\"description\":null,\"kind\":\"untracked\"}}",
+      "content_hash": "sha256:9ad3197941929b082436a5b24e899218ed83424bde6dd06c94b864e78f3213e1",
+      "schema_valid": true
+    },
+    {
+      "name": "point-minimal-source",
+      "description": "Point array source with only a retained snapshot and an empty selection.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[4],\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"},\"selection\":{}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "canonical_json": "{\"diagnostics\":{\"components\":[],\"estimated_error\":null,\"evaluations\":null,\"exactness\":\"direct\"},\"engine\":{\"build_id\":null,\"framework_version\":\"0.5.0\",\"numerical_methods\":{\"point\":\"crc-impact/1\"},\"source_revision\":\"1288d99\",\"target\":\"x86_64-unknown-linux-gnu\"},\"function\":{\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\",\"kind\":\"definition\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"preprocessing\":[],\"replay\":{\"missing_requirements\":[],\"status\":\"complete\"},\"resolution\":null,\"schema_version\":\"1.0\",\"source\":{\"content_digest\":null,\"kind\":\"point_array\",\"selection\":{\"columns\":[],\"dataset\":null,\"horizon\":null,\"rows\":null,\"scenario\":null},\"shape\":[4],\"snapshot\":{\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\",\"revision\":null,\"uri\":\"file:///data/exposure.parquet\"}}}",
+      "content_hash": "sha256:3a81ad971d71243e9ca2847c5f87f69256eec40c0a60d85f3f5ef8b23c78a94f",
+      "schema_valid": true
+    },
+    {
+      "name": "canonical-distribution-identified",
+      "description": "Canonical distribution with shape, digest and selection but no retained snapshot.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"expected_value\",\"settings\":{\"requested_method\":\"gauss_kronrod\",\"method\":{\"kind\":\"gauss_kronrod\",\"version\":\"crc-gk15/1\",\"absolute_tolerance\":1e-10,\"relative_tolerance\":1e-08,\"max_evaluations\":100000}}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_kind\":\"hurdle\",\"curve_type\":\"genextreme\",\"curve_shape\":-0.1,\"curve_location\":1.0,\"curve_scale\":0.5,\"curve_atom_probability\":0.2,\"curve_atom_location\":0.0},\"content_digest\":{\"encoding\":\"crc-curve-parameters/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"selection\":{\"dataset\":\"crc-open/heat\",\"columns\":[\"curve_*\"],\"scenario\":\"ssp585\",\"horizon\":\"2080\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"mixed\",\"estimated_error\":1e-11,\"evaluations\":225,\"components\":[{\"kind\":\"exact\",\"value\":0.0},{\"kind\":\"numerical\",\"value\":0.61,\"estimated_error\":1e-11,\"evaluations\":225}]},\"replay\":{\"status\":\"missing_source_snapshot\",\"missing_requirements\":[\"source_snapshot\"]}}",
+      "canonical_json": "{\"diagnostics\":{\"components\":[{\"estimated_error\":null,\"evaluations\":null,\"kind\":\"exact\",\"value\":0.0},{\"estimated_error\":1e-11,\"evaluations\":225,\"kind\":\"numerical\",\"value\":0.61}],\"estimated_error\":1e-11,\"evaluations\":225,\"exactness\":\"mixed\"},\"engine\":{\"build_id\":null,\"framework_version\":\"0.5.0\",\"numerical_methods\":{\"point\":\"crc-impact/1\"},\"source_revision\":\"1288d99\",\"target\":\"x86_64-unknown-linux-gnu\"},\"function\":{\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\",\"kind\":\"definition\"},\"operation\":{\"kind\":\"expected_value\",\"settings\":{\"method\":{\"absolute_tolerance\":1e-10,\"kind\":\"gauss_kronrod\",\"max_evaluations\":100000,\"relative_tolerance\":1e-8,\"version\":\"crc-gk15/1\"},\"requested_method\":\"gauss_kronrod\"}},\"preprocessing\":[],\"replay\":{\"missing_requirements\":[\"source_snapshot\"],\"status\":\"missing_source_snapshot\"},\"resolution\":null,\"schema_version\":\"1.0\",\"source\":{\"content_digest\":{\"encoding\":\"crc-curve-parameters/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_atom_location\":0.0,\"curve_atom_probability\":0.2,\"curve_kind\":\"hurdle\",\"curve_location\":1.0,\"curve_probabilities\":null,\"curve_scale\":0.5,\"curve_shape\":-0.1,\"curve_type\":\"genextreme\",\"curve_values\":null},\"selection\":{\"columns\":[\"curve_*\"],\"dataset\":\"crc-open/heat\",\"horizon\":\"2080\",\"rows\":null,\"scenario\":\"ssp585\"},\"snapshot\":null}}",
+      "content_hash": "sha256:503f3ad6ff17ced195abdf8832783a93be70c8c737a686f1abdbde93b62d27a2",
+      "schema_valid": true
+    },
+    {
+      "name": "histogram-identified",
+      "description": "Histogram with digest and selection but no retained snapshot.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"expected_value\",\"settings\":{\"requested_method\":\"exact\",\"method\":{\"kind\":\"exact\",\"version\":\"crc-exact-piecewise/1\"}}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"histogram\",\"interval_count\":2,\"within_bin\":\"uniform\",\"original_mass_sum\":1,\"normalization_factor\":1,\"content_digest\":{\"encoding\":\"crc-histogram/1\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"selection\":{\"rows\":\"region = 'EU'\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"exact\"},\"replay\":{\"status\":\"missing_source_snapshot\",\"missing_requirements\":[\"source_snapshot\"]}}",
+      "canonical_json": "{\"diagnostics\":{\"components\":[],\"estimated_error\":null,\"evaluations\":null,\"exactness\":\"exact\"},\"engine\":{\"build_id\":null,\"framework_version\":\"0.5.0\",\"numerical_methods\":{\"point\":\"crc-impact/1\"},\"source_revision\":\"1288d99\",\"target\":\"x86_64-unknown-linux-gnu\"},\"function\":{\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\",\"kind\":\"definition\"},\"operation\":{\"kind\":\"expected_value\",\"settings\":{\"method\":{\"kind\":\"exact\",\"version\":\"crc-exact-piecewise/1\"},\"requested_method\":\"exact\"}},\"preprocessing\":[],\"replay\":{\"missing_requirements\":[\"source_snapshot\"],\"status\":\"missing_source_snapshot\"},\"resolution\":null,\"schema_version\":\"1.0\",\"source\":{\"content_digest\":{\"encoding\":\"crc-histogram/1\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"interval_count\":2,\"kind\":\"histogram\",\"normalization_factor\":1.0,\"original_mass_sum\":1.0,\"selection\":{\"columns\":[],\"dataset\":null,\"horizon\":null,\"rows\":\"region = 'EU'\",\"scenario\":null},\"snapshot\":null,\"within_bin\":\"uniform\"}}",
+      "content_hash": "sha256:1a2515ced102b39c739a4fca90464bb9102a9332ae5fb036add0ffb9da8f8a74",
+      "schema_valid": true
+    },
+    {
+      "name": "u64-max-shape",
+      "description": "Integer metadata preserves the largest native u64 exactly.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[18446744073709551615],\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "canonical_json": "{\"diagnostics\":{\"components\":[],\"estimated_error\":null,\"evaluations\":null,\"exactness\":\"direct\"},\"engine\":{\"build_id\":null,\"framework_version\":\"0.5.0\",\"numerical_methods\":{\"point\":\"crc-impact/1\"},\"source_revision\":\"1288d99\",\"target\":\"x86_64-unknown-linux-gnu\"},\"function\":{\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\",\"kind\":\"definition\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"preprocessing\":[],\"replay\":{\"missing_requirements\":[],\"status\":\"complete\"},\"resolution\":null,\"schema_version\":\"1.0\",\"source\":{\"content_digest\":null,\"kind\":\"point_array\",\"selection\":null,\"shape\":[18446744073709551615],\"snapshot\":{\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\",\"revision\":null,\"uri\":\"file:///data/exposure.parquet\"}}}",
+      "content_hash": "sha256:4b37ac0df17688bf3b67ca319c078948c1805a4d7fd2e39edcddadded5f9eb2e",
+      "schema_valid": true
+    },
+    {
+      "name": "gumbel-unused-shape",
+      "description": "Canonical Gumbel normalization removes the unused shape.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_kind\":\"fitted\",\"curve_type\":\"gumbel_r\",\"curve_location\":0.0,\"curve_scale\":1.0,\"curve_shape\":7.0},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "canonical_json": "{\"diagnostics\":{\"components\":[],\"estimated_error\":null,\"evaluations\":null,\"exactness\":\"direct\"},\"engine\":{\"build_id\":null,\"framework_version\":\"0.5.0\",\"numerical_methods\":{\"point\":\"crc-impact/1\"},\"source_revision\":\"1288d99\",\"target\":\"x86_64-unknown-linux-gnu\"},\"function\":{\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\",\"kind\":\"definition\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"preprocessing\":[],\"replay\":{\"missing_requirements\":[],\"status\":\"complete\"},\"resolution\":null,\"schema_version\":\"1.0\",\"source\":{\"content_digest\":null,\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_atom_location\":null,\"curve_atom_probability\":null,\"curve_kind\":\"fitted\",\"curve_location\":0.0,\"curve_probabilities\":null,\"curve_scale\":1.0,\"curve_shape\":null,\"curve_type\":\"gumbel_r\",\"curve_values\":null},\"selection\":null,\"snapshot\":{\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\",\"revision\":null,\"uri\":\"file:///data/exposure.parquet\"}}}",
+      "content_hash": "sha256:4b6a6110842c23cda66238243b61071a73ac3f78c30d7439a0a945aacb73696a",
+      "schema_valid": true
+    },
+    {
+      "name": "curve-family-genextreme",
+      "description": "A reconstructible canonical fitted source.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_kind\":\"fitted\",\"curve_type\":\"genextreme\",\"curve_location\":0.0,\"curve_scale\":1.0,\"curve_shape\":0.2},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "canonical_json": "{\"diagnostics\":{\"components\":[],\"estimated_error\":null,\"evaluations\":null,\"exactness\":\"direct\"},\"engine\":{\"build_id\":null,\"framework_version\":\"0.5.0\",\"numerical_methods\":{\"point\":\"crc-impact/1\"},\"source_revision\":\"1288d99\",\"target\":\"x86_64-unknown-linux-gnu\"},\"function\":{\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\",\"kind\":\"definition\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"preprocessing\":[],\"replay\":{\"missing_requirements\":[],\"status\":\"complete\"},\"resolution\":null,\"schema_version\":\"1.0\",\"source\":{\"content_digest\":null,\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_atom_location\":null,\"curve_atom_probability\":null,\"curve_kind\":\"fitted\",\"curve_location\":0.0,\"curve_probabilities\":null,\"curve_scale\":1.0,\"curve_shape\":0.2,\"curve_type\":\"genextreme\",\"curve_values\":null},\"selection\":null,\"snapshot\":{\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\",\"revision\":null,\"uri\":\"file:///data/exposure.parquet\"}}}",
+      "content_hash": "sha256:c276dc8df1d9f0c1aa2cf10ea62bdca167d93b3dd109f4d8c47e8e08b99da13d",
+      "schema_valid": true
+    },
+    {
+      "name": "curve-family-weibull_min",
+      "description": "A reconstructible canonical fitted source.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_kind\":\"fitted\",\"curve_type\":\"weibull_min\",\"curve_location\":0.0,\"curve_scale\":1.0,\"curve_shape\":0.2},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "canonical_json": "{\"diagnostics\":{\"components\":[],\"estimated_error\":null,\"evaluations\":null,\"exactness\":\"direct\"},\"engine\":{\"build_id\":null,\"framework_version\":\"0.5.0\",\"numerical_methods\":{\"point\":\"crc-impact/1\"},\"source_revision\":\"1288d99\",\"target\":\"x86_64-unknown-linux-gnu\"},\"function\":{\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\",\"kind\":\"definition\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"preprocessing\":[],\"replay\":{\"missing_requirements\":[],\"status\":\"complete\"},\"resolution\":null,\"schema_version\":\"1.0\",\"source\":{\"content_digest\":null,\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_atom_location\":null,\"curve_atom_probability\":null,\"curve_kind\":\"fitted\",\"curve_location\":0.0,\"curve_probabilities\":null,\"curve_scale\":1.0,\"curve_shape\":0.2,\"curve_type\":\"weibull_min\",\"curve_values\":null},\"selection\":null,\"snapshot\":{\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\",\"revision\":null,\"uri\":\"file:///data/exposure.parquet\"}}}",
+      "content_hash": "sha256:8914d2abbe44fa1124a09df95d61c325e2e6f3910293e8aa1337acf23611ceb1",
+      "schema_valid": true
+    },
+    {
+      "name": "curve-family-weibull_max",
+      "description": "A reconstructible canonical fitted source.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_kind\":\"fitted\",\"curve_type\":\"weibull_max\",\"curve_location\":0.0,\"curve_scale\":1.0,\"curve_shape\":0.2},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "canonical_json": "{\"diagnostics\":{\"components\":[],\"estimated_error\":null,\"evaluations\":null,\"exactness\":\"direct\"},\"engine\":{\"build_id\":null,\"framework_version\":\"0.5.0\",\"numerical_methods\":{\"point\":\"crc-impact/1\"},\"source_revision\":\"1288d99\",\"target\":\"x86_64-unknown-linux-gnu\"},\"function\":{\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\",\"kind\":\"definition\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"preprocessing\":[],\"replay\":{\"missing_requirements\":[],\"status\":\"complete\"},\"resolution\":null,\"schema_version\":\"1.0\",\"source\":{\"content_digest\":null,\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_atom_location\":null,\"curve_atom_probability\":null,\"curve_kind\":\"fitted\",\"curve_location\":0.0,\"curve_probabilities\":null,\"curve_scale\":1.0,\"curve_shape\":0.2,\"curve_type\":\"weibull_max\",\"curve_values\":null},\"selection\":null,\"snapshot\":{\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\",\"revision\":null,\"uri\":\"file:///data/exposure.parquet\"}}}",
+      "content_hash": "sha256:7a6f2b3400efa1e4bad843fc1e5371de7732cea8301e4daafcd012ad34bcc911",
+      "schema_valid": true
+    },
+    {
+      "name": "curve-family-skewnorm",
+      "description": "A reconstructible canonical fitted source.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_kind\":\"fitted\",\"curve_type\":\"skewnorm\",\"curve_location\":0.0,\"curve_scale\":1.0,\"curve_shape\":0.2},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "canonical_json": "{\"diagnostics\":{\"components\":[],\"estimated_error\":null,\"evaluations\":null,\"exactness\":\"direct\"},\"engine\":{\"build_id\":null,\"framework_version\":\"0.5.0\",\"numerical_methods\":{\"point\":\"crc-impact/1\"},\"source_revision\":\"1288d99\",\"target\":\"x86_64-unknown-linux-gnu\"},\"function\":{\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\",\"kind\":\"definition\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"preprocessing\":[],\"replay\":{\"missing_requirements\":[],\"status\":\"complete\"},\"resolution\":null,\"schema_version\":\"1.0\",\"source\":{\"content_digest\":null,\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_atom_location\":null,\"curve_atom_probability\":null,\"curve_kind\":\"fitted\",\"curve_location\":0.0,\"curve_probabilities\":null,\"curve_scale\":1.0,\"curve_shape\":0.2,\"curve_type\":\"skewnorm\",\"curve_values\":null},\"selection\":null,\"snapshot\":{\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\",\"revision\":null,\"uri\":\"file:///data/exposure.parquet\"}}}",
+      "content_hash": "sha256:585b9112bbb644d71fd1f47ac8e33919f7805b70b9d1be5f0250b0fe8385b167",
+      "schema_valid": true
+    },
+    {
+      "name": "curve-family-gumbel_r",
+      "description": "A reconstructible canonical fitted source.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_kind\":\"fitted\",\"curve_type\":\"gumbel_r\",\"curve_location\":0.0,\"curve_scale\":1.0,\"curve_shape\":null},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "canonical_json": "{\"diagnostics\":{\"components\":[],\"estimated_error\":null,\"evaluations\":null,\"exactness\":\"direct\"},\"engine\":{\"build_id\":null,\"framework_version\":\"0.5.0\",\"numerical_methods\":{\"point\":\"crc-impact/1\"},\"source_revision\":\"1288d99\",\"target\":\"x86_64-unknown-linux-gnu\"},\"function\":{\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\",\"kind\":\"definition\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"preprocessing\":[],\"replay\":{\"missing_requirements\":[],\"status\":\"complete\"},\"resolution\":null,\"schema_version\":\"1.0\",\"source\":{\"content_digest\":null,\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_atom_location\":null,\"curve_atom_probability\":null,\"curve_kind\":\"fitted\",\"curve_location\":0.0,\"curve_probabilities\":null,\"curve_scale\":1.0,\"curve_shape\":null,\"curve_type\":\"gumbel_r\",\"curve_values\":null},\"selection\":null,\"snapshot\":{\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\",\"revision\":null,\"uri\":\"file:///data/exposure.parquet\"}}}",
+      "content_hash": "sha256:4b6a6110842c23cda66238243b61071a73ac3f78c30d7439a0a945aacb73696a",
+      "schema_valid": true
+    },
+    {
+      "name": "curve-family-gumbel_l",
+      "description": "A reconstructible canonical fitted source.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_kind\":\"fitted\",\"curve_type\":\"gumbel_l\",\"curve_location\":0.0,\"curve_scale\":1.0,\"curve_shape\":null},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "canonical_json": "{\"diagnostics\":{\"components\":[],\"estimated_error\":null,\"evaluations\":null,\"exactness\":\"direct\"},\"engine\":{\"build_id\":null,\"framework_version\":\"0.5.0\",\"numerical_methods\":{\"point\":\"crc-impact/1\"},\"source_revision\":\"1288d99\",\"target\":\"x86_64-unknown-linux-gnu\"},\"function\":{\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\",\"kind\":\"definition\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"preprocessing\":[],\"replay\":{\"missing_requirements\":[],\"status\":\"complete\"},\"resolution\":null,\"schema_version\":\"1.0\",\"source\":{\"content_digest\":null,\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_atom_location\":null,\"curve_atom_probability\":null,\"curve_kind\":\"fitted\",\"curve_location\":0.0,\"curve_probabilities\":null,\"curve_scale\":1.0,\"curve_shape\":null,\"curve_type\":\"gumbel_l\",\"curve_values\":null},\"selection\":null,\"snapshot\":{\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\",\"revision\":null,\"uri\":\"file:///data/exposure.parquet\"}}}",
+      "content_hash": "sha256:8feaa39128afb5f506b9def900c918d37e23bb6b6623d8aa74a0a00b03a2a57e",
+      "schema_valid": true
+    },
+    {
+      "name": "curve-family-genpareto",
+      "description": "A reconstructible canonical fitted source.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_kind\":\"fitted\",\"curve_type\":\"genpareto\",\"curve_location\":0.0,\"curve_scale\":1.0,\"curve_shape\":0.2},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "canonical_json": "{\"diagnostics\":{\"components\":[],\"estimated_error\":null,\"evaluations\":null,\"exactness\":\"direct\"},\"engine\":{\"build_id\":null,\"framework_version\":\"0.5.0\",\"numerical_methods\":{\"point\":\"crc-impact/1\"},\"source_revision\":\"1288d99\",\"target\":\"x86_64-unknown-linux-gnu\"},\"function\":{\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\",\"kind\":\"definition\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"preprocessing\":[],\"replay\":{\"missing_requirements\":[],\"status\":\"complete\"},\"resolution\":null,\"schema_version\":\"1.0\",\"source\":{\"content_digest\":null,\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_atom_location\":null,\"curve_atom_probability\":null,\"curve_kind\":\"fitted\",\"curve_location\":0.0,\"curve_probabilities\":null,\"curve_scale\":1.0,\"curve_shape\":0.2,\"curve_type\":\"genpareto\",\"curve_values\":null},\"selection\":null,\"snapshot\":{\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\",\"revision\":null,\"uri\":\"file:///data/exposure.parquet\"}}}",
+      "content_hash": "sha256:fe5f3bb2aa23a25f6b635439a3f6dada049a858756c208eceb35533c8ed82846",
+      "schema_valid": true
+    }
+  ],
+  "rejected": [
+    {
+      "name": "shape-u64-overflow",
+      "description": "Integer metadata must fit the declared Rust u64.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[18446744073709551616],\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/source/shape/0"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "evaluations-u64-overflow",
+      "description": "Integration budgets must fit the declared Rust u64.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"expected_value\",\"settings\":{\"requested_method\":\"auto\",\"method\":{\"kind\":\"gauss_kronrod\",\"version\":\"crc-gk15/1\",\"absolute_tolerance\":1e-10,\"relative_tolerance\":1e-08,\"max_evaluations\":18446744073709551616}}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[3,2],\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"},\"selection\":{\"dataset\":\"jrc-flood\",\"columns\":[\"depth_rp100\"],\"rows\":\"asset_id in portfolio\",\"scenario\":\"ssp245\",\"horizon\":\"2050\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/operation/settings/method/max_evaluations"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "curve-negative-scale",
+      "description": "Source curves require a positive fitted scale.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_kind\":\"fitted\",\"curve_type\":\"gumbel_r\",\"curve_location\":0.0,\"curve_scale\":-1.0},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/source/parameters/curve_scale"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "curve-missing-location",
+      "description": "A fitted source requires its location.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_kind\":\"fitted\",\"curve_type\":\"gumbel_r\",\"curve_location\":null,\"curve_scale\":1.0},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/source/parameters/curve_location"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "curve-unknown-kind",
+      "description": "Arbitrary curve kinds cannot claim complete replay.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_kind\":\"invented\",\"curve_type\":\"gumbel_r\",\"curve_location\":0.0,\"curve_scale\":1.0},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "unsupported_value",
+        "path": "/source/parameters/curve_kind"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "curve-unknown-family",
+      "description": "A fitted source must use a supported family.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_kind\":\"fitted\",\"curve_type\":\"invented\",\"curve_location\":0.0,\"curve_scale\":1.0},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "unsupported_value",
+        "path": "/source/parameters/curve_type"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "curve-required-shape",
+      "description": "Non-Gumbel fitted families require shape.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_kind\":\"fitted\",\"curve_type\":\"genextreme\",\"curve_location\":0.0,\"curve_scale\":1.0},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/source/parameters/curve_shape"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "curve-fitted-atom",
+      "description": "A fitted source cannot smuggle hurdle parameters.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_kind\":\"fitted\",\"curve_type\":\"gumbel_r\",\"curve_location\":0.0,\"curve_scale\":1.0,\"curve_atom_probability\":0.2},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/source/parameters/curve_atom_probability"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "curve-hurdle-probability",
+      "description": "Hurdle atom mass must be strictly between zero and one.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_kind\":\"hurdle\",\"curve_type\":\"gumbel_r\",\"curve_location\":0.0,\"curve_scale\":1.0,\"curve_atom_probability\":1.0,\"curve_atom_location\":0.0},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/source/parameters/curve_atom_probability"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "curve-point-mass-mismatch",
+      "description": "A point mass has one consistent atom and curve location.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_kind\":\"point_mass\",\"curve_type\":\"point_mass\",\"curve_location\":0.0,\"curve_scale\":0.0,\"curve_atom_probability\":1.0,\"curve_atom_location\":1.0},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/source/parameters/curve_atom_location"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "curve-tabulated-length",
+      "description": "Quantile knot arrays have equal lengths.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_kind\":\"tabulated\",\"curve_type\":\"linear_probability\",\"curve_location\":null,\"curve_scale\":null,\"curve_probabilities\":[0.0,1.0],\"curve_values\":[0.0]},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/source/parameters/curve_values"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "curve-tabulated-order",
+      "description": "Quantile probabilities strictly increase.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_kind\":\"tabulated\",\"curve_type\":\"linear_probability\",\"curve_location\":null,\"curve_scale\":null,\"curve_probabilities\":[0.5,0.4],\"curve_values\":[0.0,1.0]},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/source/parameters/curve_probabilities/1"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "curve-tabulated-values",
+      "description": "Quantile values cannot decrease.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"canonical_distribution\",\"parameters\":{\"curve_kind\":\"tabulated\",\"curve_type\":\"linear_probability\",\"curve_location\":null,\"curve_scale\":null,\"curve_probabilities\":[0.0,1.0],\"curve_values\":[1.0,0.0]},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/source/parameters/curve_values/1"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "histogram-normalization-factor",
+      "description": "Normalization diagnostics must equal the reciprocal of original mass.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"histogram\",\"interval_count\":1,\"within_bin\":\"uniform\",\"original_mass_sum\":1.0,\"normalization_factor\":2.0,\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/source/normalization_factor"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "custom-complete",
+      "description": "Custom functions cannot claim complete replay.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"custom\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[3,2],\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"},\"selection\":{\"dataset\":\"jrc-flood\",\"columns\":[\"depth_rp100\"],\"rows\":\"asset_id in portfolio\",\"scenario\":\"ssp245\",\"horizon\":\"2050\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/replay/status"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "definition-runtime-only",
+      "description": "Definition functions are not runtime-only.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[3,2],\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"},\"selection\":{\"dataset\":\"jrc-flood\",\"columns\":[\"depth_rp100\"],\"rows\":\"asset_id in portfolio\",\"scenario\":\"ssp245\",\"horizon\":\"2050\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"runtime_only\",\"missing_requirements\":[\"source_snapshot\"]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/replay/status"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "complete-with-missing",
+      "description": "Complete replay lists no missing requirements.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[3,2],\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"},\"selection\":{\"dataset\":\"jrc-flood\",\"columns\":[\"depth_rp100\"],\"rows\":\"asset_id in portfolio\",\"scenario\":\"ssp245\",\"horizon\":\"2050\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[\"engine_build\"]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/replay/missing_requirements"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "missing-snapshot-unlisted",
+      "description": "missing_source_snapshot lists source_snapshot.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[3,2],\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"},\"selection\":{\"dataset\":\"jrc-flood\",\"columns\":[\"depth_rp100\"],\"rows\":\"asset_id in portfolio\",\"scenario\":\"ssp245\",\"horizon\":\"2050\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"missing_source_snapshot\",\"missing_requirements\":[\"engine_build\"]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/replay/missing_requirements"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "complete-without-snapshot",
+      "description": "Hashing alone does not retain data.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[2]},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/replay/status"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "duplicate-requirement",
+      "description": "Requirements are duplicate-free.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[3,2],\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"},\"selection\":{\"dataset\":\"jrc-flood\",\"columns\":[\"depth_rp100\"],\"rows\":\"asset_id in portfolio\",\"scenario\":\"ssp245\",\"horizon\":\"2050\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"missing_source_snapshot\",\"missing_requirements\":[\"source_snapshot\",\"source_snapshot\"]}}",
+      "error": {
+        "code": "duplicate_identifier",
+        "path": "/replay/missing_requirements/1"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "unknown-requirement",
+      "description": "Requirements come from the closed list.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[3,2],\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"},\"selection\":{\"dataset\":\"jrc-flood\",\"columns\":[\"depth_rp100\"],\"rows\":\"asset_id in portfolio\",\"scenario\":\"ssp245\",\"horizon\":\"2050\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"missing_source_snapshot\",\"missing_requirements\":[\"source_snapshot\",\"luck\"]}}",
+      "error": {
+        "code": "unsupported_value",
+        "path": "/replay/missing_requirements/1"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "method-contradiction",
+      "description": "An explicit request equals the resolved method.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"expected_value\",\"settings\":{\"requested_method\":\"exact\",\"method\":{\"kind\":\"gauss_kronrod\",\"version\":\"crc-gk15/1\",\"absolute_tolerance\":1e-10,\"relative_tolerance\":1e-08,\"max_evaluations\":100000}}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[3,2],\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"},\"selection\":{\"dataset\":\"jrc-flood\",\"columns\":[\"depth_rp100\"],\"rows\":\"asset_id in portfolio\",\"scenario\":\"ssp245\",\"horizon\":\"2050\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/operation/settings/method"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "unresolved-auto",
+      "description": "Records store the resolved method, not only auto.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"expected_value\",\"settings\":{\"requested_method\":\"auto\",\"method\":{\"kind\":\"auto\"}}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[3,2],\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"},\"selection\":{\"dataset\":\"jrc-flood\",\"columns\":[\"depth_rp100\"],\"rows\":\"asset_id in portfolio\",\"scenario\":\"ssp245\",\"horizon\":\"2050\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "unsupported_kind",
+        "path": "/operation/settings/method/kind"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "fractional-evaluations",
+      "description": "Integer fields reject fractional spellings.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"expected_value\",\"settings\":{\"requested_method\":\"auto\",\"method\":{\"kind\":\"gauss_kronrod\",\"version\":\"crc-gk15/1\",\"absolute_tolerance\":1e-10,\"relative_tolerance\":1e-08,\"max_evaluations\":1.5}}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[3,2],\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"},\"selection\":{\"dataset\":\"jrc-flood\",\"columns\":[\"depth_rp100\"],\"rows\":\"asset_id in portfolio\",\"scenario\":\"ssp245\",\"horizon\":\"2050\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "invalid_type",
+        "path": "/operation/settings/method/max_evaluations"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "integral-float-evaluations",
+      "description": "Integer fields reject float spellings.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"expected_value\",\"settings\":{\"requested_method\":\"auto\",\"method\":{\"kind\":\"gauss_kronrod\",\"version\":\"crc-gk15/1\",\"absolute_tolerance\":1e-10,\"relative_tolerance\":1e-08,\"max_evaluations\":100000.0}}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[3,2],\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"},\"selection\":{\"dataset\":\"jrc-flood\",\"columns\":[\"depth_rp100\"],\"rows\":\"asset_id in portfolio\",\"scenario\":\"ssp245\",\"horizon\":\"2050\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "invalid_type",
+        "path": "/operation/settings/method/max_evaluations"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "zero-evaluations",
+      "description": "Maximum evaluations is positive.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"expected_value\",\"settings\":{\"requested_method\":\"auto\",\"method\":{\"kind\":\"gauss_kronrod\",\"version\":\"crc-gk15/1\",\"absolute_tolerance\":1e-10,\"relative_tolerance\":1e-08,\"max_evaluations\":0}}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[3,2],\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"},\"selection\":{\"dataset\":\"jrc-flood\",\"columns\":[\"depth_rp100\"],\"rows\":\"asset_id in portfolio\",\"scenario\":\"ssp245\",\"horizon\":\"2050\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/operation/settings/method/max_evaluations"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "tabulate-not-approximate",
+      "description": "Tabulation is always approximate.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"tabulate\",\"settings\":{\"probabilities\":[0.5],\"interpolation\":\"linear_probability\",\"approximate\":false}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[3,2],\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"},\"selection\":{\"dataset\":\"jrc-flood\",\"columns\":[\"depth_rp100\"],\"rows\":\"asset_id in portfolio\",\"scenario\":\"ssp245\",\"horizon\":\"2050\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/operation/settings/approximate"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "tabulate-unsorted",
+      "description": "Tabulation grids strictly increase.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"tabulate\",\"settings\":{\"probabilities\":[0.5,0.1],\"interpolation\":\"linear_probability\",\"approximate\":true}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[3,2],\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"},\"selection\":{\"dataset\":\"jrc-flood\",\"columns\":[\"depth_rp100\"],\"rows\":\"asset_id in portfolio\",\"scenario\":\"ssp245\",\"horizon\":\"2050\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/operation/settings/probabilities/1"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "tabulate-no-interpolation",
+      "description": "Tabulation requires an interpolation choice.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"tabulate\",\"settings\":{\"probabilities\":[0.5],\"approximate\":true}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[3,2],\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"},\"selection\":{\"dataset\":\"jrc-flood\",\"columns\":[\"depth_rp100\"],\"rows\":\"asset_id in portfolio\",\"scenario\":\"ssp245\",\"horizon\":\"2050\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "missing_field",
+        "path": "/operation/settings/interpolation"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "histogram-mass",
+      "description": "Histogram mass within 1e-12 of one.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"histogram\",\"interval_count\":1,\"within_bin\":\"uniform\",\"original_mass_sum\":1.1,\"normalization_factor\":0.9090909090909091,\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/source/original_mass_sum"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "context-hash-mismatch",
+      "description": "Context identity matches the canonical context.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[3,2],\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"},\"selection\":{\"dataset\":\"jrc-flood\",\"columns\":[\"depth_rp100\"],\"rows\":\"asset_id in portfolio\",\"scenario\":\"ssp245\",\"horizon\":\"2050\"}},\"preprocessing\":[],\"resolution\":{\"reference_hash\":\"sha256:758c8bb469383b4d9b3670ac82fcc3c10817ad077c0c5b79aa4c2164a4bdce3b\",\"context\":{\"country\":\"PHL\"},\"context_hash\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/resolution/context_hash"
+      },
+      "schema_valid": true
+    },
+    {
+      "name": "unknown-operation",
+      "description": "Aggregation is not an operation kind.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"aggregate\",\"settings\":{}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[3,2],\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"},\"selection\":{\"dataset\":\"jrc-flood\",\"columns\":[\"depth_rp100\"],\"rows\":\"asset_id in portfolio\",\"scenario\":\"ssp245\",\"horizon\":\"2050\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "unsupported_kind",
+        "path": "/operation/kind"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "unknown-source",
+      "description": "Unknown source kind.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"zarr\"},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "unsupported_kind",
+        "path": "/source/kind"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "negative-shape",
+      "description": "Shape dimensions are non-negative integers.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[-1],\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "invalid_value",
+        "path": "/source/shape/0"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "output-columns",
+      "description": "Records never prescribe output storage.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[3,2],\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"},\"selection\":{\"dataset\":\"jrc-flood\",\"columns\":[\"depth_rp100\"],\"rows\":\"asset_id in portfolio\",\"scenario\":\"ssp245\",\"horizon\":\"2050\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]},\"output_column\":\"damage\"}",
+      "error": {
+        "code": "unknown_field",
+        "path": "/output_column"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "missing-engine",
+      "description": "Engine identity is required.",
+      "input_json": "{\"schema_version\":\"1.0\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[3,2],\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"},\"selection\":{\"dataset\":\"jrc-flood\",\"columns\":[\"depth_rp100\"],\"rows\":\"asset_id in portfolio\",\"scenario\":\"ssp245\",\"horizon\":\"2050\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "missing_field",
+        "path": "/engine"
+      },
+      "schema_valid": false
+    },
+    {
+      "name": "schema-version",
+      "description": "Unsupported record schema.",
+      "input_json": "{\"schema_version\":\"0.9\",\"function\":{\"kind\":\"definition\",\"definition_hash\":\"sha256:f542cf89a83540bcac1fa7b5a956f4a742fa75036f88cddcd71a2de3bad4b5f0\"},\"operation\":{\"kind\":\"point\",\"settings\":{\"alignment\":\"event_aligned\",\"shape\":\"preserve\"}},\"engine\":{\"framework_version\":\"0.5.0\",\"source_revision\":\"1288d99\",\"build_id\":null,\"target\":\"x86_64-unknown-linux-gnu\",\"numerical_methods\":{\"point\":\"crc-impact/1\"}},\"source\":{\"kind\":\"point_array\",\"shape\":[3,2],\"content_digest\":{\"encoding\":\"crc-array-f64le/1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"},\"snapshot\":{\"uri\":\"file:///data/exposure.parquet\",\"content_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"retention\":\"retained\"},\"selection\":{\"dataset\":\"jrc-flood\",\"columns\":[\"depth_rp100\"],\"rows\":\"asset_id in portfolio\",\"scenario\":\"ssp245\",\"horizon\":\"2050\"}},\"preprocessing\":[],\"resolution\":null,\"diagnostics\":{\"exactness\":\"direct\"},\"replay\":{\"status\":\"complete\",\"missing_requirements\":[]}}",
+      "error": {
+        "code": "unsupported_schema_version",
+        "path": "/schema_version"
+      },
+      "schema_valid": false
+    }
+  ]
+}
