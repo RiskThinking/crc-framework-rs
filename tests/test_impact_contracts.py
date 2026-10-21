@@ -321,6 +321,10 @@ def test_monotonicity_fixtures_are_true_and_acceptable() -> None:
         assert reference.monotonicity(definition) == fixture["reference"]
         assert fixture["reference"] in fixture["acceptable"]
         assert "unknown" in fixture["acceptable"]
+        if fixture["reference"] == "constant":
+            assert set(fixture["acceptable"]) == {
+                "constant", "non_decreasing", "non_increasing", "unknown"
+            }, fixture["name"]
         if fixture["reference"] in ("non_decreasing", "non_increasing", "constant"):
             grid = [-50.0 + 0.25 * step for step in range(401)]
             values = [reference.evaluate(definition, x) for x in grid if _in_domain(definition, x)]

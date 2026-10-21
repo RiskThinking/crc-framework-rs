@@ -1033,7 +1033,7 @@ def monotonicity_cases() -> List[Dict[str, Any]]:
         ("linear-increasing", definition({"kind": "linear", "slope": 2.0}), ["non_decreasing", "unknown"]),
         ("linear-decreasing-clamped", definition({"kind": "linear", "slope": -2.0}, clamp={"minimum": 0.0}), ["non_increasing", "unknown"]),
         ("linear-zero", definition({"kind": "linear", "slope": 0.0}), ["constant", "non_decreasing", "non_increasing", "unknown"]),
-        ("linear-equal-clamp", definition({"kind": "linear", "slope": 3.0}, clamp={"minimum": 1.0, "maximum": 1.0}), ["constant", "non_decreasing", "unknown"]),
+        ("linear-equal-clamp", definition({"kind": "linear", "slope": 3.0}, clamp={"minimum": 1.0, "maximum": 1.0}), ["constant", "non_decreasing", "non_increasing", "unknown"]),
         ("sigmoid-increasing", definition({"kind": "sigmoid", "midpoint": 1.0, "steepness": 2.0}), ["non_decreasing", "unknown"]),
         ("sigmoid-decreasing", definition({"kind": "sigmoid", "midpoint": 1.0, "steepness": -2.0}), ["non_increasing", "unknown"]),
         ("sigmoid-zero-amplitude", definition({"kind": "sigmoid", "midpoint": 1.0, "steepness": 2.0, "amplitude": 0.0}), ["constant", "non_decreasing", "non_increasing", "unknown"]),

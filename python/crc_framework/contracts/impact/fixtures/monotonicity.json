@@ -135,6 +135,7 @@
       "acceptable": [
         "constant",
         "non_decreasing",
+        "non_increasing",
         "unknown"
       ]
     },
