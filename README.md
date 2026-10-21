@@ -361,6 +361,60 @@ values; pass `overrides` when an application needs to replace transform
 parameters. Registry-backed impacts support the same point and distribution
 interfaces, with point evaluation delegated directly to the native registry.
 
+### Impact contracts and provenance
+
+`crc_framework.contracts` publishes the `crc-impact-contracts` artifact, currently
+version `1.0.0`, with JSON Schemas, accepted and rejected examples, canonical JSON
+and SHA-256 identities, numerical reference cases, and catalogs of errors, units,
+and versioned semantics.
+
+The contracts separate the reusable function from caller data, execution
+provenance, and application policy:
+
+| Contract | Responsibility |
+| --- | --- |
+| `impact_definition` | Calibration quantity and units, model parameters, final clamp, and function provenance |
+| `registry_impact_reference` | Pinned registry revision and manifest, factor, context defaults, overrides, and fallback policy |
+| `impact_evaluation_record` | Function and source identities, operation, preprocessing, engine, diagnostics, and replay information |
+| `spatial_combination_policy` | Application choice to combine aligned point exposures before evaluation or combine impacts afterward |
+| `spatial_impact_evaluation_record` | Spatial policy identity, contributors, geometry coverage, weights, and child evaluation records |
+
+A definition describes the impact function independently of a dataset or output
+format. Evaluation records describe how it was applied. Spatial combination is a
+separate application policy; combination of whole source distributions remains
+deferred.
+
+Artifact versions, wire `schema_version`, and numerical `semantics_version` have
+separate roles. Registry references also pin resolver semantics and reference
+data. Persist these identities with the evaluation provenance to make numerical
+choices and data dependencies explicit.
+
+Inspect the packaged artifact without importing development tooling:
+
+```python
+from crc_framework.contracts import (
+    impact_contract_manifest_sha256,
+    load_impact_fixtures,
+    load_impact_schema,
+    verify_impact_contracts,
+)
+
+verify_impact_contracts()
+manifest_sha256 = impact_contract_manifest_sha256()
+schema = load_impact_schema("impact_definition")
+examples = load_impact_fixtures("impact_definition")
+```
+
+Consumers should compare the manifest SHA-256 with their pinned value and verify
+the listed file digests before using the artifact. The SDK's internal contract
+loader performs both checks. A verified manifest identifies the exact contract
+files; replay also depends on the source data and provenance in each record.
+
+The artifact supplies contracts and conformance expectations. Executable impacts
+continue to use the classes described above. The
+[native capability catalog](python/crc_framework/contracts/impact/catalogs/native-capabilities.json)
+tracks which fixture families the native implementation currently supports.
+
 ### Aggregate factor outcomes
 
 Each microscore can be converted to a `BinaryOutcome`. Combine outcomes into
@@ -435,6 +489,8 @@ The package exports the following primary interfaces:
 | `crates/core` | Shared Rust algorithms and reference data |
 | `src/lib.rs` | PyO3 extension |
 | `python/crc_framework` | Typed Python API shipped with the extension |
+| `python/crc_framework/contracts/impact` | Generated impact schemas, catalogs, conformance fixtures, and digest manifest |
+| `tools/impact_contracts` | Contract generator, schema sources, fixture cases, and independent Python reference implementation |
 | `crates/wasm` | WASM exports backed by the Rust core |
 | `js` | JS adapter, TypeScript declarations, build tooling, and consumer tests |
 | `tests` | Python tests and shared parity fixtures |
@@ -461,6 +517,38 @@ cargo test --workspace --locked
 
 After changing Rust code, run `.venv/bin/maturin develop` to rebuild the Python
 extension. Python-only edits are available directly from the editable install.
+
+### Impact contract generation and regression checks
+
+Edit the sources in [`tools/impact_contracts`](tools/impact_contracts), then
+regenerate the artifact from the repository root:
+
+```sh
+.venv/bin/python tools/impact_contracts/generate.py
+```
+
+Commit the generator sources and generated artifact together. The generator and
+reference implementation are development tooling; Python consumers load the
+generated resources through `crc_framework.contracts`. No separate tools package
+is needed. When the manifest changes, update the SDK's pinned manifest digest
+together with any required consumer changes.
+
+After the Python setup above, run the focused checks:
+
+```sh
+.venv/bin/python tools/impact_contracts/generate.py --check
+.venv/bin/python -m pytest tests/test_impact_contracts.py -q
+cargo test -p crc-framework-core --test impact_contract_canonical --locked
+cargo test -p crc-framework-core --no-default-features --test impact_contract_canonical --locked
+```
+
+The Python suite checks generation freshness, schema agreement, canonical
+identities, validation errors, numerical reference cases, and provenance rules.
+Numerical cases specify tolerances; canonical bytes and hashes require exact
+agreement. Monotonicity cases allow documented weaker classifications, including
+both monotone directions for constant functions. Rust tests consume the same
+artifact to check canonical serialization, native integer limits, and source
+distribution reconstruction with and without default features.
 
 ### JavaScript setup and checks
 
