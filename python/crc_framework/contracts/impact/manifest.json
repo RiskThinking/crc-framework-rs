@@ -42,8 +42,8 @@
     },
     {
       "path": "catalogs/native-capabilities.json",
-      "sha256": "eb1852a0bbdd44c7c9d570f441bd75cfd5c034eda8819fae9797a995e506e29d",
-      "bytes": 446
+      "sha256": "6f28fde56d640b4b21b2e9549061ff58fc9a0872624294891bf849050efa82ec",
+      "bytes": 784
     },
     {
       "path": "catalogs/registry-overrides.json",

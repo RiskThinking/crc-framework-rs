@@ -93,21 +93,33 @@ fn exponent_inputs_are_normalized_to_exact_canonical_bytes() {
 }
 
 #[test]
-fn native_capability_is_only_canonical_json() {
+fn native_capabilities_cover_definition_kernels() {
     let capabilities = fixtures(NATIVE_CAPABILITIES);
     assert_eq!(
         capabilities["supported"],
-        serde_json::json!(["canonical_json"])
+        serde_json::json!([
+            "canonical_json",
+            "impact_definition",
+            "point_evaluations",
+            "monotonicity",
+            "registry"
+        ])
     );
     assert_eq!(
-        capabilities["required_fixture_families"]["canonical_json"],
-        serde_json::json!(["numbers", "strings"])
+        capabilities["model_kinds"],
+        serde_json::json!([
+            "linear",
+            "sigmoid",
+            "tabulated",
+            "binned",
+            "spei",
+            "cooling",
+            "crop"
+        ])
     );
-    assert!(
-        capabilities["future_families"]
-            .as_array()
-            .unwrap()
-            .contains(&serde_json::json!("strict_duplicate_key_parser"))
+    assert_eq!(
+        capabilities["future_families"],
+        serde_json::json!(["operations"])
     );
 }
 

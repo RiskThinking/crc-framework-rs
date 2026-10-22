@@ -114,10 +114,17 @@ def test_semantics_inventory_is_complete_and_references_executable_fixtures() ->
 def test_native_capability_metadata_is_explicit() -> None:
     capabilities = load_impact_contract_file("catalogs/native-capabilities.json")
     assert capabilities == {
-        "supported": ["canonical_json"],
-        "required_fixture_families": {"canonical_json": ["numbers", "strings"]},
+        "supported": ["canonical_json", "impact_definition", "point_evaluations", "monotonicity", "registry"],
+        "required_fixture_families": {
+            "canonical_json": ["numbers", "strings"],
+            "impact_definition": ["accepted", "rejected"],
+            "point_evaluations": ["fixtures"],
+            "monotonicity": ["fixtures"],
+            "registry": ["accepted", "rejected"],
+        },
+        "model_kinds": ["linear", "sigmoid", "tabulated", "binned", "spei", "cooling", "crop"],
         "native_parser_rejections": ["leading-bom", "nan", "infinity", "negative-infinity", "binary64-overflow", "unpaired-surrogate"],
-        "future_families": ["strict_duplicate_key_parser", "point_evaluations", "monotonicity", "operations", "registry"],
+        "future_families": ["operations"],
     }
 
 
