@@ -31,8 +31,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Consume canonical artifact in the native core
         run: |
-          cargo test -p crc-framework-core --test impact_contract_canonical --locked
-          cargo test -p crc-framework-core --no-default-features --test impact_contract_canonical --locked
+          cargo test -p crc-framework-core --test impact_contract_canonical --test impact_definition_conformance --test impact_registry_conformance --locked
+          cargo test -p crc-framework-core --no-default-features --test impact_contract_canonical --test impact_definition_conformance --test impact_registry_conformance --locked
   build:
     needs: [impact-contracts, native-contracts]
     runs-on: ubuntu-latest

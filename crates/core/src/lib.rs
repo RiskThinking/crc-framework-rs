@@ -3,6 +3,7 @@ pub use canonical::{CanonicalCurve, CurveParameters};
 pub mod constants;
 pub mod distribution;
 pub mod error;
+pub mod impact;
 pub mod metrics;
 mod reference;
 pub mod risk;
@@ -17,6 +18,9 @@ pub use distribution::{
     fit_hurdle_quantiles, fit_lmoments, fit_quantiles,
 };
 pub use error::{CrcError, Result};
+pub use impact::{
+    ImpactContractError, ImpactDefinition, RegistryImpactReference, ResolutionContext,
+};
 pub use metrics::{
     BinaryOutcome, DistributionStatistics, Microscore, MicroscoreSuite, ScenarioMetadata,
     generate_microscores,
