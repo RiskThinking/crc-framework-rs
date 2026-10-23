@@ -1,9 +1,13 @@
 mod definition;
 mod error;
+mod expectation;
 mod json;
 mod kernel;
+mod pushforward;
+mod quadrature;
 mod reference;
 mod registry;
+mod source;
 
 pub use registry::{RegistryImpactReference, ResolutionContext, manifest_json, manifest_sha256};
 
@@ -56,7 +60,28 @@ impl ImpactDefinition {
     pub fn monotonicity(&self) -> &'static str {
         kernel::monotonicity(&self.model, &self.clamp)
     }
+
+    pub fn expected_value(
+        &self,
+        source: &ImpactSource,
+        method: MethodRequest,
+    ) -> Result<Expectation, ImpactContractError> {
+        expectation::expected_value(&self.model, &self.clamp, source, method)
+    }
+
+    pub fn transform_distribution(
+        &self,
+        source: &ImpactSource,
+    ) -> Result<ImpactDistribution, ImpactContractError> {
+        pushforward::transform(&self.model, &self.clamp, &self.hash, source)
+    }
 }
+
+pub use expectation::{
+    Expectation, GaussKronrodOptions, MethodRequest, RequestedMethod, ResolvedMethod,
+};
+pub use pushforward::{ImpactAtom, ImpactDistribution};
+pub use source::{DiscreteDistribution, HistogramExposure, ImpactSource};
 
 pub use definition::ModelKind as ImpactModelKind;
 

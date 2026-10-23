@@ -378,6 +378,7 @@ def test_operation_fixtures_pin_plan_acceptance_values() -> None:
     assert expected["tabulated-clamp-inside-bin"]["expected"] == 7.0 / 16.0
     transforms = {case["name"]: case for case in operations["transform_distribution"]}
     assert transforms["decreasing-uniform"]["quantiles"] == [1.0, 5.0, 8.0]
+    assert transforms["flat-segment"]["quantiles"] == [0.5, 1.0, 1.0, 1.75]
     assert {atom["value"] for atom in transforms["binary-threshold"]["atoms"]} == {0.0, 1.0}
     spatial = {case["name"]: case["results"] for case in operations["spatial_combination"]}
     assert spatial["square"]["exposure"]["values"] == [0.25, 0.25]

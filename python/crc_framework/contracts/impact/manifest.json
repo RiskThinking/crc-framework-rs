@@ -82,8 +82,8 @@
     },
     {
       "path": "fixtures/operations.json",
-      "sha256": "f0594a48259cd9ff2f292387f27a4cac74ff5dcb13ce6aa6cc058224b57e623b",
-      "bytes": 43720
+      "sha256": "954e2c53b9f4e626a191b78be57855011ea9ff0af9028aa4c319d655ce651f9a",
+      "bytes": 43721
     },
     {
       "path": "fixtures/point-evaluations.json",

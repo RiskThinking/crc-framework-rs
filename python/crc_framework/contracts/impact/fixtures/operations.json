@@ -1284,7 +1284,7 @@
         0.5,
         1.0,
         1.0,
-        1.5
+        1.75
       ],
       "atoms": [
         {
@@ -1296,7 +1296,7 @@
         "absolute": 1e-12,
         "relative": 1e-12
       },
-      "derivation": "flat between x = 2 and 8 creates an atom of mass 0.6 at 1"
+      "derivation": "flat on [2, 8] has mass 0.6 at 1; Q(0.95) = f(9.5) = 1.75"
     },
     {
       "definition": {
