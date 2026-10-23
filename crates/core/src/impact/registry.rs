@@ -206,6 +206,16 @@ pub fn manifest_json() -> &'static str {
     installed().manifest_json.as_str()
 }
 
+/// Installed registry id, revision, resolver semantics, and manifest digest.
+pub fn registry_identity() -> (&'static str, &'static str, &'static str, &'static str) {
+    (
+        REGISTRY_ID,
+        REGISTRY_REVISION,
+        "crc-impact-registry/1",
+        manifest_sha256(),
+    )
+}
+
 fn resolve(
     reference: &CompiledReference,
     call: &ResolutionContext,
