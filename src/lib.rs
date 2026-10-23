@@ -1,5 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
+mod impact;
+
 use crc_framework_core::{
     BinaryOutcome, Distribution, DistributionFamily, EmpiricalDistribution, FittedDistribution,
     HurdleDistribution, ImpactContext, ImpactRegistry, Interpolation, PointMassDistribution,
@@ -1021,5 +1023,6 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(pathways, m)?)?;
     m.add_function(wrap_pyfunction!(horizons, m)?)?;
     m.add_function(wrap_pyfunction!(risk_factors, m)?)?;
+    impact::register(m)?;
     Ok(())
 }
