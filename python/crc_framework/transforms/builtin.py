@@ -4,12 +4,17 @@ from dataclasses import dataclass
 from typing import Optional, Sequence
 
 import numpy as np
-import numpy.typing as npt
 
 from crc_framework.distributions import Distribution, TabulatedDistribution
+from crc_framework.impacts import (
+    ImpactExpression,
+    legacy_linear_expression,
+    legacy_piecewise_expression,
+    legacy_sigmoid_expression,
+)
 from crc_framework.models import TransformContext
 
-from .base import ImpactResult, ImpactValues, evaluate_values, probability_grid
+from .base import ImpactResult, ImpactValues, probability_grid
 
 
 @dataclass(frozen=True)
@@ -27,20 +32,20 @@ class SigmoidImpact:
         context: Optional[TransformContext] = None,
     ) -> ImpactResult:
         del context
+        return self._compiled().evaluate(values)
 
-        def transform(
-            exposure: npt.NDArray[np.float64],
-        ) -> npt.NDArray[np.float64]:
-            with np.errstate(over="ignore"):
-                unit = 1.0 / (
-                    1.0 + np.exp(-self.steepness * (exposure - self.midpoint))
-                )
-            impact = self.minimum + unit * (self.maximum - self.minimum)
-            if self.zero_below is not None:
-                impact = np.where(exposure < self.zero_below, 0.0, impact)
-            return impact
-
-        return evaluate_values(transform, values)
+    def _compiled(self) -> ImpactExpression:
+        compiled = getattr(self, "_compiled_expression", None)
+        if compiled is None:
+            compiled = legacy_sigmoid_expression(
+                self.midpoint,
+                self.steepness,
+                self.minimum,
+                self.maximum,
+                self.zero_below,
+            )
+            object.__setattr__(self, "_compiled_expression", compiled)
+        return compiled
 
     def __call__(
         self,
@@ -72,18 +77,16 @@ class LinearImpact:
         context: Optional[TransformContext] = None,
     ) -> ImpactResult:
         del context
+        return self._compiled().evaluate(values)
 
-        def transform(
-            exposure: npt.NDArray[np.float64],
-        ) -> npt.NDArray[np.float64]:
-            impact = self.slope * exposure + self.intercept
-            if self.minimum is not None:
-                impact = np.maximum(impact, self.minimum)
-            if self.maximum is not None:
-                impact = np.minimum(impact, self.maximum)
-            return impact
-
-        return evaluate_values(transform, values)
+    def _compiled(self) -> ImpactExpression:
+        compiled = getattr(self, "_compiled_expression", None)
+        if compiled is None:
+            compiled = legacy_linear_expression(
+                self.slope, self.intercept, self.minimum, self.maximum
+            )
+            object.__setattr__(self, "_compiled_expression", compiled)
+        return compiled
 
     def __call__(
         self,
@@ -114,6 +117,9 @@ class PiecewiseLinearImpact:
             or np.any(np.diff(self.impact) < 0)
         ):
             raise ValueError("exposure must increase and impact must not decrease")
+        self._compiled_expression = legacy_piecewise_expression(
+            self.exposure.tolist(), self.impact.tolist()
+        )
 
     def evaluate(
         self,
@@ -122,9 +128,7 @@ class PiecewiseLinearImpact:
         context: Optional[TransformContext] = None,
     ) -> ImpactResult:
         del context
-        return evaluate_values(
-            lambda exposure: np.interp(exposure, self.exposure, self.impact), values
-        )
+        return self._compiled_expression.evaluate(values)
 
     def __call__(
         self,

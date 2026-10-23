@@ -213,3 +213,120 @@ def lookup_geography(cell: object) -> Optional[Dict[str, object]]: ...
 def pathways() -> List[Tuple[int, str]]: ...
 def horizons() -> List[int]: ...
 def risk_factors() -> List[Tuple[int, str]]: ...
+
+class ImpactError(Exception):
+    code: str
+    path: str
+
+class NativeImpactExpression:
+    definition_hash: str
+    model_kind: str
+    monotonicity: str
+    @staticmethod
+    def from_json(text: str) -> NativeImpactExpression: ...
+    def canonical_json(self) -> str: ...
+    def evaluate_value(self, value: float) -> float: ...
+    def evaluate_values(self, values: Sequence[float]) -> List[float]: ...
+    def expected_value(
+        self,
+        source: NativeImpactSource,
+        requested: str,
+        absolute_tolerance: Optional[float] = ...,
+        relative_tolerance: Optional[float] = ...,
+        max_evaluations: Optional[int] = ...,
+    ) -> NativeExpectation: ...
+    def transform_distribution(self, source: NativeImpactSource) -> NativeImpactDistribution: ...
+    def point_record(
+        self,
+        shape: Sequence[int],
+        values: Sequence[float],
+        snapshot_uri: Optional[str] = ...,
+        snapshot_revision: Optional[str] = ...,
+        snapshot_sha256: Optional[str] = ...,
+        snapshot_retention: Optional[str] = ...,
+    ) -> NativeImpactEvaluationRecord: ...
+    def expectation_record(
+        self,
+        source: NativeImpactSource,
+        expectation: NativeExpectation,
+        snapshot_uri: Optional[str] = ...,
+        snapshot_revision: Optional[str] = ...,
+        snapshot_sha256: Optional[str] = ...,
+        snapshot_retention: Optional[str] = ...,
+    ) -> NativeImpactEvaluationRecord: ...
+    def transform_record(
+        self,
+        source: NativeImpactSource,
+        snapshot_uri: Optional[str] = ...,
+        snapshot_revision: Optional[str] = ...,
+        snapshot_sha256: Optional[str] = ...,
+        snapshot_retention: Optional[str] = ...,
+    ) -> NativeImpactEvaluationRecord: ...
+
+class NativeImpactSource:
+    original_mass_sum: Optional[float]
+    normalization_factor: Optional[float]
+    @staticmethod
+    def histogram(edges: Sequence[float], weights: Sequence[float]) -> NativeImpactSource: ...
+    @staticmethod
+    def discrete(
+        support: Sequence[float], probabilities: Sequence[float]
+    ) -> NativeImpactSource: ...
+    @staticmethod
+    def empirical(samples: Sequence[float]) -> NativeImpactSource: ...
+    @staticmethod
+    def curve(
+        curve_kind: str,
+        curve_type: str,
+        curve_shape: Optional[float] = ...,
+        curve_location: Optional[float] = ...,
+        curve_scale: Optional[float] = ...,
+        curve_atom_probability: Optional[float] = ...,
+        curve_atom_location: Optional[float] = ...,
+        curve_probabilities: Optional[Sequence[float]] = ...,
+        curve_values: Optional[Sequence[float]] = ...,
+    ) -> NativeImpactSource: ...
+
+class NativeExpectation:
+    value: float
+    requested: str
+    method: str
+    method_version: str
+    absolute_tolerance: Optional[float]
+    relative_tolerance: Optional[float]
+    max_evaluations: Optional[int]
+    evaluations: int
+    error_estimate: float
+    exact_component: float
+    numerical_component: float
+    original_mass_sum: Optional[float]
+    normalization_factor: Optional[float]
+
+class NativeImpactDistribution:
+    definition_hash: str
+    algorithm: str
+    def atoms(self) -> List[Tuple[float, float]]: ...
+    def quantile(self, probability: float) -> float: ...
+    def quantiles(self, probabilities: Sequence[float]) -> List[float]: ...
+    def tabulate(self, probabilities: Sequence[float], interpolation: str) -> List[float]: ...
+
+class NativeImpactEvaluationRecord:
+    def canonical_json(self) -> str: ...
+
+class NativeImpactReference:
+    reference_hash: str
+    @staticmethod
+    def from_json(text: str) -> NativeImpactReference: ...
+    def canonical_json(self) -> str: ...
+    def resolve(
+        self,
+        cell: Optional[str] = ...,
+        country: Optional[str] = ...,
+        continent: Optional[str] = ...,
+        building_type: Optional[str] = ...,
+        historic_mean: Optional[float] = ...,
+    ) -> NativeImpactExpression: ...
+
+def impact_registry_identity() -> Tuple[str, str, str, str]: ...
+def impact_engine() -> Tuple[str, str]: ...
+def impact_array_digest(shape: Sequence[int], values: Sequence[float]) -> str: ...
