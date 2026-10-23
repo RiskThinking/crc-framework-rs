@@ -20,8 +20,9 @@ pub use distribution::{
 pub use error::{CrcError, Result};
 pub use impact::{
     DiscreteDistribution, Expectation, GaussKronrodOptions, HistogramExposure, ImpactAtom,
-    ImpactContractError, ImpactDefinition, ImpactDistribution, ImpactSource, MethodRequest,
-    RegistryImpactReference, RequestedMethod, ResolutionContext, ResolvedMethod,
+    ImpactContractError, ImpactDefinition, ImpactDistribution, ImpactEvaluationRecord,
+    ImpactSource, MethodRequest, RecordedSource, RegistryImpactReference, RequestedMethod,
+    ResolutionContext, ResolvedMethod, SnapshotRef, array_content_sha256, registry_identity,
 };
 pub use metrics::{
     BinaryOutcome, DistributionStatistics, Microscore, MicroscoreSuite, ScenarioMetadata,
