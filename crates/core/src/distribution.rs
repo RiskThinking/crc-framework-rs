@@ -20,6 +20,22 @@ pub trait Distribution: Send + Sync {
         (0.0, 1.0)
     }
 
+    /// `P(X = x)`. Continuous laws return zero.
+    fn probability_atom(&self, _x: f64) -> f64 {
+        0.0
+    }
+
+    /// Strict lower cdf `P(X < x)`.
+    fn cdf_below(&self, x: f64) -> f64 {
+        (self.cdf(x) - self.probability_atom(x)).max(0.0)
+    }
+
+    /// True when the quantile function is defined on the whole of `[0, 1]`.
+    fn has_full_probability_support(&self) -> bool {
+        let (lower, upper) = self.probability_support();
+        lower <= 0.0 && upper >= 1.0
+    }
+
     fn pdf(&self, x: f64) -> f64 {
         let h = 1.0e-5 * x.abs().max(1.0);
         ((self.cdf(x + h) - self.cdf(x - h)) / (2.0 * h)).max(0.0)
@@ -199,7 +215,13 @@ impl Distribution for TabulatedDistribution {
         if x >= *self.values.last().expect("validated non-empty") {
             return *self.probabilities.last().expect("validated non-empty");
         }
-        let upper = self.values.partition_point(|candidate| *candidate < x);
+        let mut upper = self.values.partition_point(|candidate| *candidate < x);
+        if self.values[upper] == x {
+            while upper + 1 < self.values.len() && self.values[upper + 1] == x {
+                upper += 1;
+            }
+            return self.probabilities[upper];
+        }
         if upper == 0 {
             return self.probabilities[0];
         }
@@ -207,6 +229,29 @@ impl Distribution for TabulatedDistribution {
         let span = self.values[upper] - self.values[lower];
         if span.abs() < EPS {
             return self.probabilities[upper];
+        }
+        let weight = (x - self.values[lower]) / span;
+        self.probabilities[lower] + weight * (self.probabilities[upper] - self.probabilities[lower])
+    }
+
+    fn cdf_below(&self, x: f64) -> f64 {
+        if x <= self.values[0] {
+            return 0.0;
+        }
+        if x > *self.values.last().expect("validated non-empty") {
+            return *self.probabilities.last().expect("validated non-empty");
+        }
+        let upper = self.values.partition_point(|candidate| *candidate < x);
+        if self.values[upper] == x {
+            return self.probabilities[upper];
+        }
+        if upper == 0 {
+            return 0.0;
+        }
+        let lower = upper - 1;
+        let span = self.values[upper] - self.values[lower];
+        if span.abs() < EPS {
+            return self.probabilities[lower];
         }
         let weight = (x - self.values[lower]) / span;
         self.probabilities[lower] + weight * (self.probabilities[upper] - self.probabilities[lower])
@@ -221,6 +266,16 @@ impl Distribution for TabulatedDistribution {
             self.probabilities[0],
             *self.probabilities.last().expect("validated non-empty"),
         )
+    }
+
+    fn probability_atom(&self, x: f64) -> f64 {
+        let mut mass = 0.0;
+        for index in 0..self.values.len() - 1 {
+            if self.values[index] == x && self.values[index + 1] == x {
+                mass += self.probabilities[index + 1] - self.probabilities[index];
+            }
+        }
+        mass
     }
 }
 
@@ -258,6 +313,11 @@ impl Distribution for EmpiricalDistribution {
         let weight = position - lower as f64;
         Ok(self.samples[lower] + weight * (self.samples[upper] - self.samples[lower]))
     }
+
+    fn probability_atom(&self, x: f64) -> f64 {
+        self.samples.iter().filter(|sample| **sample == x).count() as f64
+            / self.samples.len() as f64
+    }
 }
 
 /// A degenerate distribution whose entire probability mass is at one value.
@@ -294,6 +354,10 @@ impl Distribution for PointMassDistribution {
     fn ppf(&self, probability: f64) -> Result<f64> {
         validate_probability(probability)?;
         Ok(self.location)
+    }
+
+    fn probability_atom(&self, x: f64) -> f64 {
+        if x == self.location { 1.0 } else { 0.0 }
     }
 
     #[cfg(feature = "sampling")]
@@ -776,6 +840,14 @@ impl Distribution for HurdleDistribution {
                 truncated_cdf(&self.base, self.base_cdf_at_atom, self.base_sf_at_atom, x);
             (self.atom_probability + (1.0 - self.atom_probability) * conditional)
                 .clamp(self.atom_probability, 1.0)
+        }
+    }
+
+    fn probability_atom(&self, x: f64) -> f64 {
+        if x == self.atom_location {
+            self.atom_probability
+        } else {
+            0.0
         }
     }
 
@@ -1613,8 +1685,29 @@ mod tests {
         );
         assert_eq!(distribution.cdf(2.49), 0.0);
         assert_eq!(distribution.cdf(2.5), 1.0);
+        assert_eq!(distribution.cdf_below(2.5), 0.0);
+        assert_eq!(distribution.probability_atom(2.5), 1.0);
         #[cfg(feature = "sampling")]
         assert_eq!(distribution.sample(3, Some(42)).unwrap(), vec![2.5; 3]);
+    }
+
+    #[test]
+    fn tabulated_flat_cdf_includes_the_atom() {
+        let distribution = TabulatedDistribution::new(
+            vec![0.0, 0.2, 0.8, 1.0],
+            vec![0.0, 1.0, 1.0, 2.0],
+            Interpolation::LinearProbability,
+            false,
+        )
+        .unwrap();
+        assert_eq!(distribution.cdf(1.0), 0.8);
+        assert_eq!(distribution.cdf_below(1.0), 0.2);
+        assert_eq!(
+            distribution.probability_atom(1.0),
+            distribution.cdf(1.0) - distribution.cdf_below(1.0)
+        );
+        assert_eq!(distribution.cdf(0.5), 0.1);
+        assert_eq!(distribution.cdf_below(0.5), 0.1);
     }
 
     #[test]
