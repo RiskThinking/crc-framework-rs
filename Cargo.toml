@@ -12,7 +12,7 @@ readme = "README.md"
 members = ["crates/core", "crates/wasm"]
 
 [workspace.package]
-version = "0.4.2"
+version = "0.5.0"
 
 [lib]
 name = "_core"
