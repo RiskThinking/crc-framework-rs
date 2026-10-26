@@ -9,12 +9,14 @@ import jsonschema
 import numpy as np
 import pytest
 
+from crc_framework import _core
 from crc_framework import (
     DiscreteDistribution,
     EmpiricalDistribution,
     FittedDistribution,
     GaussKronrodOptions,
     HistogramExposure,
+    HurdleDistribution,
     ImpactError,
     ImpactExpression,
     LinearImpact,
@@ -178,6 +180,90 @@ def test_shapes_records_pickle_and_immutability() -> None:
     assert json.loads(recorded.record.to_json())["source"]["shape"] == [2, 2]
     assert document["diagnostics"]["exactness"] == "direct"
     assert not recorded.value.flags.writeable
+
+    # The record hashes the evaluated exposures, not the clamped responses.
+    # [0, 1, 4, -3] -> [0, 1, 7, 0]: inputs and outputs differ here, so a hash
+    # of the outputs would not match a hash of the inputs.
+    expected_digest = _core.impact_array_digest([2, 2], values.reshape(-1).tolist())
+    assert document["source"]["content_digest"]["sha256"] == expected_digest
+    wrong_digest = _core.impact_array_digest([2, 2], evaluated.reshape(-1).tolist())
+    assert document["source"]["content_digest"]["sha256"] != wrong_digest
+
+
+def test_record_keeps_zero_components_that_actually_ran() -> None:
+    # A constant-zero sigmoid response has no exact-expectation path (sigmoid
+    # is not piecewise-linear), so it always runs Gauss-Kronrod; the integral
+    # is exactly zero, but it still ran and must stay reported.
+    expression = ImpactExpression.sigmoid(
+        midpoint=0.0, steepness=1.0, offset=0.0, amplitude=0.0, calibration=CALIBRATION
+    )
+    histogram = HistogramExposure([0.0, 1.0], [1.0])
+    recorded = expression.expected_value_with_record(
+        histogram, method=GaussKronrodOptions()
+    )
+    document = recorded.record.to_dict()
+    jsonschema.validate(
+        json.loads(recorded.record.to_json()),
+        load_impact_schema("impact_evaluation_record"),
+    )
+    assert recorded.value == pytest.approx(0.0)
+    kinds = {component["kind"] for component in document["diagnostics"]["components"]}
+    assert kinds == {"numerical"}
+    assert document["diagnostics"]["exactness"] == "numerical"
+
+    # A hurdle atom sitting exactly where the response is zero makes the
+    # peeled exact component evaluate to zero; it still ran (the continuous
+    # tail still needs quadrature) and must stay reported too.
+    base = FittedDistribution("gumbel_r", location=0.5, scale=1.2)
+    hurdle = HurdleDistribution(base, atom_probability=0.4, atom_location=0.0)
+    unclamped = ImpactExpression.linear(1.0, calibration=CALIBRATION)
+    recorded = unclamped.expected_value_with_record(hurdle, method=GaussKronrodOptions())
+    document = recorded.record.to_dict()
+    jsonschema.validate(
+        json.loads(recorded.record.to_json()),
+        load_impact_schema("impact_evaluation_record"),
+    )
+    components = {
+        component["kind"]: component["value"]
+        for component in document["diagnostics"]["components"]
+    }
+    assert components.keys() == {"exact", "numerical"}
+    assert components["exact"] == pytest.approx(0.0)
+    assert document["diagnostics"]["exactness"] == "mixed"
+
+
+def test_untracked_sources_never_claim_complete_replay() -> None:
+    # Discrete and empirical sources have no snapshot member in their record
+    # schema, so a passed-in snapshot cannot land there; replay must say so.
+    expression = ImpactExpression.linear(1.0, calibration=CALIBRATION)
+    snapshot = {
+        "uri": "s3://bucket/key",
+        "revision": None,
+        "content_sha256": "0" * 64,
+        "retention": "retained",
+    }
+    for source in (
+        DiscreteDistribution([0.0, 1.0], [0.5, 0.5]),
+        EmpiricalDistribution([0.0, 1.0, 2.0]),
+    ):
+        recorded = expression.expected_value_with_record(source, snapshot=snapshot)
+        document = recorded.record.to_dict()
+        assert document["source"]["kind"] == "untracked"
+        assert "snapshot" not in document["source"]
+        assert document["replay"]["status"] == "missing_source_snapshot"
+        assert tuple(document["replay"]["missing_requirements"]) == ("source_snapshot",)
+
+
+def test_call_raises_impact_error_with_code_and_path() -> None:
+    expression = ImpactExpression.tabulated(
+        [(0.0, 0.0), (5.0, 1.0), (10.0, 0.0)],
+        calibration=CALIBRATION,
+    )
+    exposure = TabulatedDistribution([0.0, 1.0], [0.0, 10.0])
+    with pytest.raises(ImpactError) as raised:
+        expression(exposure)
+    assert raised.value.code == "monotonicity_required"
+    assert raised.value.path == ""
 
     with pytest.raises(TypeError, match="context"):
         expression.evaluate(1.0, context=TransformContext())  # type: ignore[call-arg]

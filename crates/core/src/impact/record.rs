@@ -203,6 +203,13 @@ impl ImpactEvaluationRecord {
         framework_version: &str,
         target: &str,
     ) -> Self {
+        // Untracked sources (discrete, empirical) have no `snapshot` member in
+        // their schema variant, so a caller-supplied snapshot never actually
+        // lands in the record for them. Replay completeness must track what
+        // the source object can carry, not merely whether a snapshot argument
+        // was passed.
+        let replay_complete =
+            snapshot.is_some() && !matches!(&source, RecordedSource::Untracked { .. });
         let record = Canon::object([
             ("schema_version", Canon::string("1.0")),
             (
@@ -227,7 +234,7 @@ impl ImpactEvaluationRecord {
             ("preprocessing", Canon::Array(Vec::new())),
             ("resolution", Canon::Null),
             ("diagnostics", diagnostics),
-            ("replay", replay(snapshot.is_some())),
+            ("replay", replay(replay_complete)),
         ]);
         Self {
             canonical: record.encode(),
@@ -281,8 +288,8 @@ fn method_json(method: &ResolvedMethod) -> Canon {
 }
 
 fn expectation_components(result: &Expectation) -> (&'static str, Vec<Canon>) {
-    let exact = result.exact_component != 0.0;
-    let numerical = result.numerical_component != 0.0;
+    let exact = result.exact_component_present;
+    let numerical = result.numerical_component_present;
     match (exact, numerical) {
         (true, true) => (
             "mixed",
@@ -530,6 +537,72 @@ impl Canon {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::expectation::{Expectation, RequestedMethod, ResolvedMethod};
+
+    fn snapshot() -> SnapshotRef {
+        SnapshotRef::new(
+            "s3://bucket/key".to_string(),
+            None,
+            "0".repeat(64),
+            "retained".to_string(),
+        )
+        .expect("valid snapshot")
+    }
+
+    #[test]
+    fn mixed_expectation_keeps_a_zero_exact_or_numerical_component() {
+        // A peeled atom whose response is exactly zero still ran: dropping it
+        // would make diagnostics disagree with the methods that actually executed.
+        let zero_exact = Expectation {
+            value: 3.0,
+            requested: RequestedMethod::Auto,
+            method: ResolvedMethod::GaussKronrod {
+                version: "crc-gk15/1",
+                absolute_tolerance: 1e-10,
+                relative_tolerance: 1e-8,
+                max_evaluations: 100_000,
+            },
+            evaluations: 42,
+            error_estimate: 1e-12,
+            exact_component: 0.0,
+            numerical_component: 3.0,
+            exact_component_present: true,
+            numerical_component_present: true,
+            original_mass_sum: None,
+            normalization_factor: None,
+        };
+        let (exactness, components) = expectation_components(&zero_exact);
+        assert_eq!(exactness, "mixed");
+        assert_eq!(components.len(), 2);
+
+        // A quadrature integral that happens to evaluate to zero still ran:
+        // the numerical component must not be dropped.
+        let zero_numerical = Expectation {
+            numerical_component: 0.0,
+            ..zero_exact
+        };
+        let (exactness, components) = expectation_components(&zero_numerical);
+        assert_eq!(exactness, "mixed");
+        assert_eq!(components.len(), 2);
+    }
+
+    #[test]
+    fn untracked_source_never_claims_complete_replay() {
+        let record = ImpactEvaluationRecord::point(
+            "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            RecordedSource::Untracked {
+                description: "discrete distribution".to_string(),
+            },
+            Some(&snapshot()),
+            "0.5.0",
+            "x86_64-unknown-linux-gnu",
+        );
+        let json = record.canonical_json();
+        // The untracked source schema has no snapshot member, so a passed-in
+        // snapshot cannot land in the record; replay must not claim completeness.
+        assert!(!json.contains("\"snapshot\""));
+        assert!(json.contains("\"status\":\"missing_source_snapshot\""));
+    }
 
     #[test]
     fn point_records_spell_shape_as_integers_and_ignore_signed_zero() {
