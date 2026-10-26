@@ -95,6 +95,12 @@ pub struct Expectation {
     pub error_estimate: f64,
     pub exact_component: f64,
     pub numerical_component: f64,
+    /// Whether an exact (peeled-atom or closed-form) term actually ran, independent
+    /// of whether it happened to evaluate to zero.
+    pub exact_component_present: bool,
+    /// Whether quadrature actually ran, independent of whether the integral
+    /// happened to evaluate to zero.
+    pub numerical_component_present: bool,
     pub original_mass_sum: Option<f64>,
     pub normalization_factor: Option<f64>,
 }
@@ -130,6 +136,8 @@ pub(crate) fn expected_value(
             error_estimate: 0.0,
             exact_component: value,
             numerical_component: 0.0,
+            exact_component_present: true,
+            numerical_component_present: false,
             original_mass_sum,
             normalization_factor,
         });
@@ -174,6 +182,10 @@ pub(crate) fn expected_value(
         error_estimate: integral.error,
         exact_component,
         numerical_component: integral.value,
+        // Quadrature always runs on this path. The peeled-atom term only ran
+        // when the source actually carries an atom to peel.
+        exact_component_present: matches!(source, ImpactSource::Hurdle(_)),
+        numerical_component_present: true,
         original_mass_sum,
         normalization_factor,
     })

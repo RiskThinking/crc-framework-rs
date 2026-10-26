@@ -43,6 +43,17 @@ _LEGACY_CALIBRATION: dict[str, str] = {
 }
 
 
+def _impact_error(code: str, path: str, message: str) -> ImpactError:
+    """Build an `ImpactError` with the `code`/`path` attributes native errors
+    always carry, so pure-Python raise sites match `impact_error()` in
+    `src/impact.rs`.
+    """
+    error = ImpactError(f"{code} at {path or '/'}: {message}")
+    error.code = code  # type: ignore[attr-defined]
+    error.path = path  # type: ignore[attr-defined]
+    return error
+
+
 def _freeze(value: Any) -> Any:
     if isinstance(value, dict):
         return MappingProxyType({key: _freeze(item) for key, item in value.items()})
@@ -473,11 +484,11 @@ class ImpactExpression:
         source: Optional[Snapshot] = None,
     ) -> ImpactEvaluationResult:
         array = _finite_array(values)
-        evaluated, flat = self._responses(array)
+        evaluated, _flat = self._responses(array)
         record = ImpactEvaluationRecord(
             self._native.point_record(
                 [int(dimension) for dimension in array.shape],
-                flat,
+                array.reshape(-1).tolist(),
                 **_snapshot_arguments(source),
             )
         )
@@ -544,9 +555,10 @@ class ImpactExpression:
         grid = probability_grid(distribution, probabilities)
         direction = self.monotonicity
         if direction in ("non_monotone", "unknown"):
-            raise ImpactError(
-                "monotonicity_required at /: distribution transformation requires a "
-                "certified monotone function"
+            raise _impact_error(
+                "monotonicity_required",
+                "",
+                "distribution transformation requires a certified monotone function",
             )
         query = 1.0 - grid if direction == "non_increasing" else grid
         exposure = np.asarray(distribution.quantiles(query), dtype=np.float64)
