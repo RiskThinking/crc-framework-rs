@@ -579,7 +579,10 @@ fn fitted_mean(distribution: &FittedDistribution) -> Option<f64> {
 fn fitted_mean_is_finite(distribution: &FittedDistribution) -> bool {
     use crate::DistributionFamily::{GenExtreme, GenPareto};
     match distribution.family {
-        GenPareto | GenExtreme => distribution.shape.expect("validated shape") < 1.0,
+        // GEV uses SciPy's `1 - c * z` parameterization: its mean exists
+        // exactly when c > -1. GPD instead requires c < 1.
+        GenExtreme => distribution.shape.expect("validated shape") > -1.0,
+        GenPareto => distribution.shape.expect("validated shape") < 1.0,
         _ => true,
     }
 }
