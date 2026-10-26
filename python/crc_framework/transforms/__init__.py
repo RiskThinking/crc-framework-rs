@@ -10,6 +10,8 @@ from crc_framework.impacts import (
     ImpactEvaluationRecord,
     ImpactEvaluationResult,
     ImpactExpression,
+    RegistryImpactReference,
+    impact_registry_manifest,
 )
 
 __all__ = [
@@ -28,7 +30,9 @@ __all__ = [
     "ImpactRegistry",
     "LinearImpact",
     "PiecewiseLinearImpact",
+    "RegistryImpactReference",
     "SigmoidImpact",
     "Transform",
+    "impact_registry_manifest",
     "impacts",
 ]

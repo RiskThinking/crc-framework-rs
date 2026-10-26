@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+import hashlib
+import importlib
 import json
 import pickle
+from collections.abc import Mapping
+from typing import Any
 
 import jsonschema
 import numpy as np
 import pytest
 
+import crc_framework
+import crc_framework.transforms as transform_api
 from crc_framework import _core
 from crc_framework import (
     DiscreteDistribution,
@@ -22,9 +28,11 @@ from crc_framework import (
     LinearImpact,
     PiecewiseLinearImpact,
     PointMassDistribution,
+    RegistryImpactReference,
     SigmoidImpact,
     TabulatedDistribution,
     TransformContext,
+    impact_registry_manifest,
     impacts,
 )
 from crc_framework.contracts import load_impact_contract_file, load_impact_schema
@@ -354,6 +362,136 @@ def test_partial_curve_is_not_silently_completed() -> None:
     assert raised.value.code == "missing_probability_support"
     table = expression(partial, probabilities=[0.1, 0.5, 0.9])
     np.testing.assert_allclose(table.quantiles([0.1, 0.5, 0.9]), partial.quantiles([0.1, 0.5, 0.9]))
+
+
+def _plain(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _plain(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_plain(item) for item in value]
+    return value
+
+
+def test_to_config_round_trips_through_from_config() -> None:
+    expression = ImpactExpression.linear(
+        2.0,
+        intercept=-1.0,
+        calibration=CALIBRATION,
+        clamp={"minimum": 0.0, "maximum": None},
+        provenance={
+            "origin": {"kind": "derived", "description": "scaled"},
+            "sources": [{"id": "paper", "kind": "publication", "uri": "doi:10.1/example"}],
+            "derived_from": ["sha256:" + "ab" * 32],
+        },
+    )
+    restored = ImpactExpression.from_config(expression.to_config())
+    assert restored.to_json() == expression.to_json()
+    assert restored.definition_hash == expression.definition_hash
+
+    tabulated = ImpactExpression.tabulated(
+        [(0.0, 0.0), (1.0, 2.0)],
+        calibration=CALIBRATION,
+    )
+    assert ImpactExpression.from_config(tabulated.to_config()).to_json() == tabulated.to_json()
+    mapped = ImpactExpression.tabulated(
+        [{"x": 0.0, "y": 0.0}, {"x": 1.0, "y": 1.0}],
+        calibration=CALIBRATION,
+    )
+    assert mapped.evaluate(0.5) == 0.5
+
+
+def test_unknown_point_and_context_keys_are_rejected() -> None:
+    with pytest.raises(ImpactError) as raised:
+        ImpactExpression.tabulated(
+            [{"x": 0.0, "y": 0.0, "z": 1.0, "label": "a"}, {"x": 1.0, "y": 1.0}],
+            calibration=CALIBRATION,
+        )
+    assert raised.value.code == "unknown_field"
+    assert raised.value.path == "/model/points/0/label"
+
+    with pytest.raises(ImpactError) as raised:
+        ImpactExpression.for_factor("fwi", context={"region": "north", "countyr": "CAN"})
+    assert raised.value.code == "unknown_field"
+    assert raised.value.path == "/context/countyr"
+
+    with pytest.raises(ImpactError) as raised:
+        ImpactExpression.for_factor("fwi", context_defaults={"countyr": "CAN"})
+    assert raised.value.code == "unknown_field"
+    assert raised.value.path == "/context_defaults/countyr"
+
+    reference = RegistryImpactReference.for_factor("fwi")
+    with pytest.raises(ImpactError) as raised:
+        reference.resolve({"countyr": "CAN"})
+    assert raised.value.code == "unknown_field"
+    assert raised.value.path == "/context/countyr"
+
+
+def test_registry_reference_keeps_its_identity() -> None:
+    defaults = {"continent": "Europe", "building_type": "Commercial buildings"}
+    reference = RegistryImpactReference.for_factor("inundation", context_defaults=defaults)
+    assert reference.reference_hash.startswith("sha256:")
+    document = json.loads(reference.to_json())
+    assert document["context_defaults"]["continent"] == "Europe"
+    assert document["context_defaults"]["country"] is None
+    assert document["factor"] == "inundation"
+
+    resolved = reference.resolve()
+    direct = ImpactExpression.for_factor("inundation", context=defaults)
+    via_defaults = ImpactExpression.for_factor("inundation", context_defaults=defaults)
+    assert resolved.definition_hash == direct.definition_hash == via_defaults.definition_hash
+
+    partial = reference.resolve({"continent": "Asia"})
+    kept = ImpactExpression.for_factor(
+        "inundation",
+        context={"continent": "Asia"},
+        context_defaults=defaults,
+    )
+    assert partial.definition_hash == kept.definition_hash
+    assert partial.definition_hash != resolved.definition_hash
+
+    cell = 0xABC
+    pinned = RegistryImpactReference.for_factor(
+        "frost_days",
+        context_defaults=TransformContext(cell=cell),
+    )
+    assert json.loads(pinned.to_json())["context_defaults"]["cell"] == f"{cell:015x}"
+
+    restored = pickle.loads(pickle.dumps(reference))
+    assert restored.to_json() == reference.to_json()
+    assert restored.reference_hash == reference.reference_hash
+    assert restored.resolve().definition_hash == resolved.definition_hash
+
+    # The package attribute crc_framework.impacts is the legacy registry singleton,
+    # so the impacts module is loaded by its full name.
+    impact_module = importlib.import_module("crc_framework.impacts")
+    assert impact_module.RegistryImpactReference is RegistryImpactReference
+    assert transform_api.RegistryImpactReference is RegistryImpactReference
+    assert crc_framework.RegistryImpactReference is RegistryImpactReference
+
+
+def test_registry_manifest_digest_matches_identity() -> None:
+    raw = _core.impact_registry_manifest_json()
+    registry_id, revision, resolver, digest = _core.impact_registry_identity()
+    assert hashlib.sha256(raw.encode()).hexdigest() == digest
+
+    manifest = impact_registry_manifest()
+    assert _plain(manifest) == json.loads(raw)
+    assert manifest["registry_id"] == registry_id
+    assert manifest["registry_revision"] == revision
+    assert manifest["resolver_semantics_version"] == resolver
+    factors = {item["factor"]: item for item in manifest["factors"]}
+    assert factors["rx1day"]["calibration"]["exposure_unit"] == "mm"
+    agricultural = factors["cooling_degree_days"]["branch_calibrations"]["agricultural"]
+    assert agricultural["impact_metric"] == "crop_yield_change"
+    with pytest.raises(TypeError):
+        manifest["registry_id"] = "other"  # type: ignore[index]
+    with pytest.raises(TypeError):
+        factors["rx1day"]["calibration"]["exposure_unit"] = "mm/day"  # type: ignore[index]
+
+    impact_module = importlib.import_module("crc_framework.impacts")
+    assert impact_module.impact_registry_manifest is impact_registry_manifest
+    assert transform_api.impact_registry_manifest is impact_registry_manifest
+    assert crc_framework.impact_registry_manifest is impact_registry_manifest
 
 
 def test_empirical_and_point_mass_expectations_are_exact() -> None:

@@ -22,7 +22,8 @@ pub use impact::{
     DiscreteDistribution, Expectation, GaussKronrodOptions, HistogramExposure, ImpactAtom,
     ImpactContractError, ImpactDefinition, ImpactDistribution, ImpactEvaluationRecord,
     ImpactSource, MethodRequest, RecordedSource, RegistryImpactReference, RequestedMethod,
-    ResolutionContext, ResolvedMethod, SnapshotRef, array_content_sha256, registry_identity,
+    ResolutionContext, ResolvedMethod, SnapshotRef, array_content_sha256, manifest_json,
+    registry_identity,
 };
 pub use metrics::{
     BinaryOutcome, DistributionStatistics, Microscore, MicroscoreSuite, ScenarioMetadata,

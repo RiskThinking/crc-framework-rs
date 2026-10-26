@@ -4,7 +4,7 @@ use crc_framework_core::{
     CurveParameters, EmpiricalDistribution, GaussKronrodOptions, HistogramExposure,
     ImpactContractError, ImpactDefinition, ImpactDistribution, ImpactEvaluationRecord,
     ImpactSource, MethodRequest, RecordedSource, RegistryImpactReference, ResolutionContext,
-    SnapshotRef, array_content_sha256, registry_identity,
+    SnapshotRef, array_content_sha256, manifest_json, registry_identity,
 };
 use pyo3::prelude::*;
 
@@ -583,6 +583,11 @@ fn impact_registry_identity() -> (&'static str, &'static str, &'static str, &'st
 }
 
 #[pyfunction]
+fn impact_registry_manifest_json() -> &'static str {
+    manifest_json()
+}
+
+#[pyfunction]
 fn impact_engine() -> (&'static str, &'static str) {
     engine()
 }
@@ -678,6 +683,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyRecord>()?;
     module.add_class::<PyReference>()?;
     module.add_function(wrap_pyfunction!(impact_registry_identity, module)?)?;
+    module.add_function(wrap_pyfunction!(impact_registry_manifest_json, module)?)?;
     module.add_function(wrap_pyfunction!(impact_engine, module)?)?;
     module.add_function(wrap_pyfunction!(impact_array_digest, module)?)?;
     Ok(())
