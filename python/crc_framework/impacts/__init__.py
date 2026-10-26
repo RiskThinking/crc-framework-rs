@@ -62,8 +62,36 @@ def _freeze(value: Any) -> Any:
     return value
 
 
+def _thaw(value: Any) -> Any:
+    """Return plain lists and dicts so ``json.dumps`` can encode frozen configs."""
+    if isinstance(value, Mapping):
+        return {key: _thaw(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_thaw(item) for item in value]
+    return value
+
+
 def _dumps(value: Mapping[str, Any]) -> str:
-    return json.dumps(value, allow_nan=False, separators=(",", ":"))
+    return json.dumps(_thaw(value), allow_nan=False, separators=(",", ":"))
+
+
+_CONTEXT_KEYS = frozenset({"cell", "country", "continent", "building_type", "historic_mean"})
+_POINT_KEYS = frozenset({"x", "y"})
+
+
+def _unknown_sort_key(key: Any) -> bytes:
+    if isinstance(key, str):
+        return key.encode("utf-8")
+    return str(key).encode("utf-8")
+
+
+def _reject_unknown_keys(mapping: Mapping[str, Any], allowed: frozenset[str], prefix: str) -> None:
+    unknown = [key for key in mapping if not isinstance(key, str) or key not in allowed]
+    if not unknown:
+        return
+    key = min(unknown, key=_unknown_sort_key)
+    location = f"{prefix}/{key}" if prefix else f"/{key}"
+    raise _impact_error("unknown_field", location, "unknown field")
 
 
 def _model_definition(
@@ -88,8 +116,9 @@ def _model_definition(
 
 def _points(points: Sequence[Union[tuple[float, float], Mapping[str, float]]]) -> list[dict[str, float]]:
     converted: list[dict[str, float]] = []
-    for point in points:
+    for index, point in enumerate(points):
         if isinstance(point, Mapping):
+            _reject_unknown_keys(point, _POINT_KEYS, f"/model/points/{index}")
             converted.append({"x": float(point["x"]), "y": float(point["y"])})
         else:
             converted.append({"x": float(point[0]), "y": float(point[1])})
@@ -104,6 +133,7 @@ def _cell(value: Union[int, str, None]) -> Optional[str]:
 
 def _context_fields(
     context: Union[TransformContext, Mapping[str, Any], None],
+    prefix: str = "/context",
 ) -> tuple[Optional[str], Optional[str], Optional[str], Optional[str], Optional[float]]:
     if context is None:
         return None, None, None, None, None
@@ -116,6 +146,7 @@ def _context_fields(
             context.historic_mean,
         )
     if isinstance(context, Mapping):
+        _reject_unknown_keys(context, _CONTEXT_KEYS, prefix)
         historic = context.get("historic_mean")
         return (
             _cell(cast(Union[int, str, None], context.get("cell"))),
@@ -125,6 +156,27 @@ def _context_fields(
             None if historic is None else float(historic),
         )
     raise TypeError("context must be a TransformContext or mapping")
+
+
+def _context_document(
+    context: Union[TransformContext, Mapping[str, Any], None],
+    prefix: str,
+) -> Optional[dict[str, Any]]:
+    if context is None:
+        return None
+    cell, country, continent, building_type, historic_mean = _context_fields(context, prefix)
+    document: dict[str, Any] = {}
+    if cell is not None:
+        document["cell"] = cell
+    if country is not None:
+        document["country"] = country
+    if continent is not None:
+        document["continent"] = continent
+    if building_type is not None:
+        document["building_type"] = building_type
+    if historic_mean is not None:
+        document["historic_mean"] = historic_mean
+    return document
 
 
 def _method_arguments(
@@ -312,6 +364,71 @@ class ImpactDistribution:
         )
 
 
+class RegistryImpactReference:
+    """Pinned registry selection. ``resolve`` merges call context over its defaults."""
+
+    def __init__(self, native: _core.NativeImpactReference) -> None:
+        self._native = native
+
+    @classmethod
+    def from_json(cls, text: str) -> "RegistryImpactReference":
+        return cls(_core.NativeImpactReference.from_json(text))
+
+    @classmethod
+    def for_factor(
+        cls,
+        factor: Union[RiskFactor, str],
+        *,
+        context_defaults: Union[TransformContext, Mapping[str, Any], None] = None,
+        overrides: Optional[Mapping[str, Optional[float]]] = None,
+        fallback_policy: str = "error",
+        registry_revision: Optional[str] = None,
+        registry_manifest_sha256: Optional[str] = None,
+    ) -> "RegistryImpactReference":
+        """Pin the installed registry. The reference keeps its identity until resolved."""
+        registry_id, revision, resolver, manifest = _core.impact_registry_identity()
+        payload: dict[str, Any] = {
+            "schema_version": "1.0",
+            "registry_id": registry_id,
+            "registry_revision": registry_revision or revision,
+            "registry_manifest_sha256": registry_manifest_sha256 or manifest,
+            "resolver_semantics_version": resolver,
+            "factor": factor.value if isinstance(factor, RiskFactor) else factor,
+            "fallback_policy": fallback_policy,
+        }
+        if overrides is not None:
+            payload["overrides"] = dict(overrides)
+        defaults = _context_document(context_defaults, "/context_defaults")
+        if defaults is not None:
+            payload["context_defaults"] = defaults
+        return cls.from_json(_dumps(payload))
+
+    def to_json(self) -> str:
+        return self._native.canonical_json()
+
+    @property
+    def reference_hash(self) -> str:
+        return self._native.reference_hash
+
+    def resolve(
+        self,
+        context: Union[TransformContext, Mapping[str, Any], None] = None,
+    ) -> "ImpactExpression":
+        cell, country, continent, building_type, historic_mean = _context_fields(context)
+        return ImpactExpression(
+            self._native.resolve(cell, country, continent, building_type, historic_mean)
+        )
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        return (self.from_json, (self.to_json(),))
+
+
+def impact_registry_manifest() -> Mapping[str, Any]:
+    """Frozen installed registry manifest, including factor calibrations."""
+    loaded = json.loads(_core.impact_registry_manifest_json())
+    return cast(Mapping[str, Any], _freeze(loaded))
+
+
 class ImpactExpression:
     """Immutable compiled impact definition."""
 
@@ -432,28 +549,21 @@ class ImpactExpression:
         factor: Union[RiskFactor, str],
         *,
         context: Union[TransformContext, Mapping[str, Any], None] = None,
+        context_defaults: Union[TransformContext, Mapping[str, Any], None] = None,
         overrides: Optional[Mapping[str, Optional[float]]] = None,
         fallback_policy: str = "error",
         registry_revision: Optional[str] = None,
         registry_manifest_sha256: Optional[str] = None,
     ) -> "ImpactExpression":
-        registry_id, revision, resolver, manifest = _core.impact_registry_identity()
-        payload: dict[str, Any] = {
-            "schema_version": "1.0",
-            "registry_id": registry_id,
-            "registry_revision": registry_revision or revision,
-            "registry_manifest_sha256": registry_manifest_sha256 or manifest,
-            "resolver_semantics_version": resolver,
-            "factor": factor.value if isinstance(factor, RiskFactor) else factor,
-            "fallback_policy": fallback_policy,
-        }
-        if overrides is not None:
-            payload["overrides"] = dict(overrides)
-        reference = _core.NativeImpactReference.from_json(_dumps(payload))
-        cell, country, continent, building_type, historic_mean = _context_fields(context)
-        return cls(
-            reference.resolve(cell, country, continent, building_type, historic_mean)
+        reference = RegistryImpactReference.for_factor(
+            factor,
+            context_defaults=context_defaults,
+            overrides=overrides,
+            fallback_policy=fallback_policy,
+            registry_revision=registry_revision,
+            registry_manifest_sha256=registry_manifest_sha256,
         )
+        return reference.resolve(context)
 
     def to_json(self) -> str:
         return self._native.canonical_json()

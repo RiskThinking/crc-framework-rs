@@ -51,7 +51,9 @@ from .transforms import (
     ImpactRegistry,
     LinearImpact,
     PiecewiseLinearImpact,
+    RegistryImpactReference,
     SigmoidImpact,
+    impact_registry_manifest,
     impacts,
 )
 
@@ -93,6 +95,7 @@ __all__ = [
     "PointMassDistribution",
     "QuantileFitDiagnostics",
     "QuantileFitResult",
+    "RegistryImpactReference",
     "RiskFactor",
     "RiskResult",
     "ScenarioMetadata",
@@ -107,6 +110,7 @@ __all__ = [
     "fit_hurdle_quantiles",
     "fit_quantiles",
     "generate_microscores",
+    "impact_registry_manifest",
     "impacts",
     "lookup_continent",
     "lookup_geography",
