@@ -51,7 +51,10 @@ impl SnapshotRef {
                 "snapshot retention must be retained or external",
             ));
         }
-        if revision.as_ref().is_some_and(|value| value.trim().is_empty()) {
+        if revision
+            .as_ref()
+            .is_some_and(|value| value.trim().is_empty() || value != value.trim())
+        {
             return Err(fail(
                 "invalid_value",
                 "/source/snapshot/revision",
@@ -547,6 +550,29 @@ mod tests {
             "retained".to_string(),
         )
         .expect("valid snapshot")
+    }
+
+    #[test]
+    fn snapshot_revision_rejects_surrounding_whitespace() {
+        let digest = "0".repeat(64);
+        let error = SnapshotRef::new(
+            "s3://bucket/key".to_string(),
+            Some(" v1 ".to_string()),
+            digest.clone(),
+            "retained".to_string(),
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "invalid_value");
+        assert_eq!(error.path, "/source/snapshot/revision");
+
+        let accepted = SnapshotRef::new(
+            "s3://bucket/key".to_string(),
+            Some("v 1".to_string()),
+            digest,
+            "retained".to_string(),
+        )
+        .expect("interior whitespace is part of the identifier");
+        assert_eq!(accepted.revision.as_deref(), Some("v 1"));
     }
 
     #[test]
