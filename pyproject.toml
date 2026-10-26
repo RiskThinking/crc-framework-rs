@@ -6,7 +6,7 @@ build-backend = "maturin"
 name = "crc-framework"
 description = "Rust computation core and Python bindings for the Climate Risk Commons Framework"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 dependencies = ["numpy>=1.23"]
 authors = [{ name = "Riskthinking.AI" }]
 license = "AGPL-3.0-or-later"
