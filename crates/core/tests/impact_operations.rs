@@ -326,3 +326,78 @@ fn quadrature_panel_is_exact_for_low_degree_polynomials() {
     assert!((result.value - expected).abs() <= 1e-10 + 1e-8 * expected);
     assert!(result.evaluations >= 15);
 }
+
+#[test]
+fn divergent_frechet_gev_is_rejected_for_unclamped_linear_expectation() {
+    let impact = ImpactDefinition::from_json(
+        r#"{
+            "schema_version": "1.0",
+            "semantics_version": "crc-impact/1",
+            "calibration": {
+                "exposure_variable": "value",
+                "exposure_unit": "1",
+                "impact_metric": "response",
+                "impact_unit": "1"
+            },
+            "model": {"kind": "linear", "slope": 1.0, "intercept": 0.0},
+            "provenance": {"origin": {"kind": "user_defined"}, "sources": [], "derived_from": []}
+        }"#,
+    )
+    .unwrap();
+    let exposure = ImpactSource::from_curve(
+        CurveParameters {
+            curve_kind: "fitted".into(),
+            curve_type: "genextreme".into(),
+            curve_shape: Some(-1.0),
+            curve_location: Some(0.0),
+            curve_scale: Some(1.0),
+            ..CurveParameters::default()
+        }
+        .reconstruct()
+        .unwrap(),
+    )
+    .unwrap();
+
+    let error = impact
+        .expected_value(&exposure, MethodRequest::Auto)
+        .unwrap_err();
+    assert_eq!(error.code, "not_integrable");
+}
+
+#[test]
+fn bounded_weibull_gev_is_integrable_for_unclamped_linear_expectation() {
+    let impact = ImpactDefinition::from_json(
+        r#"{
+            "schema_version": "1.0",
+            "semantics_version": "crc-impact/1",
+            "calibration": {
+                "exposure_variable": "value",
+                "exposure_unit": "1",
+                "impact_metric": "response",
+                "impact_unit": "1"
+            },
+            "model": {"kind": "linear", "slope": 1.0, "intercept": 0.0},
+            "provenance": {"origin": {"kind": "user_defined"}, "sources": [], "derived_from": []}
+        }"#,
+    )
+    .unwrap();
+    let exposure = ImpactSource::from_curve(
+        CurveParameters {
+            curve_kind: "fitted".into(),
+            curve_type: "genextreme".into(),
+            curve_shape: Some(1.0),
+            curve_location: Some(0.0),
+            curve_scale: Some(1.0),
+            ..CurveParameters::default()
+        }
+        .reconstruct()
+        .unwrap(),
+    )
+    .unwrap();
+
+    let result = impact
+        .expected_value(&exposure, MethodRequest::Auto)
+        .unwrap();
+    assert!(result.value.is_finite());
+    assert!((result.value - 0.0).abs() < 1e-8);
+}
