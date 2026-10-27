@@ -8,13 +8,13 @@ Python version, and the JS build derives the npm version. Source
 `js/package.json` stays private and versionless; the build generates the public
 package manifest in ignored `js/dist/`.
 
-To release, for example, `0.5.3-alpha.1`:
+To release, for example, `0.5.3`:
 
 1. Edit only the workspace version in `Cargo.toml`, then run
    `cargo check -p crc-framework-core` to refresh `Cargo.lock`.
 2. Review and commit `Cargo.toml` and `Cargo.lock` with the release changes.
    Push and run the JavaScript WASM workflow on the branch; wait for checks to pass.
-3. In GitHub Releases, create **`v0.5.3-alpha.1`** targeting the tested branch
+3. In GitHub Releases, create **`v0.5.3`** targeting the tested branch
    or commit, marking alpha/beta/rc releases as **prereleases**. Releases can
    target the prepared release branch before it is merged into `main`.
 4. Check both **Package release** and **JavaScript WASM** workflow results.
@@ -22,12 +22,13 @@ To release, for example, `0.5.3-alpha.1`:
 
 | Destination | Version in this example | Release behavior |
 | --- | --- | --- |
-| Rust workspace | `0.5.3-alpha.1` | Versioned source; no crates.io publishing workflow is configured |
-| PyPI: `crc-framework` | `0.5.3a1` | `release.yaml` builds wheels and an sdist, attaches assets to the GitHub release, and publishes to PyPI |
-| npm: `@climateriskcommons/crc-framework` | `0.5.3-alpha.1` | `npm.yaml` builds/tests and publishes the tested tarball under the `alpha` dist-tag |
+| Rust workspace | `0.5.3` | Versioned source; no crates.io publishing workflow is configured |
+| PyPI: `crc-framework` | `0.5.3` | `release.yaml` builds wheels and an sdist, attaches assets to the GitHub release, and publishes to PyPI |
+| npm: `@climateriskcommons/crc-framework` | `0.5.3` | `npm.yaml` builds/tests and publishes the tested tarball under the `latest` dist-tag |
 
-Use **`v` + the exact Cargo version** for the Git tag. Python's `a1` spelling
-is an output conversion, not the release-tag format. The npm publisher rejects
+Use **`v` + the exact Cargo version** for the Git tag. For prereleases,
+`0.5.3-alpha.1` maps to Python's `0.5.3a1`; the Python spelling is an output
+conversion, not the release-tag format. The npm publisher rejects
 a tag that differs from its generated package version. Stable `0.5.3` uses tag
 `v0.5.3` and npm's `latest` channel; `beta` and `rc` prereleases use their
 respective channels. No npm version edits, extra versioning tools, or CI-generated

@@ -53,7 +53,7 @@ both on and off GitHub using [All Contributors](https://allcontributors.org/).
 
 ```sh
 python -m pip install crc-framework
-# Include prereleases during the 0.5.3 alpha cycle:
+# To opt into prereleases:
 python -m pip install --upgrade --pre crc-framework
 ```
 
@@ -64,11 +64,11 @@ suitable for Python extensions.
 ### JavaScript / WebAssembly
 
 ```sh
-npm install @climateriskcommons/crc-framework@alpha
+npm install @climateriskcommons/crc-framework
 ```
 
-Use `@alpha` for the current prerelease channel; stable releases use npm's
-`latest` channel. The package is ESM, requires WebAssembly, and includes TypeScript
+Stable releases use npm's `latest` channel. Add `@alpha` to opt into
+alpha prereleases. The package is ESM, requires WebAssembly, and includes TypeScript
 declarations. See the [JavaScript guide](docs/javascript.md) for browser, bundler, Node,
 and SSR setup, canonical input rules, and prepared collection APIs.
 
