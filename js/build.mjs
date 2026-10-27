@@ -45,7 +45,10 @@ if (checking) {
     if (/\.(?:js|wasm|ts)$/.test(name)) copyFileSync(path.join(wasm, name), path.join(output, 'wasm', name));
   }
   for (const name of ['LICENSE', 'THIRD_PARTY_NOTICES.md']) copyFileSync(path.join(root, name), path.join(output, name));
-  copyFileSync(path.join(directory, 'README.md'), path.join(output, 'README.md'));
+  // Registry README links must work without a repository-relative base URL.
+  const readme = readFileSync(path.join(directory, 'README.md'), 'utf8')
+    .replace(/\]\(\.\.\/([^)]*)\)/g, `](https://github.com/RiskThinking/crc-framework-rs/blob/v${version}/$1)`);
+  writeFileSync(path.join(output, 'README.md'), readme);
   // The checked-in manifest describes development. Only the generated artifact
   // is publishable, with no development scripts/dependencies or private flag.
   const { private: _private, scripts, devDependencies, ...published } = manifest;

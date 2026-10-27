@@ -67,7 +67,7 @@ dependencies = [
 
 [[package]]
 name = "crc-framework-core"
-version = "0.5.2"
+version = "0.5.3-alpha.1"
 dependencies = [
  "h3o",
  "phf",
@@ -79,7 +79,7 @@ dependencies = [
 
 [[package]]
 name = "crc-framework-rs"
-version = "0.5.2"
+version = "0.5.3-alpha.1"
 dependencies = [
  "crc-framework-core",
  "h3o",
@@ -88,7 +88,7 @@ dependencies = [
 
 [[package]]
 name = "crc-framework-wasm"
-version = "0.5.2"
+version = "0.5.3-alpha.1"
 dependencies = [
  "crc-framework-core",
  "js-sys",
