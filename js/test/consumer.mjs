@@ -10,7 +10,7 @@ import {build, preview} from 'vite';
 import {chromium} from 'playwright';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const manifest=JSON.parse(await readFile(path.join(root,'dist/package.json'),'utf8'));
-const filename=`riskthinking.ai-crc-framework-${manifest.version}.tgz`;
+const filename=`climateriskcommons-crc-framework-${manifest.version}.tgz`;
 assert.equal(manifest.private, undefined);
 assert.equal(manifest.devDependencies, undefined);
 assert.equal(manifest.scripts, undefined);
@@ -20,20 +20,20 @@ let server;
 let browser;
 try {
   await writeFile(path.join(directory,'package.json'), JSON.stringify({private:true,type:'module'}));
-  const packageDirectory=path.join(directory,'node_modules/@riskthinking.ai/crc-framework');
+  const packageDirectory=path.join(directory,'node_modules/@climateriskcommons/crc-framework');
   await mkdir(packageDirectory,{recursive:true});
   execFileSync('tar',['-xzf',path.join(root,'dist',filename),'-C',packageDirectory,'--strip-components=1']);
   const imported=await import(pathToFileURL(path.join(packageDirectory,'src/index.js')).href);
   assert.throws(()=>imported.evaluateCurve({},.5),/not initialized/);
   let html=await readFile(new URL('./browser.html',import.meta.url),'utf8');
-  html=html.replace("'../src/index.js'","'@riskthinking.ai/crc-framework'")
+  html=html.replace("'../src/index.js'","'@climateriskcommons/crc-framework'")
     .replace("'../../tests/fixtures/canonical-quantiles.json'","'./canonical-quantiles.json'");
   await writeFile(path.join(directory,'index.html'),html);
   await mkdir(path.join(directory,'public'));
   await writeFile(path.join(directory,'public/canonical-quantiles.json'),
     await readFile(new URL('../../tests/fixtures/canonical-quantiles.json',import.meta.url)));
   await writeFile(path.join(directory,'smoke.ts'), `
-import init, {evaluateCurve, evaluateCurves, prepareCurve, prepareCurves, type CurveProperties} from '@riskthinking.ai/crc-framework';
+import init, {evaluateCurve, evaluateCurves, prepareCurve, prepareCurves, type CurveProperties} from '@climateriskcommons/crc-framework';
 const row: CurveProperties = {curve_kind:'fitted',curve_type:'gumbel_r',curve_location:0,curve_scale:1};
 await init();
 const value: number | null = evaluateCurve(row, .5);

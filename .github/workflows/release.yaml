@@ -111,7 +111,6 @@ jobs:
     environment: production
     runs-on: ubuntu-latest
     needs: [linux, macos, sdist]
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -129,7 +128,8 @@ jobs:
           generate_release_notes: true
           fail_on_unmatched_files: true
           draft: false
-          prerelease: false
+          make_latest: ${{ !contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: ${{ steps.download.outputs.download-path }}/*
 
       - name: Publish package distributions to PyPI

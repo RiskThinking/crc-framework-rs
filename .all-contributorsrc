@@ -4,7 +4,8 @@
   "repoType": "github",
   "repoHost": "https://github.com",
   "files": [
-    "README.md"
+    "README.md",
+    "js/README.md"
   ],
   "imageSize": 80,
   "contributorsPerLine": 7,

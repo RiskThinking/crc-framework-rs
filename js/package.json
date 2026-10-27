@@ -1,5 +1,5 @@
 {
-  "name": "@riskthinking.ai/crc-framework",
+  "name": "@climateriskcommons/crc-framework",
   "private": true,
   "description": "Official CRC Framework WebAssembly bindings for canonical climate curve consumption",
   "type": "module",
