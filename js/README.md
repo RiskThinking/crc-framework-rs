@@ -37,7 +37,7 @@ both on and off GitHub using [All Contributors](https://allcontributors.org/).
 ## Installation and quick start
 
 ```sh
-npm install @climateriskcommons/crc-framework@alpha
+npm install @climateriskcommons/crc-framework
 ```
 
 ```js
