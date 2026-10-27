@@ -7,7 +7,10 @@ use std::str::FromStr;
 
 use crc_framework_core::{
     ImpactContext, ImpactDefinition, ImpactRegistry,
-    impact::{RegistryImpactReference, ResolutionContext, manifest_json, manifest_sha256},
+    impact::{
+        RegistryImpactReference, ResolutionContext, manifest_json, manifest_sha256,
+        registry_identity,
+    },
 };
 use h3o::{CellIndex, Resolution};
 use serde_json::{Value, json};
@@ -29,7 +32,7 @@ fn reference(
     let text = json!({
         "schema_version": "1.0",
         "registry_id": "crc-climate-impacts",
-        "registry_revision": "2026.10.0",
+        "registry_revision": registry_identity().1,
         "registry_manifest_sha256": manifest_sha256(),
         "resolver_semantics_version": "crc-impact-registry/1",
         "factor": factor,
@@ -157,7 +160,10 @@ fn installed_manifest_is_stable() {
     );
     assert_eq!(manifest_sha256(), manifest_sha256());
     assert!(manifest_json().contains("\"registry_id\":\"crc-climate-impacts\""));
-    assert!(manifest_json().contains("\"registry_revision\":\"2026.10.0\""));
+    assert!(manifest_json().contains(&format!(
+        "\"registry_revision\":\"{}\"",
+        registry_identity().1
+    )));
     assert!(!manifest_json().contains(' '));
     let manifest: Value = serde_json::from_str(manifest_json()).unwrap();
     let cooling = manifest["factors"]
@@ -275,7 +281,7 @@ fn resolution_checks_identity_context_overrides_and_fallbacks() {
     assert_eq!(error.code, "registry_unavailable");
     assert_eq!(error.path, "/registry_revision");
 
-    wrong_revision["registry_revision"] = json!("2026.10.0");
+    wrong_revision["registry_revision"] = json!(registry_identity().1);
     wrong_revision["registry_id"] = json!("other-registry");
     let error = RegistryImpactReference::from_json(&wrong_revision.to_string())
         .unwrap()
@@ -318,7 +324,7 @@ fn resolution_checks_identity_context_overrides_and_fallbacks() {
         &json!({
             "schema_version": "1.0",
             "registry_id": "crc-climate-impacts",
-            "registry_revision": "2026.10.0",
+            "registry_revision": registry_identity().1,
             "registry_manifest_sha256": manifest_sha256(),
             "resolver_semantics_version": "crc-impact-registry/1",
             "factor": "spei",

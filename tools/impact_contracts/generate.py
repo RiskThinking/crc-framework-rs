@@ -79,6 +79,22 @@ UNIT_ALIASES = {
     "aliases": {"metre": "m", "metres": "m", "meter": "m", "meters": "m", "day": "d", "days": "d", "fraction": "1", "ratio": "1", "dimensionless": "1"},
 }
 
+# External hazard ids that denote a registry factor. Exposure variable and unit
+# are read from that factor's calibration; this catalog does not copy them.
+# Unlisted hazards are unknown and need an explicit caller declaration.
+HAZARD_EXPOSURES = {
+    "description": (
+        "External hazard identifiers that denote a registry factor's exposure. "
+        "Readers take the exposure variable and unit from that factor's calibration "
+        "in the installed registry manifest. Names that are absent are unknown."
+    ),
+    "entries": [
+        {"id": "rx1day", "aliases": ["Rx1day"], "factor": "rx1day"},
+        {"id": "fd", "aliases": ["FD"], "factor": "frost_days"},
+        {"id": "cdd", "aliases": ["CDD"], "factor": "maximum_consecutive_dry_days"},
+    ],
+}
+
 OVERRIDE_MEANINGS = {
     "sigmoid": "minimum_damage and maximum_damage set curve levels (offset and offset + amplitude), not a final clamp.",
     "hot_days": "minimum_damage and maximum_damage set the final clamp; null clears a limit.",
@@ -121,6 +137,19 @@ def _override_catalog() -> Dict[str, Any]:
             item["branches"] = {"agricultural": []}
         factors[factor] = item
     return {"resolver_semantics_version": ref.RESOLVER_SEMANTICS_VERSION, "factors": factors}
+
+
+def _check_hazard_exposures(catalog: Dict[str, Any]) -> None:
+    """Names are unique and every factor is one the reference registry knows."""
+    seen: set[str] = set()
+    for entry in catalog["entries"]:
+        factor = entry["factor"]
+        if factor not in ref.REGISTRY_FACTORS:
+            raise AssertionError(f"hazard exposure factor {factor} is not a registry factor")
+        for name in (entry["id"], *entry["aliases"]):
+            if name in seen:
+                raise AssertionError(f"hazard exposure name {name} is repeated")
+            seen.add(name)
 
 
 def _json(value: Any) -> bytes:
@@ -218,6 +247,8 @@ def build() -> Dict[str, bytes]:
         {"codes": {code: {"stage": stage, "meaning": meaning} for code, (stage, meaning) in ERROR_CODES.items()}}
     )
     files["catalogs/unit-aliases.json"] = _json(UNIT_ALIASES)
+    files["catalogs/hazard-exposures.json"] = _json(HAZARD_EXPOSURES)
+    _check_hazard_exposures(HAZARD_EXPOSURES)
     used = {
         case["error"]["code"]
         for path in FIXTURE_CONTRACTS

@@ -1,0 +1,26 @@
+{
+  "description": "External hazard identifiers that denote a registry factor's exposure. Readers take the exposure variable and unit from that factor's calibration in the installed registry manifest. Names that are absent are unknown.",
+  "entries": [
+    {
+      "id": "rx1day",
+      "aliases": [
+        "Rx1day"
+      ],
+      "factor": "rx1day"
+    },
+    {
+      "id": "fd",
+      "aliases": [
+        "FD"
+      ],
+      "factor": "frost_days"
+    },
+    {
+      "id": "cdd",
+      "aliases": [
+        "CDD"
+      ],
+      "factor": "maximum_consecutive_dry_days"
+    }
+  ]
+}

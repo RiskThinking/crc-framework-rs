@@ -480,18 +480,49 @@ def test_registry_manifest_digest_matches_identity() -> None:
     assert manifest["registry_revision"] == revision
     assert manifest["resolver_semantics_version"] == resolver
     factors = {item["factor"]: item for item in manifest["factors"]}
-    assert factors["rx1day"]["calibration"]["exposure_unit"] == "mm"
+    assert factors["rx1day"]["calibration"]["exposure_unit"] == "mm/day"
     agricultural = factors["cooling_degree_days"]["branch_calibrations"]["agricultural"]
     assert agricultural["impact_metric"] == "crop_yield_change"
     with pytest.raises(TypeError):
         manifest["registry_id"] = "other"  # type: ignore[index]
     with pytest.raises(TypeError):
-        factors["rx1day"]["calibration"]["exposure_unit"] = "mm/day"  # type: ignore[index]
+        factors["rx1day"]["calibration"]["exposure_unit"] = "cm"  # type: ignore[index]
 
     impact_module = importlib.import_module("crc_framework.impacts")
     assert impact_module.impact_registry_manifest is impact_registry_manifest
     assert transform_api.impact_registry_manifest is impact_registry_manifest
     assert crc_framework.impact_registry_manifest is impact_registry_manifest
+
+
+def test_hazard_exposure_catalog_uses_factor_calibrations() -> None:
+    catalog = load_impact_contract_file("catalogs/hazard-exposures.json")
+    factors = {item["factor"]: item for item in impact_registry_manifest()["factors"]}
+    seen: set[str] = set()
+    expected = {
+        "rx1day": "rx1day",
+        "fd": "frost_days",
+        "cdd": "maximum_consecutive_dry_days",
+    }
+    found = {}
+    for entry in catalog["entries"]:
+        factor = factors[entry["factor"]]
+        calibration = factor["calibration"]
+        for branch in factor.get("branch_calibrations", {}).values():
+            assert branch["exposure_variable"] == calibration["exposure_variable"]
+            assert branch["exposure_unit"] == calibration["exposure_unit"]
+        for name in (entry["id"], *entry["aliases"]):
+            assert name not in seen
+            seen.add(name)
+        found[entry["id"]] = entry["factor"]
+        assert calibration["exposure_variable"]
+        assert calibration["exposure_unit"]
+    assert found == expected
+    assert factors["rx1day"]["calibration"] == {
+        "exposure_variable": "rx1day",
+        "exposure_unit": "mm/day",
+        "impact_metric": "damage_ratio",
+        "impact_unit": "1",
+    }
 
 
 def test_empirical_and_point_mass_expectations_are_exact() -> None:

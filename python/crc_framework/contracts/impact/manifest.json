@@ -41,6 +41,11 @@
       "bytes": 4843
     },
     {
+      "path": "catalogs/hazard-exposures.json",
+      "sha256": "114a9e2dc76e4b4f4d2fbb1f03bab21a5a35db28b003f566e2253074165128a4",
+      "bytes": 585
+    },
+    {
       "path": "catalogs/native-capabilities.json",
       "sha256": "6f28fde56d640b4b21b2e9549061ff58fc9a0872624294891bf849050efa82ec",
       "bytes": 784
@@ -67,8 +72,8 @@
     },
     {
       "path": "fixtures/definitions.json",
-      "sha256": "54460a41ab7446b017c6a9d353da6615037cbabaa9f223703ba4db9bad7085c4",
-      "bytes": 91026
+      "sha256": "970e1d95c574978e49233038b1db398cfc04ec5639cb1d6e697fd53defc77ea3",
+      "bytes": 91034
     },
     {
       "path": "fixtures/evaluation-records.json",
