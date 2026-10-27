@@ -14,7 +14,7 @@ use crate::reference::climate::{
 };
 
 const REGISTRY_ID: &str = "crc-climate-impacts";
-const REGISTRY_REVISION: &str = "2026.10.0";
+const REGISTRY_REVISION: &str = "2026.10.1";
 const RESOLVER_VERSION: &str = "crc-impact-registry/1";
 const FWI_MIDPOINT: f64 = 35.65;
 const FWI_STEEPNESS: f64 = 0.2051873853077659;
@@ -114,7 +114,7 @@ const FACTORS: &[FactorMeta] = &[
     FactorMeta {
         factor: "rx1day",
         context: &["cell"],
-        calibration: ["rx1day", "mm", "damage_ratio", "1"],
+        calibration: ["rx1day", "mm/day", "damage_ratio", "1"],
         branches: &[],
     },
     FactorMeta {

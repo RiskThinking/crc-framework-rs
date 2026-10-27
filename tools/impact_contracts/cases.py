@@ -218,7 +218,7 @@ def definition_cases() -> Dict[str, List[Dict[str, Any]]]:
         "Registry origin with composite lookup keys, a recorded fallback, a null override and full context.",
         definition(
             {"kind": "sigmoid", "midpoint": 682.5, "steepness": 0.007, "origin_adjustment": "subtract_at_zero"},
-            calibration={"exposure_variable": "rx1day", "exposure_unit": "mm", "impact_metric": "damage_ratio", "impact_unit": "1"},
+            calibration={"exposure_variable": "rx1day", "exposure_unit": "mm/day", "impact_metric": "damage_ratio", "impact_unit": "1"},
             provenance={
                 "origin": {
                     "kind": "registry",
