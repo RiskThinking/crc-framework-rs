@@ -1,0 +1,3 @@
+# Manifest digests are SHA-256 of these exact bytes. A Windows checkout must
+# not rewrite them to CRLF before maturin packages the wheel.
+python/crc_framework/contracts/impact/** text eol=lf
