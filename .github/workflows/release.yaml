@@ -89,6 +89,54 @@ jobs:
           name: wheels-mac-${{ matrix.target }}
           path: dist
 
+  windows:
+    runs-on: windows-latest
+    env:
+      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.14 and 3.14t are separate jobs. setup-python cannot co-install the
+        # regular and free-threaded builds of one minor version on Windows
+        # (python/cpython#127294, PyO3/maturin-action#313).
+        interpreter: ["3.11", "3.12", "3.13", "3.14", "3.14t"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enable long paths
+        run: |
+          reg add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem /v LongPathsEnabled /t REG_DWORD /d 1 /f
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-x64-${{ matrix.interpreter }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions/setup-python@v5
+        id: setup-python
+        with:
+          python-version: ${{ matrix.interpreter }}
+          architecture: x64
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+        with:
+          target: x64
+          args: >-
+            --release
+            --out dist
+            --interpreter ${{ steps.setup-python.outputs.python-path }}
+          sccache: "true"
+          container: "off"
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows-x64-${{ matrix.interpreter }}
+          path: dist
+
   sdist:
     runs-on: ubuntu-latest
     steps:
@@ -110,7 +158,7 @@ jobs:
     name: Release
     environment: production
     runs-on: ubuntu-latest
-    needs: [linux, macos, sdist]
+    needs: [linux, macos, windows, sdist]
     steps:
       - uses: actions/checkout@v4
 
