@@ -84,7 +84,9 @@ pub enum RecordedSource {
     },
     Canonical(CurveParameters),
     /// Discrete and empirical laws have no record-schema tag yet.
-    Untracked { description: String },
+    Untracked {
+        description: String,
+    },
 }
 
 /// Canonical JSON of one impact evaluation record.
@@ -159,12 +161,7 @@ impl ImpactEvaluationRecord {
             ]),
             source,
             snapshot,
-            diagnostics(
-                exactness,
-                error,
-                Some(result.evaluations),
-                components,
-            ),
+            diagnostics(exactness, error, Some(result.evaluations), components),
             numerical_methods(&methods),
             framework_version,
             target,
@@ -196,6 +193,7 @@ impl ImpactEvaluationRecord {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn build(
         definition_hash: &str,
         operation: Canon,
@@ -384,10 +382,7 @@ fn source_json(source: RecordedSource, snapshot: Option<&SnapshotRef>) -> Canon 
             ("interval_count", Canon::Int(interval_count)),
             ("within_bin", Canon::string("uniform")),
             ("original_mass_sum", Canon::Float(original_mass_sum)),
-            (
-                "normalization_factor",
-                Canon::Float(normalization_factor),
-            ),
+            ("normalization_factor", Canon::Float(normalization_factor)),
             ("content_digest", Canon::Null),
             ("snapshot", snapshot_json),
             ("selection", Canon::Null),
@@ -424,7 +419,7 @@ fn snapshot_json(snapshot: &SnapshotRef) -> Canon {
             snapshot
                 .revision
                 .as_ref()
-                .map(|value| Canon::string(value))
+                .map(Canon::string)
                 .unwrap_or(Canon::Null),
         ),
         ("content_sha256", Canon::string(&snapshot.content_sha256)),
@@ -470,7 +465,10 @@ fn optional_floats(values: Option<&[f64]>) -> Canon {
 }
 
 fn is_sha256(value: &str) -> bool {
-    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -518,7 +516,9 @@ impl Canon {
             }
             Self::Object(entries) => {
                 let mut order = (0..entries.len()).collect::<Vec<_>>();
-                order.sort_by(|&left, &right| entries[left].0.as_bytes().cmp(entries[right].0.as_bytes()));
+                order.sort_by(|&left, &right| {
+                    entries[left].0.as_bytes().cmp(entries[right].0.as_bytes())
+                });
                 let encoded = order
                     .into_iter()
                     .map(|index| {
@@ -539,8 +539,8 @@ impl Canon {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::expectation::{Expectation, RequestedMethod, ResolvedMethod};
+    use super::*;
 
     fn snapshot() -> SnapshotRef {
         SnapshotRef::new(

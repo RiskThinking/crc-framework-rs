@@ -8,7 +8,11 @@ use crc_framework_core::{
 };
 use pyo3::prelude::*;
 
-pyo3::create_exception!(crc_framework._core, ImpactError, pyo3::exceptions::PyException);
+pyo3::create_exception!(
+    crc_framework._core,
+    ImpactError,
+    pyo3::exceptions::PyException
+);
 
 fn impact_error(py: Python<'_>, error: ImpactContractError) -> PyErr {
     let err = ImpactError::new_err(error.to_string());
@@ -133,6 +137,7 @@ impl PyExpression {
         snapshot_sha256=None,
         snapshot_retention=None
     ))]
+    #[allow(clippy::too_many_arguments)]
     fn point_record(
         &self,
         py: Python<'_>,
@@ -174,6 +179,7 @@ impl PyExpression {
         snapshot_sha256=None,
         snapshot_retention=None
     ))]
+    #[allow(clippy::too_many_arguments)]
     fn expectation_record(
         &self,
         py: Python<'_>,
@@ -250,7 +256,8 @@ struct PyImpactSource {
 impl PyImpactSource {
     #[staticmethod]
     fn histogram(py: Python<'_>, edges: Vec<f64>, weights: Vec<f64>) -> PyResult<Self> {
-        let histogram = HistogramExposure::new(edges, weights).map_err(|error| impact_error(py, error))?;
+        let histogram =
+            HistogramExposure::new(edges, weights).map_err(|error| impact_error(py, error))?;
         let recorded = RecordedSource::Histogram {
             interval_count: histogram.weights().len() as u64,
             original_mass_sum: histogram.original_mass_sum(),
@@ -263,11 +270,7 @@ impl PyImpactSource {
     }
 
     #[staticmethod]
-    fn discrete(
-        py: Python<'_>,
-        support: Vec<f64>,
-        probabilities: Vec<f64>,
-    ) -> PyResult<Self> {
+    fn discrete(py: Python<'_>, support: Vec<f64>, probabilities: Vec<f64>) -> PyResult<Self> {
         let discrete = crc_framework_core::DiscreteDistribution::new(support, probabilities)
             .map_err(|error| impact_error(py, error))?;
         Ok(Self {
@@ -306,6 +309,7 @@ impl PyImpactSource {
         curve_probabilities=None,
         curve_values=None
     ))]
+    #[allow(clippy::too_many_arguments)]
     fn curve(
         py: Python<'_>,
         curve_kind: String,
@@ -330,10 +334,7 @@ impl PyImpactSource {
             curve_values,
         };
         let curve = parameters.reconstruct().map_err(|error| {
-            impact_error(
-                py,
-                value_error("invalid_value", "", &error.to_string()),
-            )
+            impact_error(py, value_error("invalid_value", "", &error.to_string()))
         })?;
         let inner = ImpactSource::from_curve(curve).map_err(|error| impact_error(py, error))?;
         Ok(Self {
@@ -344,12 +345,16 @@ impl PyImpactSource {
 
     #[getter]
     fn original_mass_sum(&self) -> Option<f64> {
-        self.inner.histogram_diagnostics().map(|diagnostics| diagnostics.0)
+        self.inner
+            .histogram_diagnostics()
+            .map(|diagnostics| diagnostics.0)
     }
 
     #[getter]
     fn normalization_factor(&self) -> Option<f64> {
-        self.inner.histogram_diagnostics().map(|diagnostics| diagnostics.1)
+        self.inner
+            .histogram_diagnostics()
+            .map(|diagnostics| diagnostics.1)
     }
 }
 

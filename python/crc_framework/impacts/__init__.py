@@ -49,8 +49,8 @@ def _impact_error(code: str, path: str, message: str) -> ImpactError:
     `src/impact.rs`.
     """
     error = ImpactError(f"{code} at {path or '/'}: {message}")
-    error.code = code  # type: ignore[attr-defined]
-    error.path = path  # type: ignore[attr-defined]
+    error.code = code
+    error.path = path
     return error
 
 

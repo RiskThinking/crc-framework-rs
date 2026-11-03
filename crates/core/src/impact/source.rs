@@ -66,7 +66,10 @@ impl HistogramExposure {
             ));
         }
         let original_mass_sum = neumaier(weights.iter().copied());
-        if !(original_mass_sum > 0.0) || (original_mass_sum - 1.0).abs() > MASS_TOLERANCE {
+        if original_mass_sum.is_nan()
+            || original_mass_sum <= 0.0
+            || (original_mass_sum - 1.0).abs() > MASS_TOLERANCE
+        {
             return Err(fail(
                 "invalid_histogram",
                 "/weights",
@@ -193,7 +196,7 @@ impl DiscreteDistribution {
             ));
         }
         let total = neumaier(probabilities.iter().copied());
-        if !(total > 0.0) || (total - 1.0).abs() > MASS_TOLERANCE {
+        if total.is_nan() || total <= 0.0 || (total - 1.0).abs() > MASS_TOLERANCE {
             return Err(fail(
                 "invalid_value",
                 "/probabilities",
