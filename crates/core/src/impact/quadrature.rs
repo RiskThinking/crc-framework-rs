@@ -230,7 +230,7 @@ where
     let mut gauss = center_value * WG[3];
     let mut kronrod = center_value * WGK[7];
     let mut absolute = kronrod.abs();
-    for index in 0..3 {
+    for (index, gauss_weight) in WG.iter().take(3).enumerate() {
         let node = 2 * index + 1;
         let (sum, magnitude) = pair(
             center,
@@ -241,7 +241,7 @@ where
             evaluations,
             integrand,
         )?;
-        gauss += WG[index] * sum;
+        gauss += gauss_weight * sum;
         kronrod += WGK[node] * sum;
         absolute += WGK[node] * magnitude;
     }
