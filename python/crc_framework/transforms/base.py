@@ -91,3 +91,30 @@ class CallableTransform(CallableImpact):
             self.evaluate(distribution.quantiles(grid), context=context), dtype=np.float64
         )
         return TabulatedDistribution(grid, values)
+
+
+def decreasing_image(
+    distribution: Distribution,
+    grid: npt.NDArray[np.float64],
+    evaluate: Callable[[npt.NDArray[np.float64]], ImpactResult],
+) -> TabulatedDistribution:
+    """Push ``distribution`` through a decreasing point map ``evaluate``.
+
+    The impact quantile at ``p`` is ``T(Q(1 - p))``: the source's upper tail
+    becomes the impact's lower tail. When the source cannot be evaluated at the
+    reflected probabilities (a bounded tabulated support), the exact knots
+    ``(1 - p, T(Q(p)))`` are returned instead.
+    """
+    reflected = 1.0 - grid
+    if isinstance(distribution, TabulatedDistribution) and len(distribution.probabilities):
+        lower = float(distribution.probabilities[0])
+        upper = float(distribution.probabilities[-1])
+        snap = 1.0e-12
+        reflected = np.where((reflected < lower) & (lower - reflected <= snap), lower, reflected)
+        reflected = np.where((reflected > upper) & (reflected - upper <= snap), upper, reflected)
+    try:
+        values = distribution.quantiles(reflected)
+    except ValueError:
+        impact = np.asarray(evaluate(distribution.quantiles(grid)), dtype=np.float64)
+        return TabulatedDistribution((1.0 - grid)[::-1], impact[::-1])
+    return TabulatedDistribution(grid, np.asarray(evaluate(values), dtype=np.float64))

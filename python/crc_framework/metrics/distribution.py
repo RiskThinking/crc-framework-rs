@@ -28,5 +28,9 @@ def conditional_value_at_risk(
 ) -> float:
     if not 0.0 < probability < 1.0:
         raise ValueError("probability must be strictly between zero and one")
-    grid = np.linspace(probability, 1.0 - np.finfo(float).eps, points)
+    if points < 1:
+        raise ValueError("points must be positive")
+    # Midpoint rule on (probability, 1): never evaluates the quantile function
+    # at (or next to) one, where heavy upper tails diverge.
+    grid = probability + (1.0 - probability) * (np.arange(points) + 0.5) / points
     return float(np.mean(distribution.quantiles(grid)))

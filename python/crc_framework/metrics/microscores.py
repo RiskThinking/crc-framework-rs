@@ -108,11 +108,10 @@ def generate_microscores(
     del statistics  # The native suite currently computes its standard diagnostic set.
     metadata = metadata or ScenarioMetadata()
     impact_distribution: Optional[Distribution] = None
-    if impact is not None and not hasattr(impact, "_native"):
-        transform = cast(Transform, impact)
-        impact_distribution = transform(exposure)
-    elif impact is not None:
+    if isinstance(impact, Distribution) or hasattr(impact, "_native"):
         impact_distribution = cast(Distribution, impact)
+    elif impact is not None:
+        impact_distribution = impact(exposure)
     exposure_native = getattr(exposure, "_native", None)
     if exposure_native is None:
         exposure_native = TabulatedDistribution(

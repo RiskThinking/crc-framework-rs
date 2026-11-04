@@ -1069,7 +1069,7 @@ fn erf(x: f64) -> f64 {
     x * polevl(z, &NDTR_T) / p1evl(z, &NDTR_U)
 }
 
-fn ndtr_cephes(a: f64) -> f64 {
+pub(crate) fn ndtr_cephes(a: f64) -> f64 {
     if a.is_nan() {
         return f64::NAN;
     }
@@ -1323,7 +1323,7 @@ fn owens_t_impl(h: f64, a: f64, ah: f64) -> f64 {
     }
 }
 
-fn owens_t(h: f64, a: f64) -> f64 {
+pub(crate) fn owens_t(h: f64, a: f64) -> f64 {
     if h.is_nan() || a.is_nan() {
         return f64::NAN;
     }

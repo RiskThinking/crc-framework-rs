@@ -1,4 +1,4 @@
-use std::f64::consts::{PI, SQRT_2};
+use std::f64::consts::PI;
 
 #[cfg(feature = "sampling")]
 use rand::{Rng, SeedableRng, rngs::StdRng};
@@ -209,6 +209,9 @@ impl TabulatedDistribution {
 
 impl Distribution for TabulatedDistribution {
     fn cdf(&self, x: f64) -> f64 {
+        if x.is_nan() {
+            return f64::NAN;
+        }
         if x < self.values[0] {
             return 0.0;
         }
@@ -235,6 +238,9 @@ impl Distribution for TabulatedDistribution {
     }
 
     fn cdf_below(&self, x: f64) -> f64 {
+        if x.is_nan() {
+            return f64::NAN;
+        }
         if x <= self.values[0] {
             return 0.0;
         }
@@ -302,6 +308,9 @@ impl EmpiricalDistribution {
 
 impl Distribution for EmpiricalDistribution {
     fn cdf(&self, x: f64) -> f64 {
+        if x.is_nan() {
+            return f64::NAN;
+        }
         self.samples.partition_point(|sample| *sample <= x) as f64 / self.samples.len() as f64
     }
 
@@ -315,8 +324,10 @@ impl Distribution for EmpiricalDistribution {
     }
 
     fn probability_atom(&self, x: f64) -> f64 {
-        self.samples.iter().filter(|sample| **sample == x).count() as f64
-            / self.samples.len() as f64
+        // Samples are sorted, so the atom is the run of values equal to `x`.
+        let upper = self.samples.partition_point(|sample| *sample <= x);
+        let lower = self.samples[..upper].partition_point(|sample| *sample < x);
+        (upper - lower) as f64 / self.samples.len() as f64
     }
 }
 
@@ -348,7 +359,13 @@ impl Distribution for PointMassDistribution {
     }
 
     fn cdf(&self, x: f64) -> f64 {
-        if x < self.location { 0.0 } else { 1.0 }
+        if x.is_nan() {
+            f64::NAN
+        } else if x < self.location {
+            0.0
+        } else {
+            1.0
+        }
     }
 
     fn ppf(&self, probability: f64) -> Result<f64> {
@@ -451,6 +468,15 @@ impl FittedDistribution {
         }
         if shape.is_some_and(|value| !value.is_finite()) {
             return Err(CrcError::InvalidInput("shape must be finite".into()));
+        }
+        if matches!(
+            family,
+            DistributionFamily::WeibullMin | DistributionFamily::WeibullMax
+        ) && shape.is_some_and(|value| value <= 0.0)
+        {
+            return Err(CrcError::InvalidInput(
+                "weibull shape must be positive".into(),
+            ));
         }
         Ok(Self {
             family,
@@ -663,15 +689,18 @@ impl Distribution for FittedDistribution {
     }
 
     fn cdf(&self, x: f64) -> f64 {
+        if x.is_nan() {
+            return f64::NAN;
+        }
         let z = self.z(x);
         match self.family {
             DistributionFamily::GumbelRight => (-(-z).exp()).exp(),
-            DistributionFamily::GumbelLeft => 1.0 - (-z.exp()).exp(),
+            DistributionFamily::GumbelLeft => -(-z.exp()).exp_m1(),
             DistributionFamily::WeibullMin => {
                 if z < 0.0 {
                     0.0
                 } else {
-                    1.0 - (-z.powf(self.shape.expect("validated"))).exp()
+                    -(-z.powf(self.shape.expect("validated"))).exp_m1()
                 }
             }
             DistributionFamily::WeibullMax => {
@@ -686,13 +715,14 @@ impl Distribution for FittedDistribution {
                 if z < 0.0 {
                     0.0
                 } else if c.abs() < EPS {
-                    1.0 - (-z).exp()
+                    -(-z).exp_m1()
                 } else {
                     let support = 1.0 + c * z;
                     if support <= 0.0 {
                         1.0
                     } else {
-                        1.0 - support.powf(-1.0 / c)
+                        // 1 - (1 + c z)^(-1/c), without cancellation for small z.
+                        -(-(c * z).ln_1p() / c).exp_m1()
                     }
                 }
             }
@@ -831,7 +861,9 @@ impl Distribution for HurdleDistribution {
     }
 
     fn cdf(&self, x: f64) -> f64 {
-        if x < self.atom_location {
+        if x.is_nan() {
+            f64::NAN
+        } else if x < self.atom_location {
             0.0
         } else if x == self.atom_location {
             self.atom_probability
@@ -1299,15 +1331,7 @@ fn diagnostics_sorted(sorted: &[f64], distribution: &dyn Distribution) -> Diagno
     } else {
         1.0
     };
-    let z = (count.sqrt() + 0.12 + 0.11 / count.sqrt()) * ks;
-    let ks_pvalue = (1..=100)
-        .map(|term| {
-            let sign = if term % 2 == 1 { 1.0 } else { -1.0 };
-            sign * (-2.0 * (term as f64).powi(2) * z * z).exp()
-        })
-        .sum::<f64>()
-        .mul_add(2.0, 0.0)
-        .clamp(0.0, 1.0);
+    let ks_pvalue = reference_curve_fitting::ks_pvalue_asymptotic(ks, sorted.len());
     DiagnosticMetrics {
         ks_statistic: ks,
         ks_pvalue,
@@ -1569,43 +1593,16 @@ fn normal_pdf(x: f64) -> f64 {
 }
 
 fn normal_cdf(x: f64) -> f64 {
-    0.5 * (1.0 + erf(x / SQRT_2))
+    reference_curve_fitting::ndtr_cephes(x)
 }
 
+/// Skew-normal cdf `Phi(z) - 2 T(z, alpha)` with Owen's T, as in SciPy.
 fn skew_normal_cdf(z: f64, alpha: f64) -> f64 {
-    if z <= -10.0 {
-        return 0.0;
+    if z.is_nan() {
+        return f64::NAN;
     }
-    if z >= 10.0 {
-        return 1.0;
-    }
-    let lower = -10.0;
-    let steps = 400usize;
-    let width = (z - lower) / steps as f64;
-    let mut total = 0.0;
-    for index in 0..=steps {
-        let x = lower + index as f64 * width;
-        let weight = if index == 0 || index == steps {
-            1.0
-        } else if index % 2 == 0 {
-            2.0
-        } else {
-            4.0
-        };
-        total += weight * 2.0 * normal_pdf(x) * normal_cdf(alpha * x);
-    }
-    (total * width / 3.0).clamp(0.0, 1.0)
-}
-
-fn erf(x: f64) -> f64 {
-    let sign = x.signum();
-    let x = x.abs();
-    let t = 1.0 / (1.0 + 0.327_591_1 * x);
-    let polynomial =
-        (((((1.061_405_429 * t - 1.453_152_027) * t) + 1.421_413_741) * t - 0.284_496_736) * t
-            + 0.254_829_592)
-            * t;
-    sign * (1.0 - polynomial * (-x * x).exp())
+    (reference_curve_fitting::ndtr_cephes(z) - 2.0 * reference_curve_fitting::owens_t(z, alpha))
+        .clamp(0.0, 1.0)
 }
 
 #[cfg(test)]
@@ -1900,13 +1897,7 @@ mod tests {
     #[test]
     fn survival_function_complements_cdf_and_inverts_for_every_family() {
         for distribution in tail_test_distributions() {
-            // The skew-normal cdf is a quadrature over an erf approximation.
-            let (tolerance, isf_tolerance) =
-                if distribution.family == DistributionFamily::SkewNormal {
-                    (1.0e-6, 1.0e-5)
-                } else {
-                    (1.0e-12, 1.0e-8)
-                };
+            let (tolerance, isf_tolerance) = (1.0e-12, 1.0e-8);
             for q in [0.001, 0.05, 0.3, 0.5, 0.7, 0.95, 0.999] {
                 let x = distribution.ppf(q).unwrap();
                 let survival = distribution.sf(x);
