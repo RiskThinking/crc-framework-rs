@@ -534,3 +534,42 @@ def test_empirical_and_point_mass_expectations_are_exact() -> None:
     assert expression.expected_value(samples) == pytest.approx(14.0 / 3.0)
     discrete = DiscreteDistribution([0.0, 1.0, 3.0], [0.2, 0.5, 0.3])
     assert expression.expected_value(discrete) == pytest.approx(2.8)
+
+
+def test_empirical_breakpoints_follow_the_interpolated_quantile() -> None:
+    # The empirical ppf interpolates order statistics (Q(p) = 2p here), so
+    # breakpoints and atoms use that law rather than the step ECDF.
+    expression = ImpactExpression.binned(
+        [-10.0, 0.5, 10.0], [0.0, 1.0], calibration=CALIBRATION
+    )
+    source = EmpiricalDistribution([0.0, 1.0, 2.0])
+    assert expression.expected_value(source) == pytest.approx(0.75, abs=1e-15)
+    atoms = expression.transform_distribution(source).atoms()
+    assert [atom.probability for atom in atoms] == pytest.approx([0.25, 0.75])
+
+
+def test_adjacent_flats_and_outside_domain_error_in_transform() -> None:
+    flat = ImpactExpression.tabulated(
+        [(0.0, 0.0), (1.0, 0.0), (2.0, 0.0), (3.0, 1.0)], calibration=CALIBRATION
+    )
+    distribution = flat.transform_distribution(
+        DiscreteDistribution([1.0, 2.5], [0.5, 0.5])
+    )
+    assert sum(atom.probability for atom in distribution.atoms()) == 1.0
+    assert distribution.quantile(0.7) == 0.5
+    strict = ImpactExpression.tabulated(
+        [(0.0, 0.0), (1.0, 1.0)], calibration=CALIBRATION, outside_domain="error"
+    )
+    source = DiscreteDistribution([-5.0, 0.5], [0.5, 0.5])
+    for operation in (strict.expected_value, strict.transform_distribution):
+        with pytest.raises(ImpactError) as caught:
+            operation(source)
+        assert caught.value.code == "out_of_domain"
+
+
+def test_evaluate_with_record_matches_evaluate() -> None:
+    expression = ImpactExpression.linear(2.0, calibration=CALIBRATION)
+    values = np.arange(6.0).reshape(2, 3)
+    result = expression.evaluate_with_record(values)
+    np.testing.assert_array_equal(result.value, expression.evaluate(values))
+    assert expression.evaluate_with_record(3.0).value == 6.0

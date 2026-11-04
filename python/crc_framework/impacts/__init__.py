@@ -594,11 +594,12 @@ class ImpactExpression:
         source: Optional[Snapshot] = None,
     ) -> ImpactEvaluationResult:
         array = _finite_array(values)
-        evaluated, _flat = self._responses(array)
+        flat = array.reshape(-1).tolist()
+        evaluated = self._shaped_responses(array, flat)
         record = ImpactEvaluationRecord(
             self._native.point_record(
                 [int(dimension) for dimension in array.shape],
-                array.reshape(-1).tolist(),
+                flat,
                 **_snapshot_arguments(source),
             )
         )
@@ -680,21 +681,20 @@ class ImpactExpression:
 
     def _evaluate(self, values: ImpactValues) -> ImpactResult:
         array = _finite_array(values)
-        evaluated, _flat = self._responses(array)
-        return evaluated
+        return self._shaped_responses(array, None)
 
-    def _responses(
-        self, array: npt.NDArray[np.float64]
-    ) -> tuple[ImpactResult, list[float]]:
-        flat_array = array.reshape(-1)
-        if flat_array.size == 0:
-            return _shaped_result(array, []), []
+    def _shaped_responses(
+        self, array: npt.NDArray[np.float64], flat: Optional[list[float]]
+    ) -> ImpactResult:
+        if array.size == 0:
+            return _shaped_result(array, [])
         if array.ndim == 0:
-            value = self._native.evaluate_value(float(flat_array[0]))
-            raw = [value]
-        else:
-            raw = self._native.evaluate_values(flat_array.tolist())
-        return _shaped_result(array, raw), list(raw)
+            return _shaped_result(
+                array, [self._native.evaluate_value(float(array.reshape(-1)[0]))]
+            )
+        if flat is None:
+            flat = array.reshape(-1).tolist()
+        return _shaped_result(array, self._native.evaluate_values(flat))
 
     def _expected(
         self,

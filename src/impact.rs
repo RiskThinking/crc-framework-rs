@@ -74,19 +74,23 @@ impl PyExpression {
     }
 
     fn evaluate_values(&self, py: Python<'_>, values: Vec<f64>) -> PyResult<Vec<f64>> {
-        let mut responses = Vec::with_capacity(values.len());
-        for (index, value) in values.into_iter().enumerate() {
-            match self.inner.evaluate(value) {
-                Ok(response) => responses.push(response),
-                Err(mut error) => {
-                    if error.path.is_empty() {
-                        error.path = format!("/{index}");
+        let inner = &self.inner;
+        py.detach(|| {
+            let mut responses = Vec::with_capacity(values.len());
+            for (index, value) in values.into_iter().enumerate() {
+                match inner.evaluate(value) {
+                    Ok(response) => responses.push(response),
+                    Err(mut error) => {
+                        if error.path.is_empty() {
+                            error.path = format!("/{index}");
+                        }
+                        return Err(error);
                     }
-                    return Err(impact_error(py, error));
                 }
             }
-        }
-        Ok(responses)
+            Ok(responses)
+        })
+        .map_err(|error| impact_error(py, error))
     }
 
     #[pyo3(signature = (
@@ -112,8 +116,8 @@ impl PyExpression {
             relative_tolerance,
             max_evaluations,
         )?;
-        self.inner
-            .expected_value(&source.inner, request)
+        let (definition, exposure) = (&self.inner, &source.inner);
+        py.detach(|| definition.expected_value(exposure, request))
             .map(|inner| PyExpectation { inner })
             .map_err(|error| impact_error(py, error))
     }
@@ -123,8 +127,8 @@ impl PyExpression {
         py: Python<'_>,
         source: PyRef<'_, PyImpactSource>,
     ) -> PyResult<PyImpactDistribution> {
-        self.inner
-            .transform_distribution(&source.inner)
+        let (definition, exposure) = (&self.inner, &source.inner);
+        py.detach(|| definition.transform_distribution(exposure))
             .map(|inner| PyImpactDistribution { inner })
             .map_err(|error| impact_error(py, error))
     }
