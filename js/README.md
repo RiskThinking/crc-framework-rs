@@ -58,9 +58,8 @@ try {
 }
 ```
 
-Use `@alpha` for prereleases and omit it for stable releases. From
-`0.5.3-alpha.1`, replace imports of `@riskthinking.ai/crc-framework` with
-`@climateriskcommons/crc-framework`, including the WASM asset subpath.
+Use `@alpha` for prereleases and omit it for stable releases. Versions before
+0.5.3 were published as `@riskthinking.ai/crc-framework`.
 
 ## Guides
 

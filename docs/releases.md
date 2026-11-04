@@ -44,29 +44,8 @@ Tags trigger publishing. Re-running an existing tag uses the code at that tag;
 a new fix requires a new release version. Keep released tags fixed and increment
 the version for subsequent releases.
 
-
-### npm scope migration and initial setup
-
-Starting with `0.5.3-alpha.1`, install `@climateriskcommons/crc-framework`.
-Replace imports from `@riskthinking.ai/crc-framework`, including the WASM asset
-subpath, and update the application lockfile. The old package is historical;
-existing versions are not moved or republished.
-
-Trusted publisher configuration is per package and does not carry over from the
-old scope. For the first release, push the tag, download the `npm-package` artifact
-from its successful build job, and publish that exact tarball as an npm maintainer
-with access to `@climateriskcommons`:
-
-```sh
-npm login
-gh run download RUN_ID --name npm-package --dir /tmp/crc-npm-release
-npm publish /tmp/crc-npm-release/climateriskcommons-crc-framework-0.5.3-alpha.1.tgz --access public --tag alpha
-npm trust github @climateriskcommons/crc-framework --repo RiskThinking/crc-framework-rs --file npm.yaml --env production --allow-publish
-```
-
-Complete any npm browser/2FA prompts. Verify the package and trusted publisher
-then rerun the failed publish job (`gh run rerun RUN_ID --failed`). The workflow
-recognizes an already published version
-only when its registry integrity matches the exact tested tarball; a different
-artifact fails the release. Subsequent versions publish directly through OIDC.
-See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/).
+The npm package moved from `@riskthinking.ai/crc-framework` to
+`@climateriskcommons/crc-framework` in 0.5.3; old versions remain under the old
+scope. npm trusted publishing is configured per package; see
+[npm trusted publishing](https://docs.npmjs.com/trusted-publishers/) if the
+publisher must be re-created.
