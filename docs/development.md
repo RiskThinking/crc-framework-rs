@@ -72,8 +72,8 @@ distribution reconstruction with and without default features.
 
 ## JavaScript setup and checks
 
-Use the Node version in [`js/.nvmrc`](../js/.nvmrc), install the
-`wasm32-unknown-unknown` Rust target and `wasm-pack 0.15.0`, then:
+Use the Node version in [`js/.nvmrc`](../js/.nvmrc), install Rust's
+`wasm32-unknown-unknown` target and `wasm-pack 0.15.0`, then:
 
 ```sh
 cd js
@@ -82,48 +82,23 @@ npm run build
 npm test
 npx playwright install chromium
 npm run test:browser
-npm run test:consumer
+npm run test:consumer   # packed Vite + TypeScript + SSR/browser checks
+npm run benchmark
+npm run pack -- --dry-run
 ```
 
-The consumer test packs the generated distribution and checks it with Vite,
-TypeScript, SSR, and Chromium. See the [JavaScript build and test guide](development.md#javascript-packaging)
-for packaging and validation commands.
+The tracked `package.json` is a private, versionless development manifest and
+`package-lock.json` pins build/test dependencies; keep both in Git. The build
+reads Cargo metadata and writes the public package (derived version, JS
+adapter, declarations, WASM glue and asset, licences) to ignored `dist/`,
+without development scripts or dependencies. `npm run pack` requires a build
+for the current workspace version and creates the tarball that the consumer
+test installs.
 
 Native and WASM transcendental math can differ slightly. Numerical regression
 and parity tests use explicit tolerances; structural validation stays exact.
 The [quantile fitting golden test](../crates/core/tests/quantile_fit_golden.rs)
 documents the optional exact-comparison mode for refactors in a fixed environment.
-
-
-## JavaScript packaging
-
-
-Use the Node version in `.nvmrc`, install Rust's `wasm32-unknown-unknown` target
-and `wasm-pack 0.15.0`, then run from this directory:
-
-```sh
-npm ci
-npm run build
-npm test
-npx playwright install chromium
-npm run test:browser
-npm run test:consumer # packed Vite + TypeScript + SSR/browser checks
-npm run benchmark
-npm run pack -- --dry-run
-npm run pack
-```
-
-The tracked `package.json` is a private, versionless development manifest;
-`package-lock.json` pins its build/test dependencies. Keep both in Git. The build
-reads Cargo metadata and writes the public package to ignored `dist/`, including
-the derived version, JS adapter, declarations, WASM glue/asset, and licenses.
-Development scripts, dev dependencies, and the private flag are omitted.
-Source manifests and lockfiles are not rewritten by the build.
-
-`npm run pack` (or `npm pack ./dist`) requires a successful build for the current
-workspace version and creates the tarball under `dist/`. The consumer test
-installs that artifact. The private development package itself cannot be published.
-
 
 ## Contributor credits
 

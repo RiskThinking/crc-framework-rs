@@ -265,7 +265,8 @@ print(level_95.var, level_95.cvar)
 
 Branch generation grows as `2**n` for `n` factors. Set `max_branches` on
 `compute_spanning_set` or `compute_risk` to enforce an application-specific
-limit. `RiskLevel.attribution` reports each factor's contribution to VaR and
+limit; the core caps it at `2**26` branches and raises instead of exhausting
+memory. `RiskLevel.attribution` reports each factor's contribution to VaR and
 CVaR.
 
 ## Spatial helpers

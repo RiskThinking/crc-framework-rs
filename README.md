@@ -118,7 +118,7 @@ collection once, then call `evaluate(q)` and free the handle when finished.
 | Bump versions, migrate the npm scope, or publish a release | [Releases](docs/releases.md) |
 
 Start with the [documentation index](docs/README.md) for the reading order and
-repository boundaries. Historical implementation notes are linked there separately.
+repository boundaries.
 
 ## License
 

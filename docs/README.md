@@ -27,9 +27,3 @@ This directory covers the framework only. Dataset discovery, ingestion, and
 Parquet workflows belong to CRC-SDK; tile loading, caches, and UI behavior belong
 to consuming applications. These boundaries keep a future shared documentation
 structure possible without duplicating other projects' guides here.
-
-## Historical context
-
-[Initial WASM rollout and performance investigation](history/wasm-quantile-consumer.md)
-records past decisions and measurements. Use the current guides above for setup
-and publishing instructions.
