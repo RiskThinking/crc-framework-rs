@@ -162,7 +162,20 @@ pub(crate) fn expected_value(
     let (exact_component, intervals) = peel_atoms(model, clamp, source)?;
     let intervals = split_at_breakpoints(model, clamp, source, &intervals);
     let integral = quadrature::integrate(&intervals, &options, |probability| {
-        let exposure = source.quantile(probability)?;
+        let exposure = source.quantile(probability).map_err(|error| {
+            // Nodes lie strictly inside each panel, so a node that rounded
+            // onto 0 or 1 means bisection has exhausted floating-point
+            // resolution in a tail: the integral did not converge.
+            if probability <= 0.0 || probability >= 1.0 {
+                fail(
+                    "convergence_failed",
+                    "",
+                    "Gauss-Kronrod integration reached the floating-point limit of a tail",
+                )
+            } else {
+                error
+            }
+        })?;
         kernel::evaluate(model, clamp, exposure)
     })?;
     let value = exact_component + integral.value;
@@ -419,7 +432,7 @@ fn support_is_bounded(source: &ImpactSource) -> bool {
     lower.is_finite() && upper.is_finite()
 }
 
-fn restricted_domain_exited(model: &Model, source: &ImpactSource) -> bool {
+pub(crate) fn restricted_domain_exited(model: &Model, source: &ImpactSource) -> bool {
     let (outside, edges) = match model {
         Model::Tabulated {
             points,

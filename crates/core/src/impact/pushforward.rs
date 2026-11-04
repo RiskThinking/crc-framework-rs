@@ -15,6 +15,7 @@ use super::source::{ImpactSource, Tail};
 
 pub const ALGORITHM: &str = "crc-pushforward/1";
 const MASS_COVER: f64 = 1e-12;
+const ATOM_MASS_TOLERANCE: f64 = 1e-9;
 
 /// An atom of the pushforward distribution.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -78,12 +79,14 @@ impl ImpactDistribution {
                 if probability == 1.0 {
                     return self.essential(false);
                 }
-                let source_probability = if *decreasing {
-                    1.0 - probability
+                // A decreasing map reverses order: `Q_Y(p) = f(Q_X^+(1 - p))`
+                // with the upper source quantile, so a zero-mass gap in the
+                // source resolves to the lower response value.
+                let exposure = if *decreasing {
+                    self.source.upper_quantile(1.0 - probability)?
                 } else {
-                    probability
+                    self.source.quantile(probability)?
                 };
-                let exposure = self.source.quantile(source_probability)?;
                 kernel::evaluate(&self.model, &self.clamp, exposure)
             }
             Law::LowerThreshold { cut, floor, .. } => {
@@ -205,7 +208,23 @@ pub(crate) fn transform(
             ));
         }
     };
-    let regions = constant_regions(model, clamp)?;
+    if super::expectation::restricted_domain_exited(model, source) {
+        return Err(fail(
+            "out_of_domain",
+            "",
+            "the source support leaves a table domain whose outside policy is error",
+        ));
+    }
+    let mut regions = constant_regions(model, clamp)?;
+    // Regions are built left to right. Two flat pieces that meet at a knot
+    // must not both own it, or the knot's mass would be counted twice.
+    for index in 1..regions.len() {
+        let previous = regions[index - 1];
+        let current = &mut regions[index];
+        if previous.end_closed && current.start_closed && previous.end == current.start {
+            current.start_closed = false;
+        }
+    }
     let mut atoms = Vec::new();
     for region in &regions {
         let mass = region.probability(source);
@@ -227,6 +246,13 @@ pub(crate) fn transform(
     }
     let atoms = merge_atoms(atoms);
     let covered = neumaier(atoms.iter().map(|atom| atom.probability));
+    if covered > 1.0 + ATOM_MASS_TOLERANCE {
+        return Err(fail(
+            "invalid_value",
+            "",
+            "pushforward atoms carry more than the total probability",
+        ));
+    }
     let piecewise_constant = matches!(
         model,
         Model::Binned { .. }
@@ -357,7 +383,7 @@ fn constant_regions(model: &Model, clamp: &Clamp) -> ContractResult<Vec<Region>>
             outside_domain,
         } => match interpolation {
             TableInterpolation::Linear => {
-                tabulated_linear_regions(points, clamp, &mut regions)?;
+                tabulated_linear_regions(points, *outside_domain, clamp, &mut regions)?;
             }
             TableInterpolation::StepLeft => {
                 step_regions(points, *outside_domain, clamp, true, &mut regions)?;
@@ -373,7 +399,8 @@ fn constant_regions(model: &Model, clamp: &Clamp) -> ContractResult<Vec<Region>>
         } => binned_regions(edges, values, *outside_domain, clamp, &mut regions)?,
         Model::Sigmoid { zero_below, .. } => {
             if let Some(threshold) = zero_below {
-                let floor = kernel::evaluate(model, clamp, threshold - 1.0)?;
+                // The raw response is exactly zero below the threshold.
+                let floor = apply_clamp(clamp, 0.0);
                 regions.push(Region {
                     start: f64::NEG_INFINITY,
                     end: *threshold,
@@ -466,16 +493,19 @@ fn probes(start: f64, end: f64) -> (f64, f64) {
 
 fn tabulated_linear_regions(
     points: &[(f64, f64)],
+    outside: OutsideDomain,
     clamp: &Clamp,
     regions: &mut Vec<Region>,
 ) -> ContractResult<()> {
-    regions.push(Region {
-        start: f64::NEG_INFINITY,
-        end: points[0].0,
-        start_closed: false,
-        end_closed: false,
-        y: apply_clamp(clamp, points[0].1),
-    });
+    if outside == OutsideDomain::Clamp {
+        regions.push(Region {
+            start: f64::NEG_INFINITY,
+            end: points[0].0,
+            start_closed: false,
+            end_closed: false,
+            y: apply_clamp(clamp, points[0].1),
+        });
+    }
     for pair in points.windows(2) {
         let (x0, y0) = pair[0];
         let (x1, y1) = pair[1];
@@ -506,14 +536,16 @@ fn tabulated_linear_regions(
             }
         }
     }
-    let last = points.last().expect("tabulated curve has points");
-    regions.push(Region {
-        start: last.0,
-        end: f64::INFINITY,
-        start_closed: false,
-        end_closed: false,
-        y: apply_clamp(clamp, last.1),
-    });
+    if outside == OutsideDomain::Clamp {
+        let last = points.last().expect("tabulated curve has points");
+        regions.push(Region {
+            start: last.0,
+            end: f64::INFINITY,
+            start_closed: false,
+            end_closed: false,
+            y: apply_clamp(clamp, last.1),
+        });
+    }
     Ok(())
 }
 
@@ -630,7 +662,7 @@ fn lower_threshold(
     else {
         return Ok(None);
     };
-    let floor = kernel::evaluate(model, clamp, threshold - 1.0)?;
+    let floor = apply_clamp(clamp, 0.0);
     let at_threshold = kernel::evaluate(model, clamp, *threshold)?;
     if floor == at_threshold {
         return Ok(None);
