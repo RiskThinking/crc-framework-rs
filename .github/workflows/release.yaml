@@ -34,8 +34,8 @@ jobs:
         with:
           target: ${{ matrix.target }}
           args: >-
-            --release 
-            --out dist 
+            --release
+            --out dist
             --compatibility manylinux_2_28
             --interpreter python3.11 python3.12 python3.13 python3.14 python3.14t
           sccache: "true"
@@ -171,7 +171,7 @@ jobs:
           merge-multiple: true
 
       - name: Create release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
           fail_on_unmatched_files: true
