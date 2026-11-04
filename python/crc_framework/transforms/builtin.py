@@ -14,7 +14,7 @@ from crc_framework.impacts import (
 )
 from crc_framework.models import TransformContext
 
-from .base import ImpactResult, ImpactValues, probability_grid
+from .base import ImpactResult, ImpactValues, decreasing_image, probability_grid
 
 
 @dataclass(frozen=True)
@@ -55,11 +55,13 @@ class SigmoidImpact:
         context: Optional[TransformContext] = None,
     ) -> TabulatedDistribution:
         grid = probability_grid(distribution, probabilities)
+        if self.steepness < 0.0:
+            return decreasing_image(
+                distribution, grid, lambda values: self.evaluate(values, context=context)
+            )
         impact = np.asarray(
             self.evaluate(distribution.quantiles(grid), context=context), dtype=np.float64
         )
-        if self.steepness < 0.0:
-            impact = impact[::-1]
         return TabulatedDistribution(grid, impact)
 
 
@@ -96,11 +98,13 @@ class LinearImpact:
         context: Optional[TransformContext] = None,
     ) -> TabulatedDistribution:
         grid = probability_grid(distribution, probabilities)
+        if self.slope < 0.0:
+            return decreasing_image(
+                distribution, grid, lambda values: self.evaluate(values, context=context)
+            )
         impact = np.asarray(
             self.evaluate(distribution.quantiles(grid), context=context), dtype=np.float64
         )
-        if self.slope < 0.0:
-            impact = impact[::-1]
         return TabulatedDistribution(grid, impact)
 
 

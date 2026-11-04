@@ -27,17 +27,66 @@ pub trait Transform: Send + Sync {
         distribution: &dyn Distribution,
         probabilities: &[f64],
     ) -> Result<TabulatedDistribution> {
-        let values = distribution.quantiles(probabilities)?;
-        let mut transformed = self.transform_values(&values);
         if self.is_decreasing() {
-            transformed.reverse();
+            return decreasing_image(self, distribution, probabilities);
         }
+        let values = distribution.quantiles(probabilities)?;
+        let transformed = self.transform_values(&values);
         TabulatedDistribution::new(
             probabilities.to_vec(),
             transformed,
             Interpolation::LinearProbability,
             false,
         )
+    }
+}
+
+/// Push a distribution through a decreasing map.
+///
+/// The impact quantile at `p` is `T(Q(1 - p))`: the source's upper tail
+/// becomes the impact's lower tail. Reversing values computed on the forward
+/// grid is only correct for grids symmetric around one half. When the source
+/// cannot be evaluated at the reflected probabilities (a bounded tabulated
+/// support), the exact knots `(1 - p, T(Q(p)))` are returned instead.
+fn decreasing_image<T: Transform + ?Sized>(
+    transform: &T,
+    distribution: &dyn Distribution,
+    probabilities: &[f64],
+) -> Result<TabulatedDistribution> {
+    const SNAP: f64 = 1.0e-12;
+    let (minimum, maximum) = distribution.probability_support();
+    let reflected = probabilities
+        .iter()
+        .map(|probability| {
+            let value = 1.0 - probability;
+            if value < minimum && minimum - value <= SNAP {
+                minimum
+            } else if value > maximum && value - maximum <= SNAP {
+                maximum
+            } else {
+                value
+            }
+        })
+        .collect::<Vec<_>>();
+    match distribution.quantiles(&reflected) {
+        Ok(values) => TabulatedDistribution::new(
+            probabilities.to_vec(),
+            transform.transform_values(&values),
+            Interpolation::LinearProbability,
+            false,
+        ),
+        Err(CrcError::OutOfSupport { .. }) => {
+            let values = distribution.quantiles(probabilities)?;
+            let mut transformed = transform.transform_values(&values);
+            transformed.reverse();
+            let knots = probabilities
+                .iter()
+                .rev()
+                .map(|probability| 1.0 - probability)
+                .collect();
+            TabulatedDistribution::new(knots, transformed, Interpolation::LinearProbability, false)
+        }
+        Err(error) => Err(error),
     }
 }
 
@@ -586,5 +635,56 @@ mod tests {
             impact.quantiles(&[0.1, 0.5, 0.9]).unwrap(),
             vec![7.0, 8.0, 9.0]
         );
+    }
+
+    #[test]
+    fn decreasing_transform_uses_reflected_quantiles_on_asymmetric_grid() {
+        use crate::distribution::{DistributionFamily, FittedDistribution};
+        let transform = LinearImpact {
+            slope: -1.0,
+            intercept: 0.0,
+            minimum: None,
+            maximum: None,
+        };
+        let exposure =
+            FittedDistribution::from_parameters(DistributionFamily::GumbelRight, None, 0.0, 1.0)
+                .unwrap();
+        let grid = [0.5, 0.9, 0.99];
+        let impact = transform.apply(&exposure, &grid).unwrap();
+        let quantiles = impact.quantiles(&grid).unwrap();
+        for (probability, quantile) in grid.iter().zip(quantiles) {
+            let expected = -exposure.ppf(1.0 - probability).unwrap();
+            assert!(
+                (quantile - expected).abs() < 1e-12,
+                "{quantile} vs {expected}"
+            );
+        }
+        // q99 of -Gumbel(0, 1) is -Q(0.01) = ln(-ln 0.01) ~= 1.527.
+        assert!((impact.ppf(0.99).unwrap() - 1.527_179_9).abs() < 1e-6);
+    }
+
+    #[test]
+    fn decreasing_transform_on_bounded_asymmetric_table_returns_reflected_knots() {
+        let transform = LinearImpact {
+            slope: -1.0,
+            intercept: 10.0,
+            minimum: None,
+            maximum: None,
+        };
+        let exposure = TabulatedDistribution::new(
+            vec![0.9, 0.98, 0.99, 0.998],
+            vec![1.0, 2.0, 3.0, 4.0],
+            Interpolation::LinearProbability,
+            false,
+        )
+        .unwrap();
+        let impact = transform
+            .apply(&exposure, &[0.9, 0.98, 0.99, 0.998])
+            .unwrap();
+        assert_eq!(impact.probability_support().0, 1.0 - 0.998);
+        let quantiles = impact
+            .quantiles(&[1.0 - 0.998, 1.0 - 0.99, 1.0 - 0.98, 1.0 - 0.9])
+            .unwrap();
+        assert_eq!(quantiles, vec![6.0, 7.0, 8.0, 9.0]);
     }
 }
