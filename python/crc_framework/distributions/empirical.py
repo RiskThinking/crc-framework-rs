@@ -14,11 +14,12 @@ def _evaluate(
     native: _core.NativeDistribution, method: str, values: ArrayLike
 ) -> Union[float, npt.NDArray[np.float64]]:
     array = np.asarray(values, dtype=np.float64)
-    function = getattr(native, method)
     if array.ndim == 0:
-        return float(function(float(array)))
-    flat = np.fromiter((function(float(value)) for value in array.flat), dtype=np.float64)
-    return flat.reshape(array.shape)
+        return float(getattr(native, method)(float(array)))
+    # One native call for the whole array instead of one per element.
+    vectorised = getattr(native, f"{method}_array")
+    flat = vectorised(np.ascontiguousarray(array).reshape(-1))
+    return np.asarray(flat, dtype=np.float64).reshape(array.shape)
 
 
 class EmpiricalDistribution:

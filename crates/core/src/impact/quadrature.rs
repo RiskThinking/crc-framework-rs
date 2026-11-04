@@ -143,29 +143,54 @@ where
             evaluations,
         });
     }
+    // The frozen rule decides convergence from Neumaier sums taken in
+    // ascending endpoint order. Recomputing those sums after every bisection
+    // is quadratic, so exact running sums (Shewchuk expansions) of the
+    // estimates and errors decide every iteration whose outcome is clear by
+    // a rigorous margin, and only borderline iterations fall back to the
+    // ordered sums. The returned value always comes from the ordered sums.
+    let mut value_sum = ExactSum::default();
+    let mut error_sum = ExactSum::default();
+    let mut magnitude = 0.0_f64;
+    let mut heap = std::collections::BinaryHeap::with_capacity(panels.len());
+    for panel in panels {
+        value_sum.add(panel.estimate);
+        error_sum.add(panel.error);
+        magnitude += panel.estimate.abs();
+        heap.push(Worst(panel));
+    }
     loop {
-        panels.sort_by(|left, right| left.left.total_cmp(&right.left));
-        let value = neumaier(panels.iter().map(|panel| panel.estimate));
-        let error = neumaier(panels.iter().map(|panel| panel.error));
-        let tolerance = options
-            .absolute_tolerance
-            .max(options.relative_tolerance * value.abs());
-        if error <= tolerance && value.is_finite() {
-            return Ok(Integral {
-                value,
-                error,
-                evaluations,
-            });
+        let count = heap.len();
+        match running_decision(
+            value_sum.approximate(),
+            error_sum.approximate(),
+            magnitude,
+            count,
+            options,
+        ) {
+            Decision::Continue => {}
+            Decision::Undecided => {
+                let (value, error) = ordered_sums(heap.iter().map(|worst| worst.0));
+                let tolerance = options
+                    .absolute_tolerance
+                    .max(options.relative_tolerance * value.abs());
+                if error <= tolerance && value.is_finite() {
+                    return Ok(Integral {
+                        value,
+                        error,
+                        evaluations,
+                    });
+                }
+                if !value.is_finite() {
+                    return Err(fail(
+                        "non_finite_result",
+                        "",
+                        "quadrature produced a non-finite estimate",
+                    ));
+                }
+            }
         }
-        if !value.is_finite() {
-            return Err(fail(
-                "non_finite_result",
-                "",
-                "quadrature produced a non-finite estimate",
-            ));
-        }
-        let worst = worst_panel(&panels);
-        let current = panels[worst];
+        let current = heap.pop().expect("at least one panel remains").0;
         let mid = (current.left + current.right) * 0.5;
         if evaluations.saturating_add(PANEL_EVALUATIONS * 2) > options.max_evaluations
             || mid <= current.left
@@ -177,7 +202,6 @@ where
                 "Gauss-Kronrod integration did not meet its tolerance",
             ));
         }
-        panels.remove(worst);
         let left = panel(current.left, mid, options, &mut evaluations, &mut integrand)?;
         let right = panel(
             mid,
@@ -186,23 +210,139 @@ where
             &mut evaluations,
             &mut integrand,
         )?;
-        panels.push(left);
-        panels.push(right);
+        value_sum.add(-current.estimate);
+        error_sum.add(-current.error);
+        // `magnitude` only bounds the ordered-sum rounding, so it may keep
+        // the retired panel's contribution.
+        for child in [left, right] {
+            value_sum.add(child.estimate);
+            error_sum.add(child.error);
+            magnitude += child.estimate.abs();
+            heap.push(Worst(child));
+        }
     }
 }
 
-fn worst_panel(panels: &[Panel]) -> usize {
-    let mut selected = 0;
-    for index in 1..panels.len() {
-        let candidate = &panels[index];
-        let current = &panels[selected];
-        if candidate.error > current.error
-            || (candidate.error == current.error && candidate.left < current.left)
-        {
-            selected = index;
-        }
+/// Neumaier sums of the estimates and errors in ascending endpoint order.
+fn ordered_sums(panels: impl Iterator<Item = Panel>) -> (f64, f64) {
+    let mut ordered: Vec<Panel> = panels.collect();
+    ordered.sort_by(|left, right| left.left.total_cmp(&right.left));
+    (
+        neumaier(ordered.iter().map(|panel| panel.estimate)),
+        neumaier(ordered.iter().map(|panel| panel.error)),
+    )
+}
+
+enum Decision {
+    /// The ordered sums certainly miss the tolerance.
+    Continue,
+    /// The running sums cannot decide; compute the ordered sums.
+    Undecided,
+}
+
+/// Decides from exact running sums whether the ordered Neumaier sums could
+/// meet the tolerance.
+///
+/// For `n` terms a Neumaier sum differs from the exact sum `S` by at most
+/// `2 u |S| + 2 n u^2 sum |x_i|` (Higham, ASNA 2nd ed., section 4.3). The
+/// margins below are several times that bound, and the running sums are
+/// themselves within one rounding of exact. Whenever the tolerance test could
+/// pass, the ordered sums are computed, so convergence happens at exactly the
+/// same bisection as the sort-every-iteration driver and returns the same bits.
+fn running_decision(
+    value: f64,
+    error: f64,
+    magnitude: f64,
+    count: usize,
+    options: &GaussKronrod,
+) -> Decision {
+    const LIMIT: f64 = 1e300;
+    if !value.is_finite()
+        || !error.is_finite()
+        || !magnitude.is_finite()
+        || value.abs() > LIMIT
+        || error > LIMIT
+        || magnitude > LIMIT
+    {
+        return Decision::Undecided;
     }
-    selected
+    let unit = f64::EPSILON;
+    let spread = 8.0 * (count as f64 + 2.0) * unit * unit;
+    let value_slack = 8.0 * unit * value.abs() + spread * magnitude + f64::MIN_POSITIVE;
+    // Errors are non-negative, so their absolute sum is the sum itself.
+    let error_low = error - (8.0 * unit + spread) * error - f64::MIN_POSITIVE;
+    let largest_value = value.abs() + value_slack;
+    let tolerance_high = options
+        .absolute_tolerance
+        .max(options.relative_tolerance * largest_value)
+        * (1.0 + 8.0 * unit);
+    if error_low > tolerance_high {
+        Decision::Continue
+    } else {
+        Decision::Undecided
+    }
+}
+
+/// Exact floating-point sum kept as non-overlapping partials (Shewchuk).
+#[derive(Default)]
+struct ExactSum {
+    partials: Vec<f64>,
+}
+
+impl ExactSum {
+    fn add(&mut self, value: f64) {
+        let mut x = value;
+        let mut kept = 0;
+        for index in 0..self.partials.len() {
+            let mut y = self.partials[index];
+            if x.abs() < y.abs() {
+                std::mem::swap(&mut x, &mut y);
+            }
+            let high = x + y;
+            let low = y - (high - x);
+            if low != 0.0 {
+                self.partials[kept] = low;
+                kept += 1;
+            }
+            x = high;
+        }
+        self.partials.truncate(kept);
+        self.partials.push(x);
+    }
+
+    /// Sum of the partials from the largest down; within a few ulps of exact.
+    fn approximate(&self) -> f64 {
+        self.partials
+            .iter()
+            .rev()
+            .fold(0.0, |total, partial| total + partial)
+    }
+}
+
+/// Max-heap order: larger error first, then the lower endpoint.
+struct Worst(Panel);
+
+impl PartialEq for Worst {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == std::cmp::Ordering::Equal
+    }
+}
+
+impl Eq for Worst {}
+
+impl PartialOrd for Worst {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Worst {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0
+            .error
+            .total_cmp(&other.0.error)
+            .then_with(|| other.0.left.total_cmp(&self.0.left))
+    }
 }
 
 fn panel<F>(
@@ -341,4 +481,142 @@ pub(crate) fn neumaier(values: impl IntoIterator<Item = f64>) -> f64 {
         total = candidate;
     }
     total + compensation
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The original driver: re-sort and re-sum every panel after each bisection.
+    fn sorted_driver<F>(
+        intervals: &[(f64, f64)],
+        options: &GaussKronrod,
+        mut integrand: F,
+    ) -> ContractResult<Integral>
+    where
+        F: FnMut(f64) -> ContractResult<f64>,
+    {
+        let mut evaluations = 0_u64;
+        let mut panels = Vec::new();
+        for &(left, right) in intervals {
+            if right == left {
+                continue;
+            }
+            panels.push(panel(
+                left,
+                right,
+                options,
+                &mut evaluations,
+                &mut integrand,
+            )?);
+        }
+        loop {
+            panels.sort_by(|left, right| left.left.total_cmp(&right.left));
+            let value = neumaier(panels.iter().map(|panel| panel.estimate));
+            let error = neumaier(panels.iter().map(|panel| panel.error));
+            let tolerance = options
+                .absolute_tolerance
+                .max(options.relative_tolerance * value.abs());
+            if error <= tolerance && value.is_finite() {
+                return Ok(Integral {
+                    value,
+                    error,
+                    evaluations,
+                });
+            }
+            let mut worst = 0;
+            for index in 1..panels.len() {
+                let (candidate, current) = (&panels[index], &panels[worst]);
+                if candidate.error > current.error
+                    || (candidate.error == current.error && candidate.left < current.left)
+                {
+                    worst = index;
+                }
+            }
+            let current = panels[worst];
+            let mid = (current.left + current.right) * 0.5;
+            if evaluations.saturating_add(PANEL_EVALUATIONS * 2) > options.max_evaluations
+                || mid <= current.left
+                || mid >= current.right
+            {
+                return Err(fail("convergence_failed", "", "did not converge"));
+            }
+            panels.remove(worst);
+            let left = panel(current.left, mid, options, &mut evaluations, &mut integrand)?;
+            let right = panel(
+                mid,
+                current.right,
+                options,
+                &mut evaluations,
+                &mut integrand,
+            )?;
+            panels.push(left);
+            panels.push(right);
+        }
+    }
+
+    #[test]
+    fn heap_driver_matches_the_sorted_driver_bit_for_bit() {
+        type Integrand = fn(f64) -> f64;
+        let integrands: [(&str, Integrand); 8] = [
+            ("cubic", |p| p * p * p - 0.3 * p),
+            ("sqrt", |p: f64| p.sqrt()),
+            ("log", |p: f64| (p + 1e-300).ln()),
+            ("step", |p| if p < 1.0 / 3.0 { 1.0 } else { -2.0 }),
+            ("sigmoid", |p: f64| 1.0 / (1.0 + (-40.0 * (p - 0.5)).exp())),
+            ("tail", |p: f64| (1.0 - p).powf(-0.6)),
+            ("oscillation", |p: f64| (60.0 * p).sin()),
+            ("cancel", |p| if p < 0.5 { 1e8 } else { -1e8 + p }),
+        ];
+        let tolerances = [
+            (1e-10, 1e-8),
+            (1e-14, 1e-12),
+            (1e-6, 1e-4),
+            (1e-300, 1e-300),
+        ];
+        let intervals: [&[(f64, f64)]; 3] = [
+            &[(0.0, 1.0)],
+            &[(0.0, 0.25), (0.25, 0.7), (0.7, 1.0)],
+            &[(0.2, 1.0)],
+        ];
+        for (name, function) in integrands {
+            for (absolute, relative) in tolerances {
+                for budget in [15_u64, 1_000, 20_000] {
+                    for interval in intervals {
+                        let options = GaussKronrod::new(absolute, relative, budget).unwrap();
+                        let expected = sorted_driver(interval, &options, |p| Ok(function(p)));
+                        let actual = integrate(interval, &options, |p| Ok(function(p)));
+                        match (expected, actual) {
+                            (Ok(expected), Ok(actual)) => {
+                                assert_eq!(
+                                    expected.value.to_bits(),
+                                    actual.value.to_bits(),
+                                    "{name} {absolute} {budget}"
+                                );
+                                assert_eq!(expected.error.to_bits(), actual.error.to_bits());
+                                assert_eq!(expected.evaluations, actual.evaluations);
+                            }
+                            (Err(expected), Err(actual)) => {
+                                assert_eq!(expected.code, actual.code, "{name}");
+                            }
+                            (expected, actual) => panic!(
+                                "{name} {absolute} {budget}: {:?} vs {:?}",
+                                expected.map(|integral| integral.value),
+                                actual.map(|integral| integral.value)
+                            ),
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn exact_sum_survives_cancellation() {
+        let mut sum = ExactSum::default();
+        for value in [1e100, 1.0, -1e100, 1e-20, 3.0] {
+            sum.add(value);
+        }
+        assert_eq!(sum.approximate(), 4.0 + 1e-20);
+    }
 }

@@ -11,6 +11,7 @@ use crc_framework_core::{
     generate_microscores,
 };
 use pyo3::{
+    buffer::PyBuffer,
     exceptions::PyValueError,
     prelude::*,
     types::{PyAny, PyDict},
@@ -20,7 +21,16 @@ fn py_error(error: crc_framework_core::CrcError) -> PyErr {
     PyValueError::new_err(error.to_string())
 }
 
-#[pyclass(name = "NativeDistribution", frozen)]
+/// Copy `values` into a new one-dimensional float64 numpy array.
+fn numpy_array<'py>(py: Python<'py>, values: &[f64]) -> PyResult<Bound<'py, PyAny>> {
+    let array = py
+        .import("numpy")?
+        .call_method1("empty", (values.len(), "float64"))?;
+    PyBuffer::<f64>::get(&array)?.copy_from_slice(py, values)?;
+    Ok(array)
+}
+
+#[pyclass(name = "NativeDistribution", frozen, from_py_object)]
 #[derive(Clone)]
 struct PyDistribution {
     inner: Arc<dyn Distribution>,
@@ -44,13 +54,49 @@ impl PyDistribution {
         self.inner.ppf(probability).map_err(py_error)
     }
 
-    fn quantiles(&self, probabilities: Vec<f64>) -> PyResult<Vec<f64>> {
-        self.inner.quantiles(&probabilities).map_err(py_error)
+    fn quantiles(&self, py: Python<'_>, probabilities: Vec<f64>) -> PyResult<Vec<f64>> {
+        let inner = Arc::clone(&self.inner);
+        py.detach(move || inner.quantiles(&probabilities))
+            .map_err(py_error)
     }
 
     #[pyo3(signature = (size, seed=None))]
-    fn sample(&self, size: usize, seed: Option<u64>) -> PyResult<Vec<f64>> {
-        self.inner.sample(size, seed).map_err(py_error)
+    fn sample(&self, py: Python<'_>, size: usize, seed: Option<u64>) -> PyResult<Vec<f64>> {
+        let inner = Arc::clone(&self.inner);
+        py.detach(move || inner.sample(size, seed))
+            .map_err(py_error)
+    }
+
+    /// Vectorised `pdf` over a float64 buffer; returns a one-dimensional numpy array.
+    fn pdf_array<'py>(&self, py: Python<'py>, x: PyBuffer<f64>) -> PyResult<Bound<'py, PyAny>> {
+        let values = x.to_vec(py)?;
+        let inner = Arc::clone(&self.inner);
+        let result: Vec<f64> =
+            py.detach(move || values.iter().map(|&value| inner.pdf(value)).collect());
+        numpy_array(py, &result)
+    }
+
+    /// Vectorised `cdf` over a float64 buffer; returns a one-dimensional numpy array.
+    fn cdf_array<'py>(&self, py: Python<'py>, x: PyBuffer<f64>) -> PyResult<Bound<'py, PyAny>> {
+        let values = x.to_vec(py)?;
+        let inner = Arc::clone(&self.inner);
+        let result: Vec<f64> =
+            py.detach(move || values.iter().map(|&value| inner.cdf(value)).collect());
+        numpy_array(py, &result)
+    }
+
+    /// Vectorised `ppf` over a float64 buffer; returns a one-dimensional numpy array.
+    fn ppf_array<'py>(
+        &self,
+        py: Python<'py>,
+        probabilities: PyBuffer<f64>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let values = probabilities.to_vec(py)?;
+        let inner = Arc::clone(&self.inner);
+        let result = py
+            .detach(move || inner.quantiles(&values))
+            .map_err(py_error)?;
+        numpy_array(py, &result)
     }
 
     #[getter]
@@ -74,7 +120,7 @@ impl PyDistribution {
     }
 }
 
-#[pyclass(name = "NativeFitResult", frozen)]
+#[pyclass(name = "NativeFitResult", frozen, from_py_object)]
 #[derive(Clone)]
 struct PyFitResult {
     #[pyo3(get)]
@@ -89,7 +135,7 @@ struct PyFitResult {
     r_squared: f64,
 }
 
-#[pyclass(name = "NativeQuantileFitResult", frozen)]
+#[pyclass(name = "NativeQuantileFitResult", frozen, from_py_object)]
 #[derive(Clone)]
 struct PyQuantileFitResult {
     #[pyo3(get)]
@@ -112,7 +158,7 @@ struct PyQuantileFitResult {
     evaluations: usize,
 }
 
-#[pyclass(name = "NativeCensoredQuantileFitResult", frozen)]
+#[pyclass(name = "NativeCensoredQuantileFitResult", frozen, from_py_object)]
 #[derive(Clone)]
 struct PyCensoredQuantileFitResult {
     #[pyo3(get)]
@@ -147,7 +193,7 @@ struct PyCensoredQuantileFitResult {
     uncensored_point_count: usize,
 }
 
-#[pyclass(name = "NativeHurdleQuantileFitResult", frozen)]
+#[pyclass(name = "NativeHurdleQuantileFitResult", frozen, from_py_object)]
 #[derive(Clone)]
 struct PyHurdleQuantileFitResult {
     #[pyo3(get)]
@@ -449,8 +495,8 @@ fn fit(
 }
 
 #[pyfunction]
-fn fit_candidates(samples: Vec<f64>) -> PyResult<Vec<PyFitResult>> {
-    crc_framework_core::distribution::fit_all(&samples)
+fn fit_candidates(py: Python<'_>, samples: Vec<f64>) -> PyResult<Vec<PyFitResult>> {
+    py.detach(move || crc_framework_core::distribution::fit_all(&samples))
         .map(|results| results.into_iter().map(fit_result_py).collect())
         .map_err(py_error)
 }
@@ -541,19 +587,23 @@ fn fit_hurdle_quantiles(
 
 #[pyfunction]
 fn diagnostic_metrics(
+    py: Python<'_>,
     samples: Vec<f64>,
     distribution: PyRef<'_, PyDistribution>,
 ) -> PyResult<HashMap<&'static str, f64>> {
-    crc_framework_core::distribution::calculate_diagnostics(&samples, distribution.inner.as_ref())
-        .map(|metrics| {
-            HashMap::from([
-                ("ks_statistic", metrics.ks_statistic),
-                ("ks_pvalue", metrics.ks_pvalue),
-                ("rmse", metrics.rmse),
-                ("r_squared", metrics.r_squared),
-            ])
-        })
-        .map_err(py_error)
+    let inner = Arc::clone(&distribution.inner);
+    py.detach(move || {
+        crc_framework_core::distribution::calculate_diagnostics(&samples, inner.as_ref())
+    })
+    .map(|metrics| {
+        HashMap::from([
+            ("ks_statistic", metrics.ks_statistic),
+            ("ks_pvalue", metrics.ks_pvalue),
+            ("rmse", metrics.rmse),
+            ("r_squared", metrics.r_squared),
+        ])
+    })
+    .map_err(py_error)
 }
 
 #[pyfunction]
@@ -603,6 +653,7 @@ fn evaluate_impact(
 ))]
 #[allow(clippy::too_many_arguments)]
 fn apply_impact(
+    py: Python<'_>,
     distribution: PyRef<'_, PyDistribution>,
     probabilities: Vec<f64>,
     factor: String,
@@ -623,8 +674,9 @@ fn apply_impact(
     };
     let transform =
         ImpactRegistry::resolve(&context, &overrides.unwrap_or_default()).map_err(py_error)?;
-    let result = transform
-        .apply(distribution.inner.as_ref(), &probabilities)
+    let inner = Arc::clone(&distribution.inner);
+    let result = py
+        .detach(move || transform.apply(inner.as_ref(), &probabilities))
         .map_err(py_error)?;
     Ok(PyDistribution {
         inner: Arc::new(result),
@@ -635,7 +687,7 @@ fn apply_impact(
     })
 }
 
-#[pyclass(name = "NativeMicroscore", frozen)]
+#[pyclass(name = "NativeMicroscore", frozen, from_py_object)]
 #[derive(Clone)]
 struct PyMicroscore {
     #[pyo3(get)]
@@ -654,7 +706,7 @@ struct PyMicroscore {
     impact_probability_above: Option<f64>,
 }
 
-#[pyclass(name = "NativeBinaryOutcome", frozen)]
+#[pyclass(name = "NativeBinaryOutcome", frozen, from_py_object)]
 #[derive(Clone)]
 struct PyBinaryOutcome {
     inner: BinaryOutcome,
@@ -793,6 +845,7 @@ fn statistics_dict(
 ))]
 #[allow(clippy::too_many_arguments)]
 fn microscores(
+    py: Python<'_>,
     exposure: PyRef<'_, PyDistribution>,
     probabilities: Vec<f64>,
     impact: Option<PyRef<'_, PyDistribution>>,
@@ -804,9 +857,8 @@ fn microscores(
     continent: Option<String>,
     building_type: Option<String>,
 ) -> PyResult<PyMicroscoreSuite> {
-    let impact_ref = impact
-        .as_ref()
-        .map(|value| value.inner.as_ref() as &dyn Distribution);
+    let exposure = Arc::clone(&exposure.inner);
+    let impact = impact.map(|value| Arc::clone(&value.inner));
     let metadata = ScenarioMetadata {
         cell,
         factor,
@@ -816,12 +868,14 @@ fn microscores(
         continent,
         building_type,
     };
-    generate_microscores(
-        exposure.inner.as_ref(),
-        impact_ref,
-        &probabilities,
-        metadata,
-    )
+    py.detach(move || {
+        generate_microscores(
+            exposure.as_ref(),
+            impact.as_deref(),
+            &probabilities,
+            metadata,
+        )
+    })
     .map(|suite| PyMicroscoreSuite { suite })
     .map_err(py_error)
 }
@@ -829,6 +883,7 @@ fn microscores(
 #[pyfunction]
 #[pyo3(signature = (outcomes, max_branches=None))]
 fn spanning_set(
+    py: Python<'_>,
     outcomes: Vec<PyRef<'_, PyBinaryOutcome>>,
     max_branches: Option<usize>,
 ) -> PyResult<Vec<PySpanningBranch>> {
@@ -836,7 +891,7 @@ fn spanning_set(
         .iter()
         .map(|outcome| outcome.inner.clone())
         .collect();
-    compute_spanning_set(&values, max_branches)
+    py.detach(move || compute_spanning_set(&values, max_branches))
         .map(|branches| {
             branches
                 .into_iter()
@@ -851,7 +906,7 @@ fn spanning_set(
         .map_err(py_error)
 }
 
-#[pyclass(name = "NativeSpanningBranch", frozen)]
+#[pyclass(name = "NativeSpanningBranch", frozen, from_py_object)]
 #[derive(Clone)]
 struct PySpanningBranch {
     #[pyo3(get)]
@@ -864,7 +919,7 @@ struct PySpanningBranch {
     factor_impacts: Vec<(String, f64)>,
 }
 
-#[pyclass(name = "NativeRiskAttribution", frozen)]
+#[pyclass(name = "NativeRiskAttribution", frozen, from_py_object)]
 #[derive(Clone)]
 struct PyRiskAttribution {
     #[pyo3(get)]
@@ -875,7 +930,7 @@ struct PyRiskAttribution {
     cvar_impact: f64,
 }
 
-#[pyclass(name = "NativeRiskLevel", frozen)]
+#[pyclass(name = "NativeRiskLevel", frozen, from_py_object)]
 #[derive(Clone)]
 struct PyRiskLevel {
     #[pyo3(get)]
@@ -888,7 +943,7 @@ struct PyRiskLevel {
     attribution: Vec<PyRiskAttribution>,
 }
 
-#[pyclass(name = "NativeRiskResult", frozen)]
+#[pyclass(name = "NativeRiskResult", frozen, from_py_object)]
 #[derive(Clone)]
 struct PyRiskResult {
     #[pyo3(get)]
@@ -900,6 +955,7 @@ struct PyRiskResult {
 #[pyfunction]
 #[pyo3(signature = (outcomes, levels, max_branches=None))]
 fn risk(
+    py: Python<'_>,
     outcomes: Vec<PyRef<'_, PyBinaryOutcome>>,
     levels: Vec<f64>,
     max_branches: Option<usize>,
@@ -908,7 +964,9 @@ fn risk(
         .iter()
         .map(|outcome| outcome.inner.clone())
         .collect();
-    let result = compute_risk(&values, &levels, max_branches).map_err(py_error)?;
+    let result = py
+        .detach(move || compute_risk(&values, &levels, max_branches))
+        .map_err(py_error)?;
     Ok(PyRiskResult {
         branch_count: result.branch_count,
         levels: result

@@ -22,47 +22,81 @@ fn apply_clamp(clamp: &Clamp, mut value: f64) -> f64 {
     if value == 0.0 { 0.0 } else { value }
 }
 
-fn table_response(
-    xs: &[f64],
-    ys: &[f64],
+fn outside_table(
+    first: f64,
+    last: f64,
+    first_value: f64,
+    last_value: f64,
     outside: OutsideDomain,
-    binned: bool,
-    interpolation: Interpolation,
     value: f64,
-) -> ContractResult<f64> {
-    if value < xs[0] || value > *xs.last().expect("table has endpoints") {
+) -> Option<ContractResult<f64>> {
+    if value < first || value > last {
         if outside == OutsideDomain::Error {
-            return Err(fail(
+            return Some(Err(fail(
                 "out_of_domain",
                 "",
                 "exposure is outside the table domain",
-            ));
+            )));
         }
-        return Ok(if value < xs[0] {
-            ys[0]
+        return Some(Ok(if value < first {
+            first_value
         } else {
-            *ys.last().expect("table has values")
-        });
+            last_value
+        }));
     }
-    if binned {
-        for (index, response) in ys.iter().enumerate() {
-            if value < xs[index + 1] {
-                return Ok(*response);
-            }
-        }
-        return Ok(*ys.last().expect("binned model has a final value"));
+    None
+}
+
+fn binned_response(
+    edges: &[f64],
+    values: &[f64],
+    outside: OutsideDomain,
+    value: f64,
+) -> ContractResult<f64> {
+    let last_value = *values.last().expect("binned model has a final value");
+    if let Some(result) = outside_table(
+        edges[0],
+        *edges.last().expect("table has endpoints"),
+        values[0],
+        last_value,
+        outside,
+        value,
+    ) {
+        return result;
     }
-    if let Some(index) = xs.iter().position(|knot| *knot == value) {
-        return Ok(ys[index]);
+    // Bin `i` is `[edges[i], edges[i + 1])`; the final edge belongs to the
+    // last bin. A NaN exposure falls through to the last bin as before.
+    let bin = edges[1..].partition_point(|edge| *edge <= value);
+    if value.is_nan() {
+        return Ok(last_value);
     }
-    let upper = xs.partition_point(|knot| *knot < value);
+    Ok(values.get(bin).copied().unwrap_or(last_value))
+}
+
+fn tabulated_response(
+    points: &[(f64, f64)],
+    interpolation: Interpolation,
+    outside: OutsideDomain,
+    value: f64,
+) -> ContractResult<f64> {
+    let first = points[0];
+    let last = *points.last().expect("table has endpoints");
+    if let Some(result) = outside_table(first.0, last.0, first.1, last.1, outside, value) {
+        return result;
+    }
+    let upper = points.partition_point(|point| point.0 < value);
+    if points[upper].0 == value {
+        return Ok(points[upper].1);
+    }
     let lower = upper - 1;
+    let (x0, y0) = points[lower];
+    let (x1, y1) = points[upper];
     Ok(match interpolation {
-        Interpolation::StepLeft => ys[lower],
-        Interpolation::StepRight => ys[upper],
+        Interpolation::StepLeft => y0,
+        Interpolation::StepRight => y1,
         Interpolation::Linear => {
-            let weight = (value - xs[lower]) / (xs[upper] - xs[lower]);
-            ys[lower] + weight * (ys[upper] - ys[lower])
+            let weight = (value - x0) / (x1 - x0);
+            y0 + weight * (y1 - y0)
         }
     })
 }
@@ -98,23 +132,12 @@ pub(crate) fn raw_response(model: &Model, value: f64) -> ContractResult<f64> {
             points,
             interpolation,
             outside_domain,
-        } => {
-            let xs = points.iter().map(|point| point.0).collect::<Vec<_>>();
-            let ys = points.iter().map(|point| point.1).collect::<Vec<_>>();
-            table_response(&xs, &ys, *outside_domain, false, *interpolation, value)
-        }
+        } => tabulated_response(points, *interpolation, *outside_domain, value),
         Model::Binned {
             edges,
             values,
             outside_domain,
-        } => table_response(
-            edges,
-            values,
-            *outside_domain,
-            true,
-            Interpolation::Linear,
-            value,
-        ),
+        } => binned_response(edges, values, *outside_domain, value),
         Model::Spei {
             water_consumption_asset,
             original_water_unit_cost,
