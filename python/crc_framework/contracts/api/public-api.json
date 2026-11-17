@@ -1532,6 +1532,49 @@
         "criterion": "SelectionCriterion"
       }
     },
+    "PrecipitationAmount": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "unit",
+            "kind": "keyword_only",
+            "annotation": "LengthUnit"
+          },
+          {
+            "name": "accumulation_duration",
+            "kind": "keyword_only",
+            "annotation": "Duration"
+          }
+        ],
+        "returns": "PrecipitationAmount"
+      },
+      "properties": {
+        "quantity": "str",
+        "unit": "LengthUnit",
+        "fields": "Mapping[str, ScientificValue]",
+        "schema": "Mapping[str, ScientificValue] | None",
+        "accumulation_duration": "Duration"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "Measurement",
+          "binding": "class"
+        }
+      }
+    },
     "PrecipitationRate": {
       "kind": "class",
       "constructor": {

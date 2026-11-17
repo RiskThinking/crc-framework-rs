@@ -99,6 +99,19 @@
     },
     {
       "document": {
+        "accumulation_duration": {
+          "unit": "d",
+          "value": 1
+        },
+        "kind": "precipitation_amount",
+        "unit": "mm"
+      },
+      "name": "PrecipitationAmount",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
         "aggregation": "count",
         "duration": {
           "unit": "yr",
@@ -434,7 +447,7 @@
     {
       "document": {
         "id": "crc:freeze_thaw_cycles",
-        "manifest_sha256": "sha256:769b6c2401bef95ff47bd2dc495dcac728f5eed3095eacbe14bc5f390928e036",
+        "manifest_sha256": "sha256:f9e7e2521ef5542c8ec398f5c949a4bcdff6f5fbe31f74f1553cd32ca2867ff7",
         "schema_version": "2.0",
         "version": "2026.10.1"
       },
@@ -445,7 +458,7 @@
     {
       "document": {
         "id": "crc:frost_days",
-        "manifest_sha256": "sha256:769b6c2401bef95ff47bd2dc495dcac728f5eed3095eacbe14bc5f390928e036",
+        "manifest_sha256": "sha256:f9e7e2521ef5542c8ec398f5c949a4bcdff6f5fbe31f74f1553cd32ca2867ff7",
         "schema_version": "2.0",
         "version": "2026.10.1"
       },
@@ -456,7 +469,7 @@
     {
       "document": {
         "id": "crc:maximum_daily_precipitation",
-        "manifest_sha256": "sha256:769b6c2401bef95ff47bd2dc495dcac728f5eed3095eacbe14bc5f390928e036",
+        "manifest_sha256": "sha256:f9e7e2521ef5542c8ec398f5c949a4bcdff6f5fbe31f74f1553cd32ca2867ff7",
         "schema_version": "2.0",
         "version": "2026.10.1"
       },
@@ -467,7 +480,7 @@
     {
       "document": {
         "id": "crc:cyclone",
-        "manifest_sha256": "sha256:769b6c2401bef95ff47bd2dc495dcac728f5eed3095eacbe14bc5f390928e036",
+        "manifest_sha256": "sha256:f9e7e2521ef5542c8ec398f5c949a4bcdff6f5fbe31f74f1553cd32ca2867ff7",
         "schema_version": "2.0",
         "version": "2026.10.1"
       },
@@ -478,7 +491,7 @@
     {
       "document": {
         "id": "crc:maximum_daily_wind_speed",
-        "manifest_sha256": "sha256:769b6c2401bef95ff47bd2dc495dcac728f5eed3095eacbe14bc5f390928e036",
+        "manifest_sha256": "sha256:f9e7e2521ef5542c8ec398f5c949a4bcdff6f5fbe31f74f1553cd32ca2867ff7",
         "schema_version": "2.0",
         "version": "2026.10.1"
       },
@@ -489,7 +502,7 @@
     {
       "document": {
         "id": "crc:fire_weather_index",
-        "manifest_sha256": "sha256:769b6c2401bef95ff47bd2dc495dcac728f5eed3095eacbe14bc5f390928e036",
+        "manifest_sha256": "sha256:f9e7e2521ef5542c8ec398f5c949a4bcdff6f5fbe31f74f1553cd32ca2867ff7",
         "schema_version": "2.0",
         "version": "2026.10.1"
       },
@@ -500,7 +513,7 @@
     {
       "document": {
         "id": "crc:hot_days",
-        "manifest_sha256": "sha256:769b6c2401bef95ff47bd2dc495dcac728f5eed3095eacbe14bc5f390928e036",
+        "manifest_sha256": "sha256:f9e7e2521ef5542c8ec398f5c949a4bcdff6f5fbe31f74f1553cd32ca2867ff7",
         "schema_version": "2.0",
         "version": "2026.10.1"
       },
@@ -511,7 +524,7 @@
     {
       "document": {
         "id": "crc:coastal_flood",
-        "manifest_sha256": "sha256:769b6c2401bef95ff47bd2dc495dcac728f5eed3095eacbe14bc5f390928e036",
+        "manifest_sha256": "sha256:f9e7e2521ef5542c8ec398f5c949a4bcdff6f5fbe31f74f1553cd32ca2867ff7",
         "schema_version": "2.0",
         "version": "2026.10.1"
       },
@@ -522,7 +535,7 @@
     {
       "document": {
         "id": "crc:river_flood",
-        "manifest_sha256": "sha256:769b6c2401bef95ff47bd2dc495dcac728f5eed3095eacbe14bc5f390928e036",
+        "manifest_sha256": "sha256:f9e7e2521ef5542c8ec398f5c949a4bcdff6f5fbe31f74f1553cd32ca2867ff7",
         "schema_version": "2.0",
         "version": "2026.10.1"
       },
@@ -533,7 +546,7 @@
     {
       "document": {
         "id": "crc:inundation",
-        "manifest_sha256": "sha256:769b6c2401bef95ff47bd2dc495dcac728f5eed3095eacbe14bc5f390928e036",
+        "manifest_sha256": "sha256:f9e7e2521ef5542c8ec398f5c949a4bcdff6f5fbe31f74f1553cd32ca2867ff7",
         "schema_version": "2.0",
         "version": "2026.10.1"
       },
@@ -544,7 +557,7 @@
     {
       "document": {
         "id": "crc:standardized_precipitation_evapotranspiration_index",
-        "manifest_sha256": "sha256:769b6c2401bef95ff47bd2dc495dcac728f5eed3095eacbe14bc5f390928e036",
+        "manifest_sha256": "sha256:f9e7e2521ef5542c8ec398f5c949a4bcdff6f5fbe31f74f1553cd32ca2867ff7",
         "schema_version": "2.0",
         "version": "2026.10.1"
       },
@@ -555,7 +568,7 @@
     {
       "document": {
         "id": "crc:cooling_degree_days",
-        "manifest_sha256": "sha256:769b6c2401bef95ff47bd2dc495dcac728f5eed3095eacbe14bc5f390928e036",
+        "manifest_sha256": "sha256:f9e7e2521ef5542c8ec398f5c949a4bcdff6f5fbe31f74f1553cd32ca2867ff7",
         "schema_version": "2.0",
         "version": "2026.10.1"
       },
@@ -566,7 +579,7 @@
     {
       "document": {
         "id": "crc:consecutive_dry_days",
-        "manifest_sha256": "sha256:769b6c2401bef95ff47bd2dc495dcac728f5eed3095eacbe14bc5f390928e036",
+        "manifest_sha256": "sha256:f9e7e2521ef5542c8ec398f5c949a4bcdff6f5fbe31f74f1553cd32ca2867ff7",
         "schema_version": "2.0",
         "version": "2026.10.1"
       },
@@ -679,6 +692,46 @@
     {
       "document": {
         "input": {
+          "accumulation_duration": {
+            "unit": "d",
+            "value": 1
+          },
+          "kind": "precipitation_amount",
+          "unit": "mm"
+        },
+        "model": {
+          "amplitude": 0.3737,
+          "kind": "sigmoid",
+          "midpoint": 515.1000003814697,
+          "offset": 0,
+          "origin_adjustment": "subtract_at_zero",
+          "steepness": 0.010916281354689056
+        },
+        "output": {
+          "kind": "ratio",
+          "unit": "1"
+        },
+        "provenance": {
+          "context": {
+            "cell": 594475159402840063,
+            "kind": "cell_context"
+          },
+          "model": {
+            "id": "crc:maximum_daily_precipitation",
+            "manifest_sha256": "sha256:f9e7e2521ef5542c8ec398f5c949a4bcdff6f5fbe31f74f1553cd32ca2867ff7",
+            "schema_version": "2.0",
+            "version": "2026.10.1"
+          }
+        },
+        "schema_version": "2.0"
+      },
+      "name": "impact-4",
+      "schema": "https://climateriskcommons.org/schemas/impact-2.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "input": {
           "kind": "depth_above_ground",
           "unit": "m"
         },
@@ -737,21 +790,21 @@
           },
           "model": {
             "id": "crc:inundation",
-            "manifest_sha256": "sha256:769b6c2401bef95ff47bd2dc495dcac728f5eed3095eacbe14bc5f390928e036",
+            "manifest_sha256": "sha256:f9e7e2521ef5542c8ec398f5c949a4bcdff6f5fbe31f74f1553cd32ca2867ff7",
             "schema_version": "2.0",
             "version": "2026.10.1"
           }
         },
         "schema_version": "2.0"
       },
-      "name": "impact-4",
+      "name": "impact-5",
       "schema": "https://climateriskcommons.org/schemas/impact-2.0.schema.json",
       "valid": true
     },
     {
       "document": {
         "id": "crc:inundation",
-        "manifest_sha256": "769b6c2401bef95ff47bd2dc495dcac728f5eed3095eacbe14bc5f390928e036",
+        "manifest_sha256": "f9e7e2521ef5542c8ec398f5c949a4bcdff6f5fbe31f74f1553cd32ca2867ff7",
         "schema_version": "2.0",
         "version": "2026.10.1"
       },
@@ -842,7 +895,7 @@
           },
           "model": {
             "id": "crc:inundation",
-            "manifest_sha256": "sha256:769b6c2401bef95ff47bd2dc495dcac728f5eed3095eacbe14bc5f390928e036",
+            "manifest_sha256": "sha256:f9e7e2521ef5542c8ec398f5c949a4bcdff6f5fbe31f74f1553cd32ca2867ff7",
             "schema_version": "2.0",
             "version": "2026.10.1"
           }

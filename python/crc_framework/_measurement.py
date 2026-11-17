@@ -366,6 +366,11 @@ _MEASUREMENT_FIELDS: dict[str, tuple[str, dict[str, object], tuple[str, ...]]] =
         },
         ("unit", "accumulation_duration", "aggregation"),
     ),
+    "precipitation_amount": (
+        "Accumulated precipitation amount over an explicit interval.",
+        {"unit": _choice(LengthUnit), "accumulation_duration": _DURATION_SCHEMA},
+        ("unit", "accumulation_duration"),
+    ),
     "event_count": (
         "Count of explicitly identified events, with optional threshold and counting duration.",
         {
@@ -406,6 +411,7 @@ _MEASUREMENT_TYPE_NAMES = {
     "temperature": "Temperature",
     "wind_speed": "WindSpeed",
     "precipitation_rate": "PrecipitationRate",
+    "precipitation_amount": "PrecipitationAmount",
     "event_count": "EventCount",
     "climate_index": "ClimateIndex",
     "degree_days": "DegreeDays",
@@ -881,6 +887,31 @@ class PrecipitationRate(_BuiltinMeasurement):
         return cast(Aggregation, self._parameters["aggregation"])
 
 
+class PrecipitationAmount(_BuiltinMeasurement):
+    """Accumulated precipitation, distinct from inundation depth and a rate."""
+
+    __slots__ = ()
+
+    def __init__(self, *, unit: LengthUnit, accumulation_duration: Duration) -> None:
+        _enum(unit, LengthUnit, "unit")
+        if not isinstance(accumulation_duration, Duration):
+            raise TypeError("accumulation_duration must be Duration")
+        self._initialize(
+            "precipitation_amount",
+            "precipitation_amount",
+            unit,
+            {"unit": unit, "accumulation_duration": accumulation_duration},
+        )
+
+    @property
+    def unit(self) -> LengthUnit:
+        return cast(LengthUnit, self._unit)
+
+    @property
+    def accumulation_duration(self) -> Duration:
+        return cast(Duration, self._parameters["accumulation_duration"])
+
+
 class EventCount(_BuiltinMeasurement):
     """Count of declared events; absent thresholds and durations remain unknown."""
 
@@ -1085,6 +1116,11 @@ def _measurement(document: object) -> Measurement:
             unit=PrecipitationRateUnit(unit),
             accumulation_duration=_duration(document["accumulation_duration"]),
             aggregation=Aggregation(document["aggregation"]),
+        )
+    if kind == "precipitation_amount":
+        return PrecipitationAmount(
+            unit=LengthUnit(unit),
+            accumulation_duration=_duration(document["accumulation_duration"]),
         )
     if kind == "event_count":
         return EventCount(

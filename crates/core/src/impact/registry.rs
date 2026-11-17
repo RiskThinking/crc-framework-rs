@@ -114,7 +114,7 @@ const FACTORS: &[FactorMeta] = &[
     FactorMeta {
         factor: "rx1day",
         context: &["cell"],
-        calibration: ["rx1day", "mm/day", "damage_ratio", "1"],
+        calibration: ["rx1day", "mm", "damage_ratio", "1"],
         branches: &[],
     },
     FactorMeta {

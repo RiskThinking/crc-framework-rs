@@ -38,8 +38,7 @@ from ._measurement import (
     InundationContext,
     LengthUnit,
     Measurement,
-    PrecipitationRate,
-    PrecipitationRateUnit,
+    PrecipitationAmount,
     Ratio,
     RatioUnit,
     SpeedUnit,
@@ -991,12 +990,11 @@ def _model_science(model: BuiltinImpact) -> _ModelScience:
         )
     if model is BuiltinImpact.MAXIMUM_DAILY_PRECIPITATION:
         return _ModelScience(
-            PrecipitationRate(
-                unit=PrecipitationRateUnit.MILLIMETRES_PER_DAY,
+            PrecipitationAmount(
+                unit=LengthUnit.MILLIMETRE,
                 accumulation_duration=Duration(1, unit=TimeUnit.DAY),
-                aggregation=Aggregation.MAXIMUM,
             ),
-            PrecipitationRate,
+            PrecipitationAmount,
             CellContext,
             ("calibration reference period",),
         )
@@ -1134,7 +1132,7 @@ class ImpactReference:
         schema_kind = {
             DepthAboveGround: "depth_above_ground",
             EventCount: "event_count",
-            PrecipitationRate: "precipitation_rate",
+            PrecipitationAmount: "precipitation_amount",
             WindSpeed: "wind_speed",
             ClimateIndex: "climate_index",
             DegreeDays: "degree_days",
