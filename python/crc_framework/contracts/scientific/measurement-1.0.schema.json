@@ -304,6 +304,59 @@
     },
     {
       "additionalProperties": false,
+      "description": "Accumulated precipitation amount over an explicit interval.",
+      "properties": {
+        "accumulation_duration": {
+          "additionalProperties": false,
+          "properties": {
+            "unit": {
+              "enum": [
+                "s",
+                "h",
+                "d",
+                "month",
+                "yr"
+              ],
+              "type": "string"
+            },
+            "value": {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "value",
+            "unit"
+          ],
+          "type": "object"
+        },
+        "kind": {
+          "const": "precipitation_amount"
+        },
+        "unit": {
+          "enum": [
+            "m",
+            "cm",
+            "mm",
+            "ft"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "unit",
+        "accumulation_duration"
+      ],
+      "title": "PrecipitationAmount",
+      "type": "object",
+      "x-crc-calibration": {
+        "quantity": "precipitation_amount",
+        "unit_field": "unit"
+      }
+    },
+    {
+      "additionalProperties": false,
       "allOf": [
         {
           "if": {

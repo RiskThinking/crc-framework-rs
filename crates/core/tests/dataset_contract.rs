@@ -195,3 +195,103 @@ fn standalone_fitting_validation_uses_the_exact_declared_family() {
     );
     assert!(validate_specification(&json!({"kind":"quantiles","family":"gumbel_r","constraints":{"minimum_value":2,"maximum_value":1}})).is_err());
 }
+
+fn sampling(calendar: &str, value: f64, unit: &str) -> Value {
+    json!({"calendar": calendar,"step":{"value":value,"unit":unit},"timestamp":"start"})
+}
+
+fn amount(days: f64) -> Value {
+    json!({"kind":"precipitation_amount","unit":"mm","accumulation_duration":{"value":days,"unit":"d"}})
+}
+
+fn reduction(operation: &str, input: Value, output: Value) -> Value {
+    json!({"kind":"temporal_reduction","operation":operation,"coverage":1.0,"input_sampling":input,"output_sampling":output})
+}
+
+fn precipitation_reduction_dataset() -> Value {
+    let daily = sampling("gregorian", 1.0, "d");
+    let yearly = sampling("gregorian", 1.0, "yr");
+    let mut total = reduction("daily_total", daily.clone(), daily.clone());
+    let rate = json!({"kind":"precipitation_rate","unit":"mm/day","accumulation_duration":{"value":1.0,"unit":"d"},"aggregation":"mean"});
+    total["measurements"] = json!([{"variable_id":"user:depth","input":rate,"output":amount(1.0)}]);
+    let mut rolling = reduction("rolling_total", daily.clone(), daily.clone());
+    rolling["window"] = json!({"value":5,"unit":"d"});
+    rolling["measurements"] =
+        json!([{"variable_id":"user:depth","input":amount(1.0),"output":amount(5.0)}]);
+    let annual = reduction("annual_maximum", daily, yearly);
+    let mut value = fixture();
+    value["metadata"]["spec"]["variables"][0]["measurement"] = amount(5.0);
+    value["metadata"]["provenance"] = json!([
+        {"kind":"unit_conversion","variable_id":"user:depth","source_unit":"kg m-2 s-1","target_unit":"mm/day","scale":86400.0,"offset":0.0},
+        total,rolling,annual
+    ]);
+    value
+}
+
+#[test]
+fn temporal_reductions_rewind_measurement_science_before_units() {
+    let base = precipitation_reduction_dataset();
+    validate_dataset(&base).unwrap();
+    let mut value = base.clone();
+    // Same unit cannot disguise a contradictory accumulation interval.
+    value["metadata"]["provenance"][2]["measurements"][0]["output"] = amount(1.0);
+    assert!(
+        validate_dataset(&value)
+            .unwrap_err()
+            .to_string()
+            .contains("measurement")
+    );
+    value = base.clone();
+    value["metadata"]["provenance"][2]["measurements"][0]["input"] = amount(2.0);
+    assert!(validate_dataset(&value).is_err());
+    value = base.clone();
+    value["metadata"]["provenance"][2]["measurements"][0]["variable_id"] = json!("unknown");
+    assert!(validate_dataset(&value).is_err());
+    value = base;
+    let duplicate = value["metadata"]["provenance"][2]["measurements"][0].clone();
+    value["metadata"]["provenance"][2]["measurements"]
+        .as_array_mut()
+        .unwrap()
+        .push(duplicate);
+    assert!(validate_dataset(&value).is_err());
+}
+
+#[test]
+fn temporal_reduction_cadence_calendar_and_windows_are_scientific() {
+    let base = precipitation_reduction_dataset();
+    for (path, replacement) in [
+        (vec!["input_sampling", "calendar"], json!("360_day")),
+        (
+            vec!["input_sampling", "step"],
+            json!({"value":7,"unit":"h"}),
+        ),
+        (
+            vec!["output_sampling", "step"],
+            json!({"value":1,"unit":"month"}),
+        ),
+        (vec!["output_sampling", "timestamp"], json!("end")),
+    ] {
+        let mut value = base.clone();
+        let mut target = &mut value["metadata"]["provenance"][1];
+        for field in path {
+            target = &mut target[field];
+        }
+        *target = replacement;
+        assert!(validate_dataset(&value).is_err());
+    }
+    let mut value = base.clone();
+    value["metadata"]["provenance"][2]["window"] = json!({"value":1.5,"unit":"d"});
+    assert!(validate_dataset(&value).is_err());
+    value = base.clone();
+    value["metadata"]["provenance"][3]["window"] = json!({"value":5,"unit":"d"});
+    assert!(validate_dataset(&value).is_err());
+    value = base;
+    value["metadata"]["provenance"] = json!([reduction(
+        "annual_minimum",
+        sampling("gregorian", 3.0, "month"),
+        sampling("gregorian", 1.0, "yr")
+    )]);
+    validate_dataset(&value).unwrap();
+    value["metadata"]["provenance"][0]["input_sampling"]["step"]["value"] = json!(5);
+    assert!(validate_dataset(&value).is_err());
+}

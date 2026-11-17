@@ -37,6 +37,7 @@ The following fields and units are generated from the same definitions used by J
 | `Temperature` | `unit` |  | `degC`, `K`, `degF` |
 | `WindSpeed` | `unit` | `aggregation`, `averaging_duration` | `m/s`, `km/h` |
 | `PrecipitationRate` | `unit`, `accumulation_duration`, `aggregation` |  | `mm/day`, `mm/h` |
+| `PrecipitationAmount` | `unit`, `accumulation_duration` |  | `m`, `cm`, `mm`, `ft` |
 | `EventCount` | `event`, `aggregation` | `duration`, `threshold` |  |
 | `ClimateIndex` | `index` | `accumulation_duration`, `reference_period` |  |
 | `DegreeDays` | `unit`, `threshold`, `duration` |  | `K.d`, `degC.d` |
@@ -49,11 +50,13 @@ A reference exposes its concrete `measurement_type`, complete `measurement_schem
 
 Some source calibrations do not establish a threshold, averaging interval, accumulation timescale or reference period. `unestablished_facts` exposes these gaps. Scientific data binding rejects them instead of guessing; supplying a plausible value on the data does not establish the published model calibration. Pure numerical `resolve` remains available for explicitly numerical work.
 
+Maximum daily precipitation uses ETCCDI Rx1day: the maximum daily precipitation amount in millimetres accumulated over one day ([Climdex definition](https://www.climdex.org/learn/indices/)). Its numerical response consumes that amount directly; it does not integrate a precipitation rate. The reduction is recorded in data provenance.
+
 | Model | Measurement | Context | Unestablished calibration facts |
 | --- | --- | --- | --- |
 | `crc:freeze_thaw_cycles` | `EventCount` | `CellContext` | event threshold, counting duration, calibration reference period |
 | `crc:frost_days` | `EventCount` | `CellContext` | event threshold, counting duration, calibration reference period |
-| `crc:maximum_daily_precipitation` | `PrecipitationRate` | `CellContext` | calibration reference period |
+| `crc:maximum_daily_precipitation` | `PrecipitationAmount` | `CellContext` | calibration reference period |
 | `crc:cyclone` | `WindSpeed` | `CountryContext` | wind averaging duration, calibration reference period |
 | `crc:maximum_daily_wind_speed` | `WindSpeed` | `CountryContext` | wind averaging duration, calibration reference period |
 | `crc:fire_weather_index` | `ClimateIndex` | `EmptyContext` |  |

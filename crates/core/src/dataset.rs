@@ -7,7 +7,7 @@ use geo::{Coord, Geometry, LineString, MultiPolygon, Point, Polygon, Relate, Val
 use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 
-use crate::canonical::{Numerical, validate_structure};
+use crate::canonical::{Numerical, scientific_equal, validate_structure};
 use crate::error::{CrcError, Result};
 
 pub const DATASET_URI: &str = "https://climateriskcommons.org/schemas/dataset/2.0";
@@ -743,6 +743,122 @@ fn validate_report(report: &Value) -> Result<()> {
     Ok(())
 }
 
+fn sampling(value: &Value) -> Result<(f64, &str)> {
+    if !matches!(
+        value["calendar"].as_str(),
+        Some("gregorian" | "proleptic_gregorian" | "no_leap" | "all_leap" | "360_day" | "julian")
+    ) || !matches!(value["timestamp"].as_str(), Some("start" | "end"))
+    {
+        return Err(invalid(
+            "sampling requires a known calendar and timestamp position",
+        ));
+    }
+    let step = &value["step"];
+    let duration = step["value"]
+        .as_f64()
+        .filter(|v| v.is_finite() && *v > 0.0)
+        .ok_or_else(|| invalid("sampling step must be a positive finite duration"))?;
+    let unit = text(&step["unit"])?;
+    if !matches!(unit, "s" | "h" | "d" | "month" | "yr") {
+        return Err(invalid("sampling step uses an unsupported time unit"));
+    }
+    Ok((duration, unit))
+}
+
+fn validate_reduction(value: &Value) -> Result<()> {
+    let (input_value, input_unit) = sampling(&value["input_sampling"])?;
+    let (output_value, output_unit) = sampling(&value["output_sampling"])?;
+    if value["input_sampling"]["calendar"] != value["output_sampling"]["calendar"] {
+        return Err(invalid(
+            "temporal reduction cannot change the source calendar",
+        ));
+    }
+    let operation = text(&value["operation"])?;
+    let annual = matches!(operation, "annual_maximum" | "annual_minimum");
+    let rolling = operation == "rolling_total";
+    if !annual
+        && !rolling
+        && !matches!(operation, "daily_total" | "daily_maximum" | "daily_minimum")
+    {
+        return Err(invalid("unknown temporal reduction operation"));
+    }
+    if output_value != 1.0
+        || output_unit != if annual { "yr" } else { "d" }
+        || value["output_sampling"]["timestamp"] != "start"
+    {
+        return Err(invalid(
+            "temporal reduction output cadence contradicts its operation",
+        ));
+    }
+    if rolling != value.get("window").is_some() {
+        return Err(invalid("only rolling totals require a window"));
+    }
+    if rolling {
+        let window = &value["window"];
+        let width = window["value"].as_f64().unwrap_or(f64::NAN);
+        if window["unit"] != "d" || !width.is_finite() || width < 1.0 || width.fract() != 0.0 {
+            return Err(invalid(
+                "rolling totals require a positive whole-day window",
+            ));
+        }
+        if input_value != 1.0 || input_unit != "d" {
+            return Err(invalid("rolling totals require one-day input sampling"));
+        }
+    } else if annual && input_unit == "month" {
+        if input_value.fract() != 0.0 || 12.0 % input_value != 0.0 {
+            return Err(invalid(
+                "annual monthly sampling must divide twelve calendar months",
+            ));
+        }
+    } else if annual && input_unit == "yr" {
+        if input_value != 1.0 {
+            return Err(invalid(
+                "annual sampling requires one calendar-year observations",
+            ));
+        }
+    } else {
+        let factor = match input_unit {
+            "s" => 1.0,
+            "h" => 3600.0,
+            "d" => 86400.0,
+            _ => return Err(invalid("daily sampling requires a fixed time step")),
+        };
+        let per_day = 86400.0 / (input_value * factor);
+        if !per_day.is_finite()
+            || per_day < 1.0
+            || (per_day - per_day.round()).abs() > 1e-12 * per_day.abs()
+        {
+            return Err(invalid("sampling step must divide a native calendar day"));
+        }
+    }
+    if !value["coverage"]
+        .as_f64()
+        .is_some_and(|v| v.is_finite() && v > 0.0 && v <= 1.0)
+    {
+        return Err(invalid("coverage fraction must be finite and in (0, 1]"));
+    }
+    let mut variables = BTreeSet::new();
+    if let Some(changes) = value.get("measurements") {
+        for change in array(changes)? {
+            if !variables.insert(text(&change["variable_id"])?) {
+                return Err(invalid(
+                    "measurement changes must refer to distinct variables",
+                ));
+            }
+            for name in ["input", "output"] {
+                validate_structure(
+                    "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+                    &change[name],
+                )?;
+            }
+            if scientific_equal(&change["input"], &change["output"]) {
+                return Err(invalid("measurement change must change scientific meaning"));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Validate the current dataset envelope, complete scientific references, and
 /// exact source support without assigning scientific meaning to delivery cells.
 pub fn validate_dataset(value: &Value) -> Result<()> {
@@ -769,12 +885,12 @@ pub fn validate_dataset(value: &Value) -> Result<()> {
         }
     }
     validate_report(&metadata["report"])?;
-    let mut units = variables
+    let mut measurements = variables
         .iter()
         .map(|(id, v)| {
             (
                 id.clone(),
-                v["measurement"].get("unit").cloned().unwrap_or(Value::Null),
+                v.get("measurement").cloned().unwrap_or(Value::Null),
             )
         })
         .collect::<BTreeMap<_, _>>();
@@ -788,12 +904,31 @@ pub fn validate_dataset(value: &Value) -> Result<()> {
                     "unit conversion requires changed units and nonzero scale",
                 ));
             }
-            if units.get(id) != Some(&transform["target_unit"]) {
+            let measurement = measurements
+                .get_mut(id)
+                .ok_or_else(|| invalid("conversion provenance refers to an unknown variable"))?;
+            if measurement.get("unit") != Some(&transform["target_unit"]) {
                 return Err(invalid(
                     "unit conversion contradicts current variable measurement",
                 ));
             }
-            units.insert(id.into(), transform["source_unit"].clone());
+            measurement["unit"] = transform["source_unit"].clone();
+        } else if transform["kind"] == "temporal_reduction" {
+            validate_reduction(transform)?;
+            if let Some(changes) = transform.get("measurements") {
+                for change in array(changes)? {
+                    let id = text(&change["variable_id"])?;
+                    let measurement = measurements.get_mut(id).ok_or_else(|| {
+                        invalid("temporal reduction refers to an unknown variable")
+                    })?;
+                    if !scientific_equal(measurement, &change["output"]) {
+                        return Err(invalid(
+                            "temporal reduction output contradicts current variable measurement",
+                        ));
+                    }
+                    *measurement = change["input"].clone();
+                }
+            }
         } else if transform["kind"] == "observation_time_selection" {
             let period = &transform["time"];
             if period["kind"] != "window" || period_identity(period)? != text(&period["id"])? {
@@ -817,7 +952,7 @@ pub fn validate_dataset(value: &Value) -> Result<()> {
                     .iter()
                     .map(|(old, new)| Ok((text(new)?.to_owned(), old)))
                     .collect::<Result<BTreeMap<_, _>>>()?;
-                let before = units
+                let before = measurements
                     .iter()
                     .map(|(id, unit)| {
                         (
@@ -828,12 +963,12 @@ pub fn validate_dataset(value: &Value) -> Result<()> {
                         )
                     })
                     .collect::<BTreeMap<_, _>>();
-                if before.len() != units.len() {
+                if before.len() != measurements.len() {
                     return Err(invalid(
                         "rename provenance collides with participating identities",
                     ));
                 }
-                units = before;
+                measurements = before;
             }
         }
     }

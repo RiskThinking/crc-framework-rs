@@ -163,6 +163,10 @@ def build():
             accumulation_duration=science.Duration(1, unit=science.TimeUnit.DAY),
             aggregation=science.Aggregation.MAXIMUM,
         ),
+        science.PrecipitationAmount(
+            unit=science.LengthUnit.MILLIMETRE,
+            accumulation_duration=science.Duration(1, unit=science.TimeUnit.DAY),
+        ),
         science.EventCount(
             event=science.Event.FROST_DAY,
             aggregation=science.Aggregation.COUNT,
@@ -365,6 +369,7 @@ def build():
             )
         ),
     ]
+    functions.insert(4, impacts.Impact.builtin(impacts.BuiltinImpact.MAXIMUM_DAILY_PRECIPITATION).resolve(science.CellContext(cell=594475159402840063)))
     impact_uri = PREFIX + "impact-2.0.schema.json"
     for n, function in enumerate(functions):
         fixtures.append(
@@ -540,6 +545,8 @@ def reference():
         "A reference exposes its concrete `measurement_type`, complete `measurement_schema`, expected `input`, accepted units, actual typed `context_type`, and allowed context choices. Inspect `model.requirements` or `help(model.requirements.context_type)` to discover the constructor. No anonymous context factory or lowercase registry singleton is required.",
         "",
         "Some source calibrations do not establish a threshold, averaging interval, accumulation timescale or reference period. `unestablished_facts` exposes these gaps. Scientific data binding rejects them instead of guessing; supplying a plausible value on the data does not establish the published model calibration. Pure numerical `resolve` remains available for explicitly numerical work.",
+        "",
+        "Maximum daily precipitation uses ETCCDI Rx1day: the maximum daily precipitation amount in millimetres accumulated over one day ([Climdex definition](https://www.climdex.org/learn/indices/)). Its numerical response consumes that amount directly; it does not integrate a precipitation rate. The reduction is recorded in data provenance.",
         "",
         "| Model | Measurement | Context | Unestablished calibration facts |",
         "| --- | --- | --- | --- |",

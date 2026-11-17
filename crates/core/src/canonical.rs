@@ -257,7 +257,7 @@ fn validate_reference(value: &Value) -> Result<()> {
     Ok(())
 }
 
-fn scientific_equal(a: &Value, b: &Value) -> bool {
+pub(crate) fn scientific_equal(a: &Value, b: &Value) -> bool {
     match (a, b) {
         (Value::Number(a), Value::Number(b)) => {
             a == b

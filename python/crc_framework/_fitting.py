@@ -464,9 +464,9 @@ def fit_samples(
     values = np.asarray(samples, dtype=np.float64)
     if values.ndim != 1:
         raise ValueError("samples must be a one-dimensional observation sequence")
-    if values.size == 0 or not np.all(np.isfinite(values)):
+    if not np.all(np.isfinite(values)):
         raise ValueError(
-            "samples must be nonempty and finite; missing observations must be handled explicitly"
+            "samples must be finite; missing observations must be handled explicitly"
         )
     candidates = (
         specification.candidates
@@ -479,7 +479,7 @@ def fit_samples(
     successes: list[
         tuple[float, Distribution, tuple[Diagnostic, ...], SampleFit, int]
     ] = []
-    support = float(np.min(values)), float(np.max(values))
+    support = (float(np.min(values)), float(np.max(values))) if values.size else None
     used_count = 0
 
     def run(
