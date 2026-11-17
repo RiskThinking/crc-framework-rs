@@ -21,6 +21,7 @@ jobs:
           python-version: '3.12'
       - name: Format, clippy and mypy
         run: |
+          python tools/api_contracts/check.py
           cargo fmt --all -- --check
           cargo clippy --workspace --all-targets --locked -- -D warnings
           pip install numpy mypy
@@ -97,9 +98,25 @@ jobs:
         with:
           name: npm-package
           path: js/dist/*.tgz
+  runtime-contract:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build and install isolated Python wheel
+        run: |
+          uv build --wheel --python 3.12 --out-dir "$RUNNER_TEMP/contract-wheel"
+          uv venv --python 3.12 "$RUNNER_TEMP/contract-venv"
+          uv pip install --python "$RUNNER_TEMP/contract-venv/bin/python" "$RUNNER_TEMP"/contract-wheel/*.whl
+      - name: Verify installed runtime before npm publication
+        working-directory: ${{ runner.temp }}
+        run: '"$RUNNER_TEMP/contract-venv/bin/python" -I "$GITHUB_WORKSPACE/tools/api_contracts/check.py" --runtime'
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: [build, runtime-contract]
     runs-on: ubuntu-latest
     environment: production
     permissions:

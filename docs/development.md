@@ -18,6 +18,47 @@
 Python consumers should import `crc_framework`; `crc_framework._core` is an
 implementation detail that may change between releases.
 
+## Python interface contract
+
+The authoritative public interface is
+[`public-api.json`](../python/crc_framework/contracts/api/public-api.json).
+It declares constructors, methods, properties, annotations, defaults, enum
+members, semantic requirements, and removed import paths. Annotation aliases
+inside the document describe types; they are not additional root exports.
+
+[`release.json`](../python/crc_framework/contracts/api/release.json) records the
+single package and artifact version ledger. All changes to unshipped definitions
+replace those definitions in place rather than introducing transitional formats
+or another major version.
+
+Validate declarations and source version ownership without importing numerical
+implementations:
+
+```sh
+.venv/bin/python tools/api_contracts/check.py
+.venv/bin/python -m pytest tests/test_api_contracts.py -q
+```
+
+Enforce the full interface on an installed package before release:
+
+```sh
+/path/to/wheel-venv/bin/python -I /path/to/repository/tools/api_contracts/check.py --runtime
+```
+
+Runtime enforcement loads the contract and version ledger from the imported
+package itself. It checks exact exports, removed attributes and modules, method
+bindings and signatures, properties, enums, and Python/native version agreement.
+`--package-root /path/to/site-packages` optionally selects and asserts the
+installation directory; in declaration mode it reads an unpacked wheel directory
+containing `crc_framework`. Without that explicit option it uses the interpreter's
+installed package and never inserts a checkout into Python's import path. The
+installed API declaration and ledger must also match the release checkout; a
+stale wheel cannot certify itself against a different draft.
+
+Do not regenerate declarations from the runtime to conceal a mismatch. Numerical
+regressions and cross-language fixtures test scientific behavior; an old symbol
+remaining importable is not an acceptance requirement.
+
 ## Python setup and checks
 
 Run these commands from the repository root:
