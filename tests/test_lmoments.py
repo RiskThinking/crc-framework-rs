@@ -1,17 +1,31 @@
-"""Independent numerical references for the standalone native estimator."""
+"""Independent numerical references for the explicit L-moment estimator."""
 
 import math
 
 import numpy as np
 import pytest
-from crc_framework import EmpiricalDistribution, FitConstraints, fit_distribution
+from crc_framework import (
+    Distribution,
+    DistributionFamily,
+    FitConstraints,
+    SampleEstimator,
+    SampleFit,
+    fit_samples,
+)
 
 
-# Unbiased PWMs evaluated separately in NumPy, with the exact GEV L-skewness
-# equation solved by SciPy brentq and parameters evaluated with scipy.special.gamma.
-# No SciPy runtime dependency is needed to check these fixed reference cases.
+def specification(
+    family=DistributionFamily.GENERALIZED_EXTREME_VALUE, *, constraints=None
+):
+    return SampleFit(
+        family=family, estimator=SampleEstimator.L_MOMENTS, constraints=constraints
+    )
+
+
+# Unbiased PWMs evaluated independently in NumPy. GEV L-skewness roots and
+# gamma factors were evaluated with SciPy; SciPy is not a runtime dependency.
 @pytest.mark.parametrize(
-    "samples, expected",
+    "samples,parameters",
     [
         (
             [1, 2, 3, 4, 5, 6, 7, 8],
@@ -31,108 +45,115 @@ from crc_framework import EmpiricalDistribution, FitConstraints, fit_distributio
         ),
     ],
 )
-def test_gev_reference_parameters(samples, expected):
-    fit = fit_distribution(samples, "genextreme", method="lmoments")
-    d = fit.distribution
-    np.testing.assert_allclose([d.shape, d.location, d.scale], expected, rtol=2e-12)
-    assert all(math.isfinite(x) for x in vars(fit.diagnostics).values())
-    # Sorting is internal and the estimator is deterministic.
-    other = fit_distribution(
-        samples[::-1], "genextreme", method="lmoments"
-    ).distribution
-    assert (d.shape, d.location, d.scale) == (other.shape, other.location, other.scale)
+def test_gev_reference_quantiles(samples, parameters):
+    shape, location, scale = parameters
+    reference = Distribution.parametric(
+        DistributionFamily.GENERALIZED_EXTREME_VALUE,
+        shape=shape,
+        location=location,
+        scale=scale,
+    )
+    fit = fit_samples(samples, specification())
+    qs = [0.01, 0.1, 0.5, 0.9, 0.99]
+    np.testing.assert_allclose(
+        fit.distribution.quantile(qs), reference.quantile(qs), rtol=2e-12, atol=2e-12
+    )
+    other = fit_samples(samples[::-1], specification())
+    np.testing.assert_array_equal(
+        other.distribution.quantile(qs), fit.distribution.quantile(qs)
+    )
+    assert fit.record.estimator is SampleEstimator.L_MOMENTS
+    assert fit.record.converged
 
 
 def test_gumbel_analytic_and_reflected_fit():
-    # For [1,...,8], L1 = 4.5 and unbiased L2 = 1.5.
-    d = fit_distribution(list(range(1, 9)), "gumbel_r", method="lmoments").distribution
     scale = 1.5 / math.log(2)
-    assert d.scale == pytest.approx(scale, rel=1e-14)
-    assert d.location == pytest.approx(4.5 - 0.5772156649015329 * scale, rel=1e-14)
-    reflected = fit_distribution(
-        list(range(-8, 0)), "gumbel_l", method="lmoments"
-    ).distribution
-    assert reflected.location == pytest.approx(-d.location)
-    assert reflected.scale == pytest.approx(d.scale)
+    reference = Distribution.parametric(
+        DistributionFamily.GUMBEL_RIGHT,
+        scale=scale,
+        location=4.5 - 0.5772156649015329 * scale,
+    )
+    fit = fit_samples(list(range(1, 9)), specification(DistributionFamily.GUMBEL_RIGHT))
+    qs = np.array([0.1, 0.5, 0.9])
+    np.testing.assert_allclose(
+        fit.distribution.quantile(qs), reference.quantile(qs), rtol=1e-14
+    )
+    reflected = fit_samples(
+        list(range(-8, 0)), specification(DistributionFamily.GUMBEL_LEFT)
+    )
+    np.testing.assert_allclose(
+        reflected.distribution.quantile(qs),
+        -fit.distribution.quantile(1 - qs),
+        rtol=1e-14,
+    )
 
 
 @pytest.mark.parametrize("shape", [-0.4, -0.2, 0.0, 0.2, 1.2])
 def test_recovers_population_quantiles(shape):
-    from crc_framework import FittedDistribution
-
-    original = FittedDistribution("genextreme", shape=shape, location=10, scale=3)
-    data = original.quantiles((np.arange(20000) + 0.5) / 20000)
-    fitted = fit_distribution(data, "genextreme", method="lmoments").distribution
-    # Heavy tails converge slowly; compare return levels within the sample record.
+    original = Distribution.parametric(
+        DistributionFamily.GENERALIZED_EXTREME_VALUE, shape=shape, location=10, scale=3
+    )
+    samples = original.quantile((np.arange(20000) + 0.5) / 20000)
+    fitted = fit_samples(samples, specification()).distribution
     np.testing.assert_allclose(
-        fitted.quantiles([0.5, 0.9, 0.99]),
-        original.quantiles([0.5, 0.9, 0.99]),
+        fitted.quantile([0.5, 0.9, 0.99]),
+        original.quantile([0.5, 0.9, 0.99]),
         rtol=0.035,
     )
 
 
-@pytest.mark.parametrize("family", ["genextreme", "gumbel_r", "gumbel_l"])
-@pytest.mark.parametrize("scale, offset", [(1e-20, 0), (1e20, 1e22), (0.1, 1e5)])
+@pytest.mark.parametrize(
+    "family",
+    [
+        DistributionFamily.GENERALIZED_EXTREME_VALUE,
+        DistributionFamily.GUMBEL_RIGHT,
+        DistributionFamily.GUMBEL_LEFT,
+    ],
+)
+@pytest.mark.parametrize("scale,offset", [(1e-20, 0), (1e20, 1e22), (0.1, 1e5)])
 def test_affine_equivariance(family, scale, offset):
     values = np.array([0, 0, 1, 3, 8, 15, 30, 100], dtype=float)
-    base = fit_distribution(values, family, method="lmoments").distribution
-    actual = fit_distribution(
-        values * scale + offset, family, method="lmoments"
-    ).distribution
-    assert actual.shape == pytest.approx(base.shape, abs=1e-10)
-    assert actual.location == pytest.approx(base.location * scale + offset, rel=1e-10)
-    assert actual.scale == pytest.approx(base.scale * scale, rel=1e-10)
+    qs = [0.1, 0.5, 0.9]
+    base = fit_samples(values, specification(family)).distribution
+    actual = fit_samples(values * scale + offset, specification(family)).distribution
+    np.testing.assert_allclose(
+        actual.quantile(qs), base.quantile(qs) * scale + offset, rtol=1e-10
+    )
 
 
 @pytest.mark.parametrize(
     "samples", [[], [1, 2, 3], [2] * 8, [0, 1, 2, np.nan], [0, 1, 2, np.inf]]
 )
-def test_invalid_records(samples):
+def test_invalid_evidence_fails_explicitly(samples):
     with pytest.raises(ValueError):
-        fit_distribution(samples, "genextreme", method="lmoments")
+        fit_samples(samples, specification())
 
 
-def test_explicit_policy_and_constraints():
-    values = EmpiricalDistribution([1, 2, 3, 4, 5, 6, 7, 8])
-    with pytest.raises(ValueError, match="explicit family"):
-        fit_distribution(values, method="lmoments")
-    with pytest.raises(ValueError, match="no candidates"):
-        fit_distribution(values, "gumbel_r", candidates=["gumbel_r"], method="lmoments")
-    with pytest.raises(ValueError, match="supports"):
-        fit_distribution(values, "genpareto", method="lmoments")
-    with pytest.raises(ValueError, match="unknown fitting method"):
-        fit_distribution(values, "gumbel_r", method="not-an-estimator")
-    fit_distribution(
-        values,
-        "gumbel_r",
-        method="lmoments",
-        constraints=FitConstraints(minimum_value=0),
-    )
-    with pytest.raises(ValueError, match="constraints"):
-        fit_distribution(
-            values,
-            "gumbel_r",
-            method="lmoments",
-            constraints=FitConstraints(maximum_value=0),
+def test_quantile_constraint_can_reject_l_moment_estimate():
+    with pytest.raises(ValueError, match="constraint"):
+        fit_samples(
+            list(range(1, 9)),
+            specification(
+                DistributionFamily.GUMBEL_RIGHT,
+                constraints=FitConstraints(maximum_value=0, probability=0.99),
+            ),
         )
 
 
 def test_heavy_tail_estimate_converges_with_record_length():
-    from crc_framework import FittedDistribution
-
-    original = FittedDistribution("genextreme", shape=-0.8, location=10, scale=3)
-    target = original.ppf(0.99)
+    original = Distribution.parametric(
+        DistributionFamily.GENERALIZED_EXTREME_VALUE, shape=-0.8, location=10, scale=3
+    )
+    target = original.quantile(0.99)
     errors = []
     for n in (1000, 20000):
-        values = original.quantiles((np.arange(n) + 0.5) / n)
-        estimated = fit_distribution(
-            values, "genextreme", method="lmoments"
-        ).distribution
-        errors.append(abs(estimated.ppf(0.99) - target))
+        values = original.quantile((np.arange(n) + 0.5) / n)
+        estimate = fit_samples(values, specification()).distribution
+        errors.append(abs(estimate.quantile(0.99) - target))
     assert errors[1] < errors[0]
 
 
 @pytest.mark.parametrize("values", [[0, 0, 0, 1], [0, 1, 1, 1]])
 def test_degenerate_skewness_is_rejected(values):
     with pytest.raises(ValueError, match="L-skewness"):
-        fit_distribution(values, "genextreme", method="lmoments")
+        fit_samples(values, specification())

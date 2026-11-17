@@ -5,6 +5,8 @@ pub mod distribution;
 pub mod error;
 pub mod impact;
 pub mod metrics;
+pub mod numerical;
+pub mod rank;
 mod reference;
 pub mod risk;
 pub mod spatial;

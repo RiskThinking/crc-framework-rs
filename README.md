@@ -2,12 +2,12 @@
 
 CRC Framework provides a shared Rust computation core with official Python and
 JavaScript/WebAssembly bindings for climate-risk calculations. It turns hazard
-distributions into comparable impact microscores, scenario branches, and
+distributions into explicit impact laws, rank scenarios, and
 portfolio-level VaR/CVaR risk metrics.
 
 | Interface | Package | Scope |
 | --- | --- | --- |
-| Python | `crc-framework` on PyPI; import `crc_framework` | Distributions, fitting, impacts, microscores, risk aggregation, and geography |
+| Python | `crc-framework` on PyPI; import `crc_framework` | Distributions, quantile evidence, fitting, impacts, risk aggregation, and geography |
 | JavaScript / WASM | `@climateriskcommons/crc-framework` on npm | Canonical CRC curve consumption: quantile evaluation, batches, prepared handles, and TypeScript declarations |
 | Rust | `crates/core` | Shared algorithms and reference data used by both bindings |
 
@@ -77,14 +77,13 @@ and SSR setup, canonical input rules, and prepared collection APIs.
 ### Python: evaluate a return-period curve
 
 ```python
-from crc_framework import TabulatedDistribution
+from crc_framework import QuantileCurve
 
-exposure = TabulatedDistribution.from_return_periods(
-    periods=[10, 20, 50, 100, 200, 500],
+exposure = QuantileCurve(
+    probabilities=[0.9, 0.95, 0.98, 0.99, 0.995, 0.998],
     values=[0.1, 0.2, 0.5, 0.9, 1.4, 2.0],
-    tail="upper",
 )
-print(exposure.ppf(0.99))  # 100-year return level: 0.9
+print(exposure.quantile(0.99))  # 100-year upper-tail return level: 0.9
 ```
 
 ### JavaScript: consume a canonical curve
@@ -111,7 +110,7 @@ collection once, then call `evaluate(q)` and free the handle when finished.
 
 | Task | Read next |
 | --- | --- |
-| Use distributions, fitting, impacts, microscores, or risk metrics | [Python guide](docs/python.md) |
+| Use distributions, fitting, impacts, rank scenarios, or risk metrics | [Python guide](docs/python.md) |
 | Initialize WASM, prepare collections, or understand canonical inputs and errors | [JavaScript guide](docs/javascript.md) |
 | Pin schemas, validate identities, or record impact provenance | [Impact contracts](docs/impact-contracts.md) |
 | Set up the repository, run checks, or update contributor credits | [Development](docs/development.md) |

@@ -59,58 +59,57 @@ fn atom_total(impact: &ImpactDefinition, source: &ImpactSource) -> f64 {
         .sum()
 }
 
-// F1: the impact source uses the law of the empirical `ppf` (type-7
-// interpolation) for its cdf and atoms too, not the step ECDF.
+// Empirical inputs are complete ECDF laws, including all observed atoms.
 #[test]
-fn empirical_breakpoints_use_the_interpolated_quantile_law() {
+fn empirical_breakpoints_use_observed_probability_masses() {
     let binned = definition(
         r#"{"kind": "binned", "bin_edges": [-10.0, 0.5, 10.0], "values": [0.0, 1.0]}"#,
         "",
     );
     let source = empirical(&[0.0, 1.0, 2.0]);
-    // Q(p) = 2p, so P(Q(U) >= 0.5) = 0.75.
     let result = binned.expected_value(&source, MethodRequest::Auto).unwrap();
     assert!(matches!(result.method, ResolvedMethod::Exact { .. }));
-    assert!((result.value - 0.75).abs() < 1e-15);
+    assert!((result.value - 2.0 / 3.0).abs() < 1e-15);
     let distribution = binned.transform_distribution(&source).unwrap();
     let atoms = distribution.atoms();
     assert_eq!(atoms.len(), 2);
-    assert!((atoms[0].probability - 0.25).abs() < 1e-15);
-    assert!((atoms[1].probability - 0.75).abs() < 1e-15);
+    assert!((atoms[0].probability - 1.0 / 3.0).abs() < 1e-15);
+    assert!((atoms[1].probability - 2.0 / 3.0).abs() < 1e-15);
 
     let capped = definition(
         r#"{"kind": "linear", "slope": 1.0, "intercept": 0.0}"#,
         r#""clamp": {"maximum": 0.5},"#,
     );
     let result = capped.expected_value(&source, MethodRequest::Auto).unwrap();
-    // E[min(2U, 0.5)] = 0.25 * 0.25 + 0.75 * 0.5.
-    assert!((result.value - 0.4375).abs() < 1e-15);
-    let atoms = capped
-        .transform_distribution(&source)
-        .unwrap()
-        .atoms()
-        .to_vec();
-    assert_eq!(atoms.len(), 1);
-    assert!((atoms[0].probability - 0.75).abs() < 1e-15);
+    assert!((result.value - 1.0 / 3.0).abs() < 1e-15);
+    let image = capped.transform_distribution(&source).unwrap();
+    assert_eq!(image.atoms().len(), 2);
+    assert_eq!(image.atoms()[0].value, 0.0);
+    assert_eq!(image.atoms()[1].value, 0.5);
+    assert!((image.atoms()[1].probability - 2.0 / 3.0).abs() < 1e-15);
 }
 
 #[test]
-fn empirical_ties_form_atoms_spanning_their_quantile_flat() {
+fn empirical_ties_retain_their_observed_mass() {
     let identity = definition(r#"{"kind": "linear", "slope": 1.0, "intercept": 0.0}"#, "");
-    // Order statistics at p = 0, 1/3, 2/3, 1: the tie at 1 spans [0, 1/3].
     let source = empirical(&[1.0, 1.0, 3.0, 5.0]);
     let distribution = identity.transform_distribution(&source).unwrap();
     let atoms = distribution.atoms();
-    assert_eq!(atoms.len(), 1);
+    assert_eq!(atoms.len(), 3);
     assert_eq!(atoms[0].value, 1.0);
-    assert!((atoms[0].probability - 1.0 / 3.0).abs() < 1e-15);
+    assert_eq!(atoms[0].probability, 0.5);
+    assert_eq!(atoms[1].probability, 0.25);
+    assert_eq!(atoms[2].probability, 0.25);
+    let result = identity
+        .expected_value(&source, MethodRequest::Exact)
+        .unwrap();
+    assert_eq!(result.value, 2.5);
     let step = definition(
         r#"{"kind": "binned", "bin_edges": [0.0, 1.0, 2.0, 6.0], "values": [0.0, 1.0, 2.0]}"#,
         "",
     );
-    // P(X < 2) = 1/3 + (1/3) * (1/2) = 1/2 under the interpolated law.
     let result = step.expected_value(&source, MethodRequest::Auto).unwrap();
-    assert!((result.value - (0.5 * 1.0 + 0.5 * 2.0)).abs() < 1e-15);
+    assert!((result.value - 1.5).abs() < 1e-15);
 }
 
 // F2: two flat pieces meeting at a knot must not both claim its mass.

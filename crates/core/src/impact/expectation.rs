@@ -209,11 +209,55 @@ fn exact_expectation(
     clamp: &Clamp,
     source: &ImpactSource,
 ) -> ContractResult<Option<(f64, &'static str)>> {
+    // Atomic probabilities are data, not differences of rounded cumulative
+    // probabilities. Direct summation preserves even sub-ulp rare masses.
+    if source.has_piecewise_constant_quantile() {
+        let mut contributions = Vec::new();
+        for (value, probability) in source.point_atoms() {
+            contributions.push(probability * kernel::evaluate(model, clamp, value)?);
+        }
+        return Ok(Some((neumaier(contributions), EXACT_PIECEWISE_VERSION)));
+    }
+    if let Model::Binned {
+        edges,
+        values,
+        outside_domain,
+    } = model
+    {
+        if restricted_domain_exited(model, source) {
+            return Err(fail(
+                "out_of_domain",
+                "",
+                "the source support leaves the binned domain",
+            ));
+        }
+        let mut contributions = Vec::new();
+        for (index, &value) in values.iter().enumerate() {
+            let lower = if index == 0 && *outside_domain == OutsideDomain::Clamp {
+                0.0
+            } else {
+                source.cdf_below(edges[index])
+            };
+            let upper = if index + 1 == values.len() {
+                if *outside_domain == OutsideDomain::Clamp {
+                    1.0
+                } else {
+                    source.cdf(edges[index + 1])
+                }
+            } else {
+                source.cdf_below(edges[index + 1])
+            };
+            let response = clamp.maximum.map_or(value, |maximum| value.min(maximum));
+            let response = clamp
+                .minimum
+                .map_or(response, |minimum| response.max(minimum));
+            contributions.push((upper - lower).max(0.0) * response);
+        }
+        return Ok(Some((neumaier(contributions), EXACT_PIECEWISE_VERSION)));
+    }
     // A piecewise-constant quantile makes `f(Q(p))` piecewise constant for every
     // finite response, so the midpoint rule is exact weighted summation.
-    if source.has_piecewise_constant_quantile()
-        || (piecewise_linear(model) && source.has_piecewise_linear_quantile())
-    {
+    if piecewise_linear(model) && source.has_piecewise_linear_quantile() {
         return Ok(Some((
             piecewise_expectation(model, clamp, source)?,
             EXACT_PIECEWISE_VERSION,

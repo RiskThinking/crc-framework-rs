@@ -1,55 +1,41 @@
-# Impact contracts and provenance
+# Impact mathematics and identities
 
-[Documentation index](README.md) · [Project README](../README.md)
+[Documentation index](README.md) · [Python guide](python.md)
 
-`crc_framework.contracts` publishes the `crc-impact-contracts` artifact, currently
-version `1.0.0`, with JSON Schemas, accepted and rejected examples, canonical JSON
-and SHA-256 identities, numerical reference cases, and catalogs of errors, units,
-and versioned semantics.
+The public mathematical interface is `Impact`: evaluate points with `evaluate`,
+integrate a complete law with `expectation`, or create its exact response law
+with `pushforward`. The same resolved function applies to custom data and
+prebuilt datasets. Variable and pathway names do not alter the mathematics.
 
-The contracts separate the reusable function from caller data, execution
-provenance, and application policy:
-
-| Contract | Responsibility |
-| --- | --- |
-| `impact_definition` | Calibration quantity and units, model parameters, final clamp, and function provenance |
-| `registry_impact_reference` | Pinned registry revision and manifest, factor, context defaults, overrides, and fallback policy |
-| `impact_evaluation_record` | Function and source identities, operation, preprocessing, engine, diagnostics, and replay information |
-| `spatial_combination_policy` | Application choice to combine aligned point exposures before evaluation or combine impacts afterward |
-| `spatial_impact_evaluation_record` | Spatial policy identity, contributors, geometry coverage, weights, and child evaluation records |
-
-A definition describes the impact function independently of a dataset or output
-format. Evaluation records describe how it was applied. Spatial combination is a
-separate application policy; combination of whole source distributions remains
-deferred.
-
-Artifact versions, wire `schema_version`, and numerical `semantics_version` have
-separate roles. Registry references also pin resolver semantics and reference
-data. Persist these identities with the evaluation provenance to make numerical
-choices and data dependencies explicit.
-
-Inspect the packaged artifact without importing development tooling:
+Input and output `Measurement` declarations describe the function's quantities
+and units. A built-in `ImpactReference` additionally pins its model identity and
+reference tables; `requirements` describes the input science and typed context
+needed to resolve it. Resolution produces an ordinary context-free `Impact`.
 
 ```python
-from crc_framework.contracts import (
-    impact_contract_manifest_sha256,
-    load_impact_fixtures,
-    load_impact_schema,
-    verify_impact_contracts,
-)
+from crc_framework import Distribution, Impact, Ratio
 
-verify_impact_contracts()
-manifest_sha256 = impact_contract_manifest_sha256()
-schema = load_impact_schema("impact_definition")
-examples = load_impact_fixtures("impact_definition")
+function = Impact.linear(slope=-2, intercept=3, input=Ratio(), output=Ratio())
+source = Distribution.discrete([0, 1], [0.9, 0.1])
+response = function.pushforward(source)
+assert response.mass(1) == 0.1
+assert response.mass(3) == 0.9
 ```
 
-Consumers should compare the manifest SHA-256 with their pinned value and verify
-the listed file digests before using the artifact. The SDK's internal contract
-loader performs both checks. A verified manifest identifies the exact contract
-files; replay also depends on the source data and provenance in each record.
+Point evaluation preserves scalar and array shape. Exact pushforwards preserve
+atoms and threshold conventions even when the function decreases. Unsupported
+exact operations raise an explicit capability error. No implicit quantile grid
+or approximation policy substitutes for a probability law.
 
-The artifact supplies contracts and conformance expectations. Executable impacts
-continue to use the classes described above. The
-[native capability catalog](../python/crc_framework/contracts/impact/catalogs/native-capabilities.json)
-tracks which fixture families the native implementation currently supports.
+Public impact serialization uses format `2.0`. `to_json` includes the calibrated
+input and output declarations; `from_json` validates the current envelope.
+`sha256` identifies the canonical mathematical definition and its declarations.
+Numerical laws have their separate format `1.0`, including recorded completion
+and conditioning choices.
+
+The shared Rust kernels and independent Python reference implementation have
+scientific fixtures for boundary conventions, point values, integration, and
+pushforward atoms. Their generated resources are implementation assets, not a
+second Python mathematical API. Edit kernel reference sources in
+`tools/impact_contracts`, regenerate their resources, and run their integrity and
+numerical conformance checks with the relevant native tests.

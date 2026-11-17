@@ -4,7 +4,7 @@ mod expectation;
 mod json;
 mod kernel;
 mod pushforward;
-mod quadrature;
+pub(crate) mod quadrature;
 mod record;
 mod reference;
 mod registry;

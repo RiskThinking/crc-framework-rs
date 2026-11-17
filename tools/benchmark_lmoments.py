@@ -31,8 +31,7 @@ from pathlib import Path
 import mpmath as mp
 import numpy as np
 import scipy
-from crc_framework import fit_distribution
-from crc_framework.distributions.fitting import _samples
+from crc_framework import DistributionFamily, SampleEstimator, SampleFit, fit_samples
 from scipy import stats
 from threadpoolctl import threadpool_limits
 
@@ -198,7 +197,7 @@ def accuracy(probe, rng):
         cases[f"random_{i}"] = rng.lognormal(sigma=1.5, size=int(rng.integers(4, 201)))
     for name, values in cases.items():
         reference = exact_moments(values)
-        rust = probe.moments(_samples(values))
+        rust = probe.moments(np.asarray(values, dtype=np.float64).tolist())
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)
             scipy_value = stats.lmoment(values, order=[1, 2, 3], standardize=False)
@@ -327,7 +326,7 @@ def benchmarks(probe, rng):
             {
                 "kind": "proposed_conversion_only",
                 "n": n,
-                "production_samples": measure(lambda values=values: _samples(values)),
+                "production_samples": measure(lambda values=values: np.asarray(values, dtype=np.float64).tolist()),
                 "numpy_tolist": measure(lambda values=values: values.tolist()),
                 "rust_with_tolist": measure(
                     lambda values=values: probe.moments(values.tolist())
@@ -340,8 +339,9 @@ def benchmarks(probe, rng):
                 "kind": "crc_full_gev_fit_context_only",
                 "n": n,
                 "crc": measure(
-                    lambda values=values: fit_distribution(
-                        values, "genextreme", method="lmoments"
+                    lambda values=values: fit_samples(
+                        values, SampleFit(family=DistributionFamily.GENERALIZED_EXTREME_VALUE,
+                                          estimator=SampleEstimator.L_MOMENTS)
                     )
                 ),
             }
@@ -350,7 +350,7 @@ def benchmarks(probe, rng):
         x = rng.lognormal(size=(count, 30))
 
         def rust(x=x):
-            return np.asarray([probe.moments(_samples(row)) for row in x]).T
+            return np.asarray([probe.moments(np.asarray(row, dtype=np.float64).tolist()) for row in x]).T
 
         def scipy_fn(x=x):
             return stats.lmoment(
