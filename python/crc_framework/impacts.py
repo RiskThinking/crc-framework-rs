@@ -6,10 +6,9 @@ import hashlib
 import json
 import math
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, make_dataclass
+from dataclasses import dataclass
 from enum import Enum
 from itertools import pairwise
-from types import MappingProxyType
 from typing import cast
 
 import numpy as np
@@ -18,17 +17,42 @@ from . import _core
 from ._diagnostics import ScientificValue
 from ._distribution import ArrayLike, Distribution, ValueResult, Values, _snapshot
 from ._measurement import (
-    BuildingType,
-    ContextValue,
+    _CONTEXT_DEFINITIONS,
+    Aggregation,
+    AssetType,
+    CellContext,
+    ClimateIndex,
+    ClimateIndexKind,
+    CoolingCostContext,
+    CountryContext,
+    CropContext,
+    DegreeDays,
+    DegreeDayUnit,
     DepthAboveGround,
+    Duration,
+    EmptyContext,
+    Event,
+    EventCount,
+    FloodRegion,
     ImpactContext,
     InundationContext,
     LengthUnit,
     Measurement,
+    PrecipitationRate,
+    PrecipitationRateUnit,
     Ratio,
     RatioUnit,
+    SpeedUnit,
+    TimeUnit,
     Unit,
+    WaterCostContext,
+    WindSpeed,
+    _canonical_value,
+    _freeze,
     _measurement,
+    _measurement_schema,
+    _scientific_equal,
+    _validate_scientific,
 )
 
 
@@ -75,7 +99,12 @@ def _scaled_square(scale: float, value: float) -> float:
 
 
 def _dumps(value: object) -> str:
-    return json.dumps(value, allow_nan=False, sort_keys=True, separators=(",", ":"))
+    return json.dumps(
+        _canonical_value(cast(ScientificValue, value)),
+        allow_nan=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
 
 
 def _pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
@@ -157,9 +186,7 @@ class Impact:
             "semantics_version": "crc-impact/1",
             "calibration": calibration,
             "model": dict(model),
-            "provenance": {"origin": {"kind": "user_defined"}}
-            if provenance is None
-            else dict(provenance),
+            "provenance": {"origin": {"kind": "user_defined"}},
         }
         if clamp is not None:
             internal["clamp"] = dict(clamp)
@@ -167,7 +194,7 @@ class Impact:
             native = _core.NativeImpactExpression.from_json(_dumps(internal))
         except Exception as error:
             raise _error(error) from error
-        return cls._from_native(native, input, output)
+        return cls._from_native(native, input, output, provenance=provenance)
 
     @classmethod
     def _from_native(
@@ -175,6 +202,8 @@ class Impact:
         native: _core.NativeImpactExpression,
         input: Measurement,
         output: Measurement,
+        *,
+        provenance: Mapping[str, object] | None = None,
     ) -> Impact:
         compiled = _load(native.canonical_json())
         model = cast(dict[str, object], compiled["model"])
@@ -196,13 +225,8 @@ class Impact:
                 for key, value in cast(dict[str, object], compiled["clamp"]).items()
                 if value is not None
             }
-        provenance = {
-            key: value
-            for key, value in cast(dict[str, object], compiled["provenance"]).items()
-            if value != []
-        }
-        if provenance != {"origin": {"kind": "user_defined"}}:
-            document["provenance"] = provenance
+        if provenance is not None:
+            document["provenance"] = dict(provenance)
         instance = object.__new__(cls)
         object.__setattr__(instance, "_native", native)
         object.__setattr__(instance, "_input", input)
@@ -769,6 +793,33 @@ class Impact:
     @classmethod
     def from_json(cls, text: str) -> Impact:
         document = _load(text)
+        if document.get("schema_version") != "2.0":
+            raise ImpactError(
+                "unsupported_schema_version",
+                "/schema_version",
+                "expected impact schema 2.0",
+            )
+        try:
+            _measurement(document.get("input"))
+            _measurement(document.get("output"))
+            _validate_scientific("impact-2.0.schema.json", document)
+        except (TypeError, ValueError) as error:
+            raise ImpactError("invalid_fields", "", str(error)) from error
+        if "provenance" in document:
+            proof = cast(dict[str, object], document["provenance"])
+            reference = ImpactReference.from_json(_dumps(proof["model"]))
+            context = ImpactContext.from_json(_dumps(proof["context"]))
+            resolved = reference.resolve(context)
+            if not _scientific_equal(
+                cast(ScientificValue, document),
+                cast(ScientificValue, _load(resolved.to_json())),
+            ):
+                raise ImpactError(
+                    "provenance_mismatch",
+                    "/provenance",
+                    "resolved model, calibration or context contradicts its pinned provenance",
+                )
+            return resolved
         required = {"schema_version", "input", "output", "model"}
         allowed = required | {"clamp", "provenance"}
         if document.get("schema_version") != "2.0":
@@ -814,31 +865,38 @@ class BuiltinImpact(Enum):
     CONSECUTIVE_DRY_DAYS = "crc:consecutive_dry_days"
 
 
-_FACTORS = dict(
-    zip(
-        BuiltinImpact,
-        (
-            "daily_freezethaw_cycles",
-            "frost_days",
-            "rx1day",
-            "cyclone",
-            "wind_max_daily_max",
-            "fwi",
-            "hot_days",
-            "cflood",
-            "rflood",
-            "inundation",
-            "spei",
-            "cooling_degree_days",
-            "maximum_consecutive_dry_days",
-        ),
-    )
-)
-_BUILDING_NAMES = {
-    BuildingType.RESIDENTIAL: "Residential buildings",
-    BuildingType.COMMERCIAL: "Commercial buildings",
-    BuildingType.INDUSTRIAL: "Industrial buildings",
-    BuildingType.AGRICULTURAL: "Agricultural buildings",
+_FACTORS = {
+    BuiltinImpact.FREEZE_THAW_CYCLES: "daily_freezethaw_cycles",
+    BuiltinImpact.FROST_DAYS: "frost_days",
+    BuiltinImpact.MAXIMUM_DAILY_PRECIPITATION: "rx1day",
+    BuiltinImpact.CYCLONE: "cyclone",
+    BuiltinImpact.MAXIMUM_DAILY_WIND_SPEED: "wind_max_daily_max",
+    BuiltinImpact.FIRE_WEATHER_INDEX: "fwi",
+    BuiltinImpact.HOT_DAYS: "hot_days",
+    BuiltinImpact.COASTAL_FLOOD: "cflood",
+    BuiltinImpact.RIVER_FLOOD: "rflood",
+    BuiltinImpact.INUNDATION: "inundation",
+    BuiltinImpact.STANDARDIZED_PRECIPITATION_EVAPOTRANSPIRATION_INDEX: "spei",
+    BuiltinImpact.COOLING_DEGREE_DAYS: "cooling_degree_days",
+    BuiltinImpact.CONSECUTIVE_DRY_DAYS: "maximum_consecutive_dry_days",
+}
+_ASSET_NAMES = {
+    AssetType.RESIDENTIAL: "Residential buildings",
+    AssetType.COMMERCIAL: "Commercial buildings",
+    AssetType.INDUSTRIAL: "Industrial buildings",
+    AssetType.AGRICULTURAL_BUILDING: "Agricultural buildings",
+    AssetType.TRANSPORT: "Transport",
+    AssetType.ROADS: "Infrastructure - roads",
+    AssetType.AGRICULTURAL_LAND: "Agriculture",
+}
+_REGION_NAMES = {
+    FloodRegion.AFRICA: "Africa",
+    FloodRegion.ASIA: "Asia",
+    FloodRegion.EUROPE: "Europe",
+    FloodRegion.NORTH_AMERICA: "North America",
+    FloodRegion.SOUTH_AMERICA: "South America",
+    FloodRegion.OCEANIA: "Oceania",
+    FloodRegion.GLOBAL: "Global",
 }
 
 
@@ -852,87 +910,169 @@ class ContextField:
 
 @dataclass(frozen=True)
 class ImpactRequirements:
+    """Published model science. Numerical resolution does not assert data binding.
+
+    ``unestablished_facts`` explicitly identifies calibration facts absent from
+    published source tables. Supplying a plausible value cannot fill those gaps.
+    """
+
+    input: Measurement
     measurement_type: type[Measurement]
-    accepted_units: tuple[Unit, ...]
+    measurement_schema: Mapping[str, ScientificValue]
+    accepted_units: tuple[Unit | str, ...]
     context_type: type[ImpactContext]
     context_fields: tuple[ContextField, ...]
+    unestablished_facts: tuple[str, ...]
     output: Measurement
 
+    def bind(self, measurement: Measurement) -> None:
+        if not isinstance(measurement, self.measurement_type):
+            raise ImpactError(
+                "measurement_type_mismatch",
+                "/measurement",
+                f"requires {self.measurement_type.__name__}; inspect model.requirements.measurement_schema for its typed constructor fields",
+            )
+        unit = measurement.unit
+        if unit not in self.accepted_units:
+            expected = ", ".join(repr(v) for v in self.accepted_units)
+            raise ImpactError(
+                "unit_mismatch",
+                "/measurement/unit",
+                f"current unit {unit!r}; accepted units: {expected}. Convert numerical values with convert_units(variable=..., unit=...) before binding; relabelling does not convert data",
+            )
+        if self.unestablished_facts:
+            raise ImpactError(
+                "calibration_unestablished",
+                "/measurement",
+                "published calibration has not established: "
+                + ", ".join(self.unestablished_facts)
+                + "; data binding is unavailable until those model-owned facts are published",
+            )
+        if measurement != self.input:
+            raise ImpactError(
+                "measurement_mismatch",
+                "/measurement",
+                f"requires {self.input!r}; datum, threshold, duration, aggregation and reference facts cannot be repaired by changing units",
+            )
 
-class _ContextRecord:
-    def __post_init__(self) -> None:
-        for name in self.__annotations__:
-            value = getattr(self, name)
-            if isinstance(value, ContextValue) and not isinstance(value, Enum):
-                continue
-            if name == "building_type":
-                if not isinstance(value, BuildingType):
-                    raise TypeError(
-                        "building_type must be BuildingType or a context binding"
-                    )
-            elif name == "historic_mean":
-                if (
-                    isinstance(value, bool)
-                    or not isinstance(value, (int, float))
-                    or not math.isfinite(value)
-                ):
-                    raise TypeError("historic_mean must be finite or a context binding")
-            elif not isinstance(value, str) or not value or value.strip() != value:
-                raise TypeError(
-                    f"{name} must be a nonempty identifier or a context binding"
-                )
 
-    @property
-    def schema(self) -> Mapping[str, ScientificValue]:
-        return MappingProxyType(
-            {
-                field: str(annotation)
-                for field, annotation in self.__annotations__.items()
-            }
+@dataclass(frozen=True)
+class _ModelScience:
+    input: Measurement
+    measurement_type: type[Measurement]
+    context_type: type[ImpactContext]
+    unestablished: tuple[str, ...] = ()
+
+
+def _model_science(model: BuiltinImpact) -> _ModelScience:
+    if model in (
+        BuiltinImpact.INUNDATION,
+        BuiltinImpact.COASTAL_FLOOD,
+        BuiltinImpact.RIVER_FLOOD,
+    ):
+        return _ModelScience(
+            DepthAboveGround(unit=LengthUnit.METRE), DepthAboveGround, InundationContext
         )
+    if model in (
+        BuiltinImpact.FREEZE_THAW_CYCLES,
+        BuiltinImpact.FROST_DAYS,
+        BuiltinImpact.HOT_DAYS,
+    ):
+        event = {
+            BuiltinImpact.FREEZE_THAW_CYCLES: Event.FREEZE_THAW_CYCLE,
+            BuiltinImpact.FROST_DAYS: Event.FROST_DAY,
+            BuiltinImpact.HOT_DAYS: Event.HOT_DAY,
+        }[model]
+        return _ModelScience(
+            EventCount(event=event, aggregation=Aggregation.COUNT),
+            EventCount,
+            EmptyContext if model is BuiltinImpact.HOT_DAYS else CellContext,
+            ("event threshold", "counting duration", "calibration reference period"),
+        )
+    if model is BuiltinImpact.MAXIMUM_DAILY_PRECIPITATION:
+        return _ModelScience(
+            PrecipitationRate(
+                unit=PrecipitationRateUnit.MILLIMETRES_PER_DAY,
+                accumulation_duration=Duration(1, unit=TimeUnit.DAY),
+                aggregation=Aggregation.MAXIMUM,
+            ),
+            PrecipitationRate,
+            CellContext,
+            ("calibration reference period",),
+        )
+    if model in (BuiltinImpact.CYCLONE, BuiltinImpact.MAXIMUM_DAILY_WIND_SPEED):
+        return _ModelScience(
+            WindSpeed(
+                unit=SpeedUnit.METRES_PER_SECOND, aggregation=Aggregation.MAXIMUM
+            ),
+            WindSpeed,
+            CountryContext,
+            ("wind averaging duration", "calibration reference period"),
+        )
+    if model is BuiltinImpact.FIRE_WEATHER_INDEX:
+        return _ModelScience(
+            ClimateIndex(index=ClimateIndexKind.FIRE_WEATHER_INDEX),
+            ClimateIndex,
+            EmptyContext,
+        )
+    if model is BuiltinImpact.STANDARDIZED_PRECIPITATION_EVAPOTRANSPIRATION_INDEX:
+        return _ModelScience(
+            ClimateIndex(
+                index=ClimateIndexKind.STANDARDIZED_PRECIPITATION_EVAPOTRANSPIRATION_INDEX
+            ),
+            ClimateIndex,
+            WaterCostContext,
+            ("index accumulation duration", "index reference period"),
+        )
+    if model is BuiltinImpact.COOLING_DEGREE_DAYS:
+        return _ModelScience(
+            Measurement(quantity="degree_days", unit=DegreeDayUnit.KELVIN_DAYS),
+            DegreeDays,
+            CoolingCostContext,
+            (
+                "temperature threshold",
+                "accumulation duration",
+                "calibration reference period",
+            ),
+        )
+    return _ModelScience(
+        EventCount(event=Event.DRY_DAY, aggregation=Aggregation.MAXIMUM),
+        EventCount,
+        CropContext,
+        (
+            "dry-day precipitation threshold",
+            "consecutive-event reduction",
+            "calibration reference period",
+        ),
+    )
 
-    def to_json(self) -> str:
-        values: dict[str, object] = {}
-        for name in self.__annotations__:
-            value = getattr(self, name)
-            if isinstance(value, Enum):
-                values[name] = value.value
-            elif isinstance(value, ContextValue):
-                values[name] = {"column": value.name}
-            else:
-                values[name] = value
-        return _dumps(values)
 
-
-_CONTEXT_TYPES: dict[tuple[str, ...], type[ImpactContext]] = {}
-
-
-def _context_type(fields: tuple[str, ...]) -> type[ImpactContext]:
-    if fields == ("continent", "building_type"):
-        return InundationContext
-    if fields not in _CONTEXT_TYPES:
-        annotations: dict[str, object] = {
-            name: BuildingType | ContextValue
-            if name == "building_type"
-            else float | ContextValue
+def _context_fields(context_type: type[ImpactContext]) -> tuple[ContextField, ...]:
+    kind = context_type._kind
+    fields = _CONTEXT_DEFINITIONS[kind]
+    result: list[ContextField] = []
+    for name in fields:
+        choices: tuple[str, ...] = ()
+        annotation = "ContextValue | " + (
+            "int"
+            if name == "cell"
+            else "float"
             if name == "historic_mean"
-            else str | ContextValue
-            for name in fields
-        }
-        generated = make_dataclass(
-            "ModelContext",
-            list(annotations.items()),
-            bases=(_ContextRecord,),
-            frozen=True,
-            kw_only=True,
-            namespace={"__module__": "crc_framework.impacts"},
+            else "FloodRegion"
+            if name == "region"
+            else "AssetType"
+            if name == "asset_type"
+            else "str"
         )
-        _CONTEXT_TYPES[fields] = cast(type[ImpactContext], generated)
-    return _CONTEXT_TYPES[fields]
+        choices = tuple(
+            cast(list[str], cast(dict[str, object], fields[name]).get("enum", []))
+        )
+        result.append(ContextField(name, annotation, True, choices))
+    return tuple(result)
 
 
 class ImpactReference:
-    """Pinned built-in identity. Resolve the model's typed context once."""
+    """Pinned built-in identity with model-owned science and exact context schemas."""
 
     _model: BuiltinImpact
     _version: str
@@ -951,7 +1091,7 @@ class ImpactReference:
             "schema_version": "2.0",
             "id": model.value,
             "version": version,
-            "manifest_sha256": digest,
+            "manifest_sha256": "sha256:" + digest,
         }
         instance = object.__new__(cls)
         object.__setattr__(instance, "_model", model)
@@ -990,126 +1130,88 @@ class ImpactReference:
 
     @property
     def requirements(self) -> ImpactRequirements:
-        metadata = self._metadata()
-        calibration = cast(dict[str, str], metadata["calibration"])
-        fields = tuple(cast(list[str], metadata["required_context"]))
-        measurement = self._input()
-        units = (measurement.unit,) if isinstance(measurement.unit, Enum) else ()
-        building_choices = (
-            (BuildingType.AGRICULTURAL,)
-            if self._model is BuiltinImpact.CONSECUTIVE_DRY_DAYS
-            else (
-                tuple(BuildingType)
-                if self._model is BuiltinImpact.COOLING_DEGREE_DAYS
-                else (
-                    BuildingType.RESIDENTIAL,
-                    BuildingType.COMMERCIAL,
-                    BuildingType.INDUSTRIAL,
-                )
-            )
-        )
-        context_fields = tuple(
-            ContextField(
-                name,
-                "BuildingType"
-                if name == "building_type"
-                else "float"
-                if name == "historic_mean"
-                else "str",
-                True,
-                tuple(item.value for item in building_choices)
-                if name == "building_type"
-                else (),
-            )
-            for name in fields
-        )
+        science = _model_science(self._model)
+        schema_kind = {
+            DepthAboveGround: "depth_above_ground",
+            EventCount: "event_count",
+            PrecipitationRate: "precipitation_rate",
+            WindSpeed: "wind_speed",
+            ClimateIndex: "climate_index",
+            DegreeDays: "degree_days",
+        }[science.measurement_type]
         return ImpactRequirements(
-            type(measurement),
-            cast(tuple[Unit, ...], units),
-            _context_type(fields),
-            context_fields,
-            self._output(calibration),
+            science.input,
+            science.measurement_type,
+            cast(
+                Mapping[str, ScientificValue],
+                _freeze(cast(ScientificValue, _measurement_schema(schema_kind))),
+            ),
+            (cast(Unit | str, science.input.unit),),
+            science.context_type,
+            _context_fields(science.context_type),
+            science.unestablished,
+            self._output(cast(dict[str, str], self._metadata()["calibration"])),
         )
 
     def _input(self) -> Measurement:
-        metadata = self._metadata()
-        calibration = cast(dict[str, str], metadata["calibration"])
-        if self._model in (
-            BuiltinImpact.INUNDATION,
-            BuiltinImpact.COASTAL_FLOOD,
-            BuiltinImpact.RIVER_FLOOD,
-        ):
-            return DepthAboveGround(unit=LengthUnit.METRE)
-        return _measurement(
-            {
-                "kind": "measurement",
-                "quantity": calibration["exposure_variable"],
-                "unit": calibration["exposure_unit"],
-                "fields": {},
-                "schema": None,
-            }
-        )
+        return _model_science(self._model).input
 
     @staticmethod
     def _output(calibration: Mapping[str, str]) -> Measurement:
         if calibration["impact_metric"] == "damage_ratio":
             return Ratio()
-        # These models divide monetary responses by their stated normalization
-        # scale; crop response is a fractional yield change. Their numerical
-        # definitions therefore declare dimensionless outputs directly.
-        quantities = {
-            "normalized_water_cost": "normalized_water_cost",
-            "normalized_cooling_cost": "normalized_cooling_cost",
-            "crop_yield_change": "crop_yield_change",
-        }
-        quantity = quantities[calibration["impact_metric"]]
-        return Measurement(quantity=quantity, unit=RatioUnit.FRACTION)
+        return Measurement(
+            quantity=calibration["impact_metric"], unit=RatioUnit.FRACTION
+        )
 
     def resolve(self, context: ImpactContext | None = None) -> Impact:
         required = self.requirements
-        if context is not None and not isinstance(context, required.context_type):
+        if context is None:
+            if required.context_type is not EmptyContext:
+                raise ImpactError(
+                    "missing_context",
+                    "/context",
+                    f"use {required.context_type.__name__}("
+                    + ", ".join(f.name + "=..." for f in required.context_fields)
+                    + ")",
+                )
+            context = EmptyContext()
+        if not isinstance(context, required.context_type):
             raise ImpactError(
                 "invalid_context",
                 "/context",
                 f"use {required.context_type.__name__} with fields "
-                + ", ".join(field.name for field in required.context_fields),
+                + ", ".join(f.name for f in required.context_fields),
             )
-        values = {} if context is None else json.loads(context.to_json())
+        values = json.loads(context.to_json())
+        values.pop("kind")
         for field in required.context_fields:
-            if field.name not in values or values[field.name] is None:
-                raise ImpactError(
-                    "missing_context",
-                    "/context/" + field.name,
-                    f"{required.context_type.__name__}.{field.name} is required",
-                )
-        for name, value in values.items():
+            value = values[field.name]
             if isinstance(value, dict):
                 raise ImpactError(
                     "unresolved_context",
-                    "/context/" + name,
+                    "/context/" + field.name,
                     "resolve asset-column bindings before numerical use",
                 )
-        building = values.get("building_type")
-        if building is not None:
-            choices = next(
-                field.choices
-                for field in required.context_fields
-                if field.name == "building_type"
-            )
-            if building not in choices:
+            if field.choices and value not in field.choices:
                 raise ImpactError(
                     "unsupported_context",
-                    "/context/building_type",
-                    "accepted BuildingType values: " + ", ".join(choices),
+                    "/context/" + field.name,
+                    "accepted values: " + ", ".join(field.choices),
                 )
-            try:
-                values["building_type"] = _BUILDING_NAMES[BuildingType(building)]
-            except (KeyError, ValueError) as error:
-                raise ImpactError(
-                    "unsupported_context",
-                    "/context/building_type",
-                    "use a supported BuildingType",
-                ) from error
+        private: dict[str, object] = {}
+        if "cell" in values:
+            private["cell"] = format(int(values["cell"]), "x")
+        if "country" in values:
+            private["country"] = values["country"]
+        if "historic_mean" in values:
+            private["historic_mean"] = values["historic_mean"]
+        if "region" in values:
+            private["continent"] = _REGION_NAMES[FloodRegion(values["region"])]
+        if "asset_type" in values:
+            private["building_type"] = _ASSET_NAMES[AssetType(values["asset_type"])]
+        if self._model is BuiltinImpact.CONSECUTIVE_DRY_DAYS:
+            private["building_type"] = _ASSET_NAMES[AssetType.AGRICULTURAL_BUILDING]
         registry, version, resolver, digest = _core.impact_registry_identity()
         if self._version != version or self._manifest != digest:
             raise ImpactError(
@@ -1117,7 +1219,7 @@ class ImpactReference:
                 "",
                 "the pinned built-in version is not installed",
             )
-        reference = {
+        internal = {
             "schema_version": "1.0",
             "registry_id": registry,
             "registry_revision": version,
@@ -1127,18 +1229,23 @@ class ImpactReference:
             "fallback_policy": "error",
         }
         try:
-            native_reference = _core.NativeImpactReference.from_json(_dumps(reference))
-            native = native_reference.resolve(
-                values.get("cell"),
-                values.get("country"),
-                values.get("continent"),
-                values.get("building_type"),
-                values.get("historic_mean"),
+            reference = _core.NativeImpactReference.from_json(_dumps(internal))
+            native = reference.resolve(
+                cast(str | None, private.get("cell")),
+                cast(str | None, private.get("country")),
+                cast(str | None, private.get("continent")),
+                cast(str | None, private.get("building_type")),
+                cast(float | None, private.get("historic_mean")),
             )
         except Exception as error:
             raise _error(error) from error
-        calibration = cast(dict[str, str], self._metadata()["calibration"])
-        return Impact._from_native(native, self._input(), self._output(calibration))
+        provenance = {
+            "model": _load(self.to_json()),
+            "context": _load(context.to_json()),
+        }
+        return Impact._from_native(
+            native, self._input(), required.output, provenance=provenance
+        )
 
     def to_json(self) -> str:
         return self._json

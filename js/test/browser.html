@@ -1,47 +1,39 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>CRC Framework browser parity</title>
+<title>CRC numerical contract conformance</title>
 <pre id="result">Loading WASM…</pre>
 <script type="module">
-import init, {evaluateCurve, evaluateCurves, prepareCurve, prepareCurves} from '../src/index.js';
+import init, {quantile,prepareNumerical,prepareNumericals} from '../src/index.js';
 try {
-  const start=performance.now();
-  await Promise.all([init(),init()]);
-  const initMs=performance.now()-start;
-  const cases=await (await fetch('../../tests/fixtures/canonical-quantiles.json')).json();
-  let assertions=0;
-  for (const fixture of cases) {
-    const prepared=prepareCurve(fixture.properties);
-    try {
-      const values=prepared.quantiles(fixture.probabilities);
-      fixture.probabilities.forEach((q,index)=>{
-        const expected=fixture.expected[index];
-        for(const actual of [evaluateCurve(fixture.properties,q),evaluateCurves([fixture.properties],q)[0],values[index]]) {
-          if(expected===null ? actual!==null : Math.abs(actual-expected)>2e-10*Math.max(1,Math.abs(expected))) {
-            throw new Error(`${fixture.name} q=${q}: ${actual} != ${expected}`);
-          }
-          assertions++;
-        }
-      });
-    } finally {prepared.free();}
-  }
-  const collection = prepareCurves(cases.map(fixture=>fixture.properties));
+ const start=performance.now();
+ await Promise.all([init(),init()]);
+ const initMs=performance.now()-start;
+ const cases=await (await fetch('../../python/crc_framework/contracts/numerical/fixtures-1.0.json')).json();
+ let assertions=0;
+ for(const fixture of cases.accepted) {
+  const text=JSON.stringify(fixture.document),prepared=prepareNumerical(text);
   try {
-    for (const q of [0,.1,.2,.5,.9,.99,.9985,1]) {
-      const values = collection.evaluate(q);
-      cases.forEach((fixture,index)=>{
-        const expected=evaluateCurve(fixture.properties,q);
-        if(!Object.is(values[index],expected)) throw new Error('Prepared batch parity failed');
-        assertions++;
-      });
+   for(const query of fixture.queries) {
+    if(query.outcome==='out_of_support') {
+     let rejected=false;try {prepared.quantile(query.probability);} catch {rejected=true;}
+     if(!rejected) throw new Error('outside evidence was accepted');
+     assertions++;continue;
     }
-  } finally {collection.free();}
-  const row={curve_kind:'tabulated',curve_type:'linear_probability',curve_probabilities:'[0.2,0.8]',curve_values:'[1,4]'};
-  if(Math.abs(evaluateCurve(row,.5)-2.5)>1e-12) throw new Error('MVT decoding failed');
-  document.querySelector('#result').textContent=JSON.stringify({status:'passed',assertions,initMs});
-  window.testResult={status:'passed',assertions,initMs};
-} catch(error) {
-  document.querySelector('#result').textContent=error.stack;
-  window.testResult={status:'failed',error:String(error)};
-}
+    const expected=query.outcome==='positive_infinity'?Infinity:query.outcome==='negative_infinity'?-Infinity:query.value;
+    for(const actual of [quantile(text,query.probability),prepared.quantile(query.probability)]) {
+     if(Number.isFinite(expected)?Math.abs(actual-expected)>2e-10*Math.max(1,Math.abs(expected)):actual!==expected) throw new Error(`${fixture.name}: ${actual} != ${expected}`);
+     assertions++;
+    }
+   }
+  } finally {prepared.free();}
+ }
+ const documents=cases.accepted.filter(c=>c.document.object==='distribution').map(c=>c.document);
+ const batch=prepareNumericals(JSON.stringify(documents));
+ try {
+  const values=batch.quantile(.99);
+  documents.forEach((doc,index)=>{if(values[index]!==quantile(JSON.stringify(doc),.99)) throw new Error('batch mismatch');assertions++;});
+ } finally {batch.free();}
+ window.testResult={status:'passed',assertions,initMs};
+ document.querySelector('#result').textContent=JSON.stringify(window.testResult);
+} catch(error) {window.testResult={status:'failed',error:String(error)};document.querySelector('#result').textContent=error.stack;}
 </script>

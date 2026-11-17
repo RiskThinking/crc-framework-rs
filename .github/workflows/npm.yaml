@@ -24,23 +24,26 @@ jobs:
           python tools/api_contracts/check.py
           cargo fmt --all -- --check
           cargo clippy --workspace --all-targets --locked -- -D warnings
-          pip install numpy mypy
+          pip install numpy mypy jsonschema types-jsonschema
           python -m mypy
-  impact-contracts:
+  python-contracts:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      - name: Verify generated contract artifact
+      - name: Verify generated contracts and Python consumers
         run: |
-          pip install maturin numpy pytest jsonschema
+          pip install maturin numpy pytest jsonschema rfc3339-validator
+          maturin build --release --locked --out /tmp/contract-wheel
+          pip install /tmp/contract-wheel/*.whl
           python tools/impact_contracts/generate.py --check
-          maturin build --release --locked --out /tmp/impact-contract-wheel
-          pip install /tmp/impact-contract-wheel/*.whl
+          python tools/numerical_contracts/generate.py --check
+          python tools/numerical_contracts/fixtures.py --check
+          python tools/scientific_contracts/generate.py --check
           cd /tmp
-          python -m pytest -q "$GITHUB_WORKSPACE/tests/test_impact_contracts.py"
+          python -m pytest -q "$GITHUB_WORKSPACE/tests/test_shared_contracts.py" "$GITHUB_WORKSPACE/tests/test_measurements.py" "$GITHUB_WORKSPACE/tests/test_fitting_serialization.py"
   native-contracts:
     runs-on: ubuntu-latest
     steps:
@@ -49,10 +52,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Consume canonical artifact in the native core
         run: |
-          cargo test -p crc-framework-core --test impact_contract_canonical --test impact_definition_conformance --test impact_registry_conformance --locked
-          cargo test -p crc-framework-core --no-default-features --test impact_contract_canonical --test impact_definition_conformance --test impact_registry_conformance --locked
+          cargo test -p crc-framework-core --test canonical_consumer --test dataset_contract --test impact_contract_canonical --test impact_definition_conformance --test impact_registry_conformance --locked
+          cargo test -p crc-framework-core --no-default-features --test canonical_consumer --test dataset_contract --test impact_contract_canonical --test impact_definition_conformance --test impact_registry_conformance --locked
   build:
-    needs: [impact-contracts, native-contracts]
+    needs: [python-contracts, native-contracts]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -72,13 +75,10 @@ jobs:
         run: |
           cargo test -p crc-framework-core --locked
           cargo test -p crc-framework-core --no-default-features --lib --test canonical_consumer --locked
-          pip install maturin pytest numpy jsonschema
+          pip install maturin pytest numpy jsonschema rfc3339-validator
           python tools/impact_contracts/generate.py --check
           maturin build --release --locked --out /tmp/crc-wheels
           pip install /tmp/crc-wheels/*.whl
-          cd /tmp
-          python -c "from crc_framework.contracts import verify_impact_contracts; verify_impact_contracts()"
-          cd "$GITHUB_WORKSPACE"
           python -m pytest -q
       - name: Install WASM build tooling
         run: cargo install wasm-pack --version 0.15.0 --locked

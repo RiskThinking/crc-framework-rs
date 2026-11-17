@@ -7,10 +7,32 @@
     "Values": "float | ArrayLike",
     "ValueResult": "float | FloatArray",
     "FloatArray": "numpy.typing.NDArray[numpy.float64]",
-    "Unit": "LengthUnit | TimeUnit | RatioUnit | TemperatureUnit | SpeedUnit | PrecipitationRateUnit",
+    "Unit": "LengthUnit | TimeUnit | RatioUnit | TemperatureUnit | SpeedUnit | PrecipitationRateUnit | DegreeDayUnit",
     "ScientificValue": "None | bool | int | float | str | Sequence[ScientificValue] | Mapping[str, ScientificValue]"
   },
   "exports": {
+    "Aggregation": {
+      "kind": "enum",
+      "members": {
+        "MAXIMUM": "maximum",
+        "MINIMUM": "minimum",
+        "MEAN": "mean",
+        "SUM": "sum",
+        "COUNT": "count"
+      }
+    },
+    "AssetType": {
+      "kind": "enum",
+      "members": {
+        "RESIDENTIAL": "residential",
+        "COMMERCIAL": "commercial",
+        "INDUSTRIAL": "industrial",
+        "AGRICULTURAL_BUILDING": "agricultural_building",
+        "TRANSPORT": "transport",
+        "ROADS": "roads",
+        "AGRICULTURAL_LAND": "agricultural_land"
+      }
+    },
     "BinaryOutcome": {
       "kind": "class",
       "constructor": {
@@ -51,15 +73,6 @@
         "upper_impact": "float"
       }
     },
-    "BuildingType": {
-      "kind": "enum",
-      "members": {
-        "RESIDENTIAL": "residential",
-        "COMMERCIAL": "commercial",
-        "INDUSTRIAL": "industrial",
-        "AGRICULTURAL": "agricultural"
-      }
-    },
     "BuiltinImpact": {
       "kind": "enum",
       "members": {
@@ -76,6 +89,41 @@
         "STANDARDIZED_PRECIPITATION_EVAPOTRANSPIRATION_INDEX": "crc:standardized_precipitation_evapotranspiration_index",
         "COOLING_DEGREE_DAYS": "crc:cooling_degree_days",
         "CONSECUTIVE_DRY_DAYS": "crc:consecutive_dry_days"
+      }
+    },
+    "CellContext": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "cell",
+            "kind": "keyword_only",
+            "annotation": "int | ContextValue"
+          }
+        ],
+        "returns": "CellContext"
+      },
+      "properties": {
+        "schema": "Mapping[str, ScientificValue]",
+        "cell": "int | ContextValue"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "ImpactContext",
+          "binding": "class"
+        }
       }
     },
     "CensoredQuantileFit": {
@@ -118,6 +166,17 @@
           "parameters": [],
           "returns": "str",
           "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "FitSpec",
+          "binding": "class"
         }
       },
       "properties": {
@@ -127,6 +186,65 @@
         "minimum_knots": "int",
         "residual_scale_floor_ratio": "float",
         "constraints": "FitConstraints | None"
+      }
+    },
+    "ClimateIndex": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "index",
+            "kind": "keyword_only",
+            "annotation": "ClimateIndexKind"
+          },
+          {
+            "name": "accumulation_duration",
+            "kind": "keyword_only",
+            "annotation": "Duration | None",
+            "default": null
+          },
+          {
+            "name": "reference_period",
+            "kind": "keyword_only",
+            "annotation": "ReferencePeriod | None",
+            "default": null
+          }
+        ],
+        "returns": "ClimateIndex"
+      },
+      "properties": {
+        "quantity": "str",
+        "unit": "RatioUnit",
+        "fields": "Mapping[str, ScientificValue]",
+        "schema": "Mapping[str, ScientificValue] | None",
+        "index": "ClimateIndexKind",
+        "accumulation_duration": "Duration | None",
+        "reference_period": "ReferencePeriod | None"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "Measurement",
+          "binding": "class"
+        }
+      }
+    },
+    "ClimateIndexKind": {
+      "kind": "enum",
+      "members": {
+        "FIRE_WEATHER_INDEX": "fire_weather_index",
+        "STANDARDIZED_PRECIPITATION_EVAPOTRANSPIRATION_INDEX": "standardized_precipitation_evapotranspiration_index"
       }
     },
     "ContextField": {
@@ -142,6 +260,185 @@
       "kind": "protocol",
       "properties": {
         "name": "str"
+      }
+    },
+    "CoolingCostContext": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "country",
+            "kind": "keyword_only",
+            "annotation": "str | ContextValue"
+          },
+          {
+            "name": "asset_type",
+            "kind": "keyword_only",
+            "annotation": "AssetType | ContextValue"
+          },
+          {
+            "name": "historic_mean",
+            "kind": "keyword_only",
+            "annotation": "float | ContextValue"
+          }
+        ],
+        "returns": "CoolingCostContext"
+      },
+      "properties": {
+        "schema": "Mapping[str, ScientificValue]",
+        "country": "str | ContextValue",
+        "asset_type": "AssetType | ContextValue",
+        "historic_mean": "float | ContextValue"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "ImpactContext",
+          "binding": "class"
+        }
+      }
+    },
+    "CountryContext": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "country",
+            "kind": "keyword_only",
+            "annotation": "str | ContextValue"
+          }
+        ],
+        "returns": "CountryContext"
+      },
+      "properties": {
+        "schema": "Mapping[str, ScientificValue]",
+        "country": "str | ContextValue"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "ImpactContext",
+          "binding": "class"
+        }
+      }
+    },
+    "CropContext": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "country",
+            "kind": "keyword_only",
+            "annotation": "str | ContextValue"
+          },
+          {
+            "name": "historic_mean",
+            "kind": "keyword_only",
+            "annotation": "float | ContextValue"
+          }
+        ],
+        "returns": "CropContext"
+      },
+      "properties": {
+        "schema": "Mapping[str, ScientificValue]",
+        "country": "str | ContextValue",
+        "historic_mean": "float | ContextValue"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "ImpactContext",
+          "binding": "class"
+        }
+      }
+    },
+    "DegreeDayUnit": {
+      "kind": "enum",
+      "members": {
+        "KELVIN_DAYS": "K.d",
+        "CELSIUS_DAYS": "degC.d"
+      }
+    },
+    "DegreeDays": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "unit",
+            "kind": "keyword_only",
+            "annotation": "DegreeDayUnit"
+          },
+          {
+            "name": "threshold",
+            "kind": "keyword_only",
+            "annotation": "Threshold"
+          },
+          {
+            "name": "duration",
+            "kind": "keyword_only",
+            "annotation": "Duration"
+          }
+        ],
+        "returns": "DegreeDays"
+      },
+      "properties": {
+        "quantity": "str",
+        "unit": "DegreeDayUnit",
+        "fields": "Mapping[str, ScientificValue]",
+        "schema": "Mapping[str, ScientificValue] | None",
+        "threshold": "Threshold",
+        "duration": "Duration"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "Measurement",
+          "binding": "class"
+        }
       }
     },
     "DepthAboveGround": {
@@ -167,6 +464,17 @@
           "parameters": [],
           "returns": "str",
           "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "Measurement",
+          "binding": "class"
         }
       }
     },
@@ -438,6 +746,130 @@
         "TRANSFORMED": "transformed"
       }
     },
+    "Duration": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "value",
+            "kind": "positional_or_keyword",
+            "annotation": "float"
+          },
+          {
+            "name": "unit",
+            "kind": "keyword_only",
+            "annotation": "TimeUnit"
+          }
+        ],
+        "returns": "Duration"
+      },
+      "properties": {
+        "value": "float",
+        "unit": "TimeUnit"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        }
+      }
+    },
+    "EmptyContext": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [],
+        "returns": "EmptyContext"
+      },
+      "properties": {
+        "schema": "Mapping[str, ScientificValue]"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "ImpactContext",
+          "binding": "class"
+        }
+      }
+    },
+    "Event": {
+      "kind": "enum",
+      "members": {
+        "FREEZE_THAW_CYCLE": "freeze_thaw_cycle",
+        "FROST_DAY": "frost_day",
+        "HOT_DAY": "hot_day",
+        "DRY_DAY": "dry_day"
+      }
+    },
+    "EventCount": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "event",
+            "kind": "keyword_only",
+            "annotation": "Event"
+          },
+          {
+            "name": "aggregation",
+            "kind": "keyword_only",
+            "annotation": "Aggregation"
+          },
+          {
+            "name": "threshold",
+            "kind": "keyword_only",
+            "annotation": "Threshold | None",
+            "default": null
+          },
+          {
+            "name": "duration",
+            "kind": "keyword_only",
+            "annotation": "Duration | None",
+            "default": null
+          }
+        ],
+        "returns": "EventCount"
+      },
+      "properties": {
+        "quantity": "str",
+        "unit": "str",
+        "fields": "Mapping[str, ScientificValue]",
+        "schema": "Mapping[str, ScientificValue] | None",
+        "event": "Event",
+        "aggregation": "Aggregation",
+        "threshold": "Threshold | None",
+        "duration": "Duration | None"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "Measurement",
+          "binding": "class"
+        }
+      }
+    },
     "FitAttempt": {
       "kind": "class",
       "properties": {
@@ -518,6 +950,24 @@
         "evidence_support": "tuple[float, float] | None",
         "engine_version": "str",
         "selected_attempt": "int | None"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "FitRecord",
+          "binding": "class"
+        }
       }
     },
     "FitResult": {
@@ -529,12 +979,23 @@
       }
     },
     "FitSpec": {
-      "kind": "protocol",
+      "kind": "class",
       "methods": {
         "to_json": {
           "parameters": [],
           "returns": "str",
           "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "FitSpec",
+          "binding": "class"
         }
       },
       "properties": {
@@ -547,6 +1008,18 @@
         "CONVERGED": "converged",
         "REJECTED": "rejected",
         "FAILED": "failed"
+      }
+    },
+    "FloodRegion": {
+      "kind": "enum",
+      "members": {
+        "AFRICA": "africa",
+        "ASIA": "asia",
+        "EUROPE": "europe",
+        "NORTH_AMERICA": "north_america",
+        "SOUTH_AMERICA": "south_america",
+        "OCEANIA": "oceania",
+        "GLOBAL": "global"
       }
     },
     "Geography": {
@@ -596,6 +1069,17 @@
           "parameters": [],
           "returns": "str",
           "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "FitSpec",
+          "binding": "class"
         }
       },
       "properties": {
@@ -802,12 +1286,23 @@
       }
     },
     "ImpactContext": {
-      "kind": "protocol",
+      "kind": "class",
       "methods": {
         "to_json": {
           "parameters": [],
           "returns": "str",
           "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "ImpactContext",
+          "binding": "class"
         }
       },
       "properties": {
@@ -864,11 +1359,27 @@
     "ImpactRequirements": {
       "kind": "class",
       "properties": {
+        "input": "Measurement",
         "measurement_type": "type[Measurement]",
-        "accepted_units": "tuple[Unit, ...]",
+        "measurement_schema": "Mapping[str, ScientificValue]",
+        "accepted_units": "tuple[Unit | str, ...]",
         "context_type": "type[ImpactContext]",
         "context_fields": "tuple[ContextField, ...]",
+        "unestablished_facts": "tuple[str, ...]",
         "output": "Measurement"
+      },
+      "methods": {
+        "bind": {
+          "parameters": [
+            {
+              "name": "measurement",
+              "kind": "positional_or_keyword",
+              "annotation": "Measurement"
+            }
+          ],
+          "returns": "None",
+          "binding": "instance"
+        }
       }
     },
     "InundationContext": {
@@ -876,38 +1387,40 @@
       "constructor": {
         "parameters": [
           {
-            "name": "country",
+            "name": "region",
             "kind": "keyword_only",
-            "annotation": "str | ContextValue | None",
-            "default": null
+            "annotation": "FloodRegion | ContextValue"
           },
           {
-            "name": "continent",
+            "name": "asset_type",
             "kind": "keyword_only",
-            "annotation": "str | ContextValue | None",
-            "default": null
-          },
-          {
-            "name": "building_type",
-            "kind": "keyword_only",
-            "annotation": "BuildingType | ContextValue | None",
-            "default": null
+            "annotation": "AssetType | ContextValue"
           }
         ],
         "returns": "InundationContext"
+      },
+      "properties": {
+        "schema": "Mapping[str, ScientificValue]",
+        "region": "FloodRegion | ContextValue",
+        "asset_type": "AssetType | ContextValue"
       },
       "methods": {
         "to_json": {
           "parameters": [],
           "returns": "str",
           "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "ImpactContext",
+          "binding": "class"
         }
-      },
-      "properties": {
-        "schema": "Mapping[str, ScientificValue]",
-        "country": "str | ContextValue | None",
-        "continent": "str | ContextValue | None",
-        "building_type": "BuildingType | ContextValue | None"
       }
     },
     "LengthUnit": {
@@ -955,6 +1468,17 @@
           "parameters": [],
           "returns": "str",
           "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "Measurement",
+          "binding": "class"
         }
       },
       "properties": {
@@ -989,12 +1513,72 @@
           "parameters": [],
           "returns": "str",
           "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "FitSpec",
+          "binding": "class"
         }
       },
       "properties": {
         "kind": "FitKind",
         "candidates": "tuple[FitSpec, ...]",
         "criterion": "SelectionCriterion"
+      }
+    },
+    "PrecipitationRate": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "unit",
+            "kind": "keyword_only",
+            "annotation": "PrecipitationRateUnit"
+          },
+          {
+            "name": "accumulation_duration",
+            "kind": "keyword_only",
+            "annotation": "Duration"
+          },
+          {
+            "name": "aggregation",
+            "kind": "keyword_only",
+            "annotation": "Aggregation"
+          }
+        ],
+        "returns": "PrecipitationRate"
+      },
+      "properties": {
+        "quantity": "str",
+        "unit": "PrecipitationRateUnit",
+        "fields": "Mapping[str, ScientificValue]",
+        "schema": "Mapping[str, ScientificValue] | None",
+        "accumulation_duration": "Duration",
+        "aggregation": "Aggregation"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "Measurement",
+          "binding": "class"
+        }
       }
     },
     "PrecipitationRateUnit": {
@@ -1129,6 +1713,17 @@
           "parameters": [],
           "returns": "str",
           "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "FitSpec",
+          "binding": "class"
         }
       },
       "properties": {
@@ -1174,6 +1769,17 @@
           "parameters": [],
           "returns": "str",
           "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "Measurement",
+          "binding": "class"
         }
       }
     },
@@ -1182,6 +1788,35 @@
       "members": {
         "FRACTION": "1",
         "PERCENT": "percent"
+      }
+    },
+    "ReferencePeriod": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "start",
+            "kind": "positional_or_keyword",
+            "annotation": "int"
+          },
+          {
+            "name": "end",
+            "kind": "positional_or_keyword",
+            "annotation": "int"
+          }
+        ],
+        "returns": "ReferencePeriod"
+      },
+      "properties": {
+        "start": "int",
+        "end": "int"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        }
       }
     },
     "RiskAttribution": {
@@ -1273,6 +1908,17 @@
           "parameters": [],
           "returns": "str",
           "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "FitSpec",
+          "binding": "class"
         }
       },
       "properties": {
@@ -1371,12 +2017,78 @@
         "upper": "float"
       }
     },
+    "Temperature": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "unit",
+            "kind": "keyword_only",
+            "annotation": "TemperatureUnit"
+          }
+        ],
+        "returns": "Temperature"
+      },
+      "properties": {
+        "quantity": "str",
+        "unit": "TemperatureUnit",
+        "fields": "Mapping[str, ScientificValue]",
+        "schema": "Mapping[str, ScientificValue] | None"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "Measurement",
+          "binding": "class"
+        }
+      }
+    },
     "TemperatureUnit": {
       "kind": "enum",
       "members": {
         "CELSIUS": "degC",
         "KELVIN": "K",
         "FAHRENHEIT": "degF"
+      }
+    },
+    "Threshold": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "value",
+            "kind": "positional_or_keyword",
+            "annotation": "float"
+          },
+          {
+            "name": "unit",
+            "kind": "keyword_only",
+            "annotation": "Unit | str"
+          }
+        ],
+        "returns": "Threshold"
+      },
+      "properties": {
+        "value": "float",
+        "unit": "Unit | str"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        }
       }
     },
     "TimeDuration": {
@@ -1402,6 +2114,17 @@
           "parameters": [],
           "returns": "str",
           "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "Measurement",
+          "binding": "class"
         }
       }
     },
@@ -1411,7 +2134,143 @@
         "SECOND": "s",
         "HOUR": "h",
         "DAY": "d",
-        "YEAR": "yr"
+        "YEAR": "yr",
+        "MONTH": "month"
+      }
+    },
+    "WaterCostContext": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "country",
+            "kind": "keyword_only",
+            "annotation": "str | ContextValue"
+          },
+          {
+            "name": "asset_type",
+            "kind": "keyword_only",
+            "annotation": "AssetType | ContextValue"
+          }
+        ],
+        "returns": "WaterCostContext"
+      },
+      "properties": {
+        "schema": "Mapping[str, ScientificValue]",
+        "country": "str | ContextValue",
+        "asset_type": "AssetType | ContextValue"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "ImpactContext",
+          "binding": "class"
+        }
+      }
+    },
+    "WaterSurfaceElevation": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "unit",
+            "kind": "keyword_only",
+            "annotation": "LengthUnit"
+          },
+          {
+            "name": "datum",
+            "kind": "keyword_only",
+            "annotation": "str"
+          }
+        ],
+        "returns": "WaterSurfaceElevation"
+      },
+      "properties": {
+        "quantity": "str",
+        "unit": "LengthUnit",
+        "fields": "Mapping[str, ScientificValue]",
+        "schema": "Mapping[str, ScientificValue] | None",
+        "datum": "str"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "Measurement",
+          "binding": "class"
+        }
+      }
+    },
+    "WindSpeed": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "unit",
+            "kind": "keyword_only",
+            "annotation": "SpeedUnit"
+          },
+          {
+            "name": "averaging_duration",
+            "kind": "keyword_only",
+            "annotation": "Duration | None",
+            "default": null
+          },
+          {
+            "name": "aggregation",
+            "kind": "keyword_only",
+            "annotation": "Aggregation | None",
+            "default": null
+          }
+        ],
+        "returns": "WindSpeed"
+      },
+      "properties": {
+        "quantity": "str",
+        "unit": "SpeedUnit",
+        "fields": "Mapping[str, ScientificValue]",
+        "schema": "Mapping[str, ScientificValue] | None",
+        "averaging_duration": "Duration | None",
+        "aggregation": "Aggregation | None"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "Measurement",
+          "binding": "class"
+        }
       }
     },
     "compute_risk": {
@@ -1532,7 +2391,8 @@
     "enum_inputs": "Closed Python choices require the declared enum; schema loaders hydrate canonical serialized values without aliases.",
     "risk_aggregation": "Independent binary outcomes contribute additive impacts in their supplied units; there is no implicit weighting or averaging. Tied VaR states use probability-weighted attribution.",
     "hurdle": "The base is conditioned strictly above atom_location before mixing the declared atom. For atom_probability < 1 a positive base survival mass is required; the truncation is explicit in the representation.",
-    "selection_criterion": "Kolmogorov-Smirnov selection applies only to observed samples. Quantile model selection explicitly requests normalized RMSE; probability-labelled evidence is not treated as an empirical sample."
+    "selection_criterion": "Kolmogorov-Smirnov selection applies only to observed samples. Quantile model selection explicitly requests normalized RMSE; probability-labelled evidence is not treated as an empirical sample.",
+    "model_requirements": "Typed named measurement and context records share authoritative schemas. Model-owned unestablished calibration facts prevent binding, never trigger invented defaults. Numerical resolution remains separate from scientific data binding."
   },
   "removals": {
     "modules": [
@@ -1629,7 +2489,8 @@
       "crc_framework.ImpactEvaluationRecord",
       "crc_framework.ImpactEvaluationResult",
       "crc_framework.GaussKronrodOptions",
-      "crc_framework.impacts"
+      "crc_framework.impacts",
+      "crc_framework.BuildingType"
     ],
     "schema_fields": [
       "curve_kind",

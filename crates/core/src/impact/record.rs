@@ -8,8 +8,8 @@ use sha2::{Digest, Sha256};
 
 use super::error::{ContractResult, fail};
 use super::expectation::{Expectation, ResolvedMethod};
+use super::kernel_curve::KernelCurveParameters;
 use super::pushforward::ALGORITHM;
-use crate::CurveParameters;
 
 const POINT_KERNEL: &str = "crc-impact/1";
 const ARRAY_ENCODING: &str = "crc-array-f64le/1";
@@ -82,7 +82,7 @@ pub enum RecordedSource {
         original_mass_sum: f64,
         normalization_factor: f64,
     },
-    Canonical(CurveParameters),
+    Canonical(KernelCurveParameters),
     /// Discrete and empirical laws have no record-schema tag yet.
     Untracked {
         description: String,
@@ -427,7 +427,7 @@ fn snapshot_json(snapshot: &SnapshotRef) -> Canon {
     ])
 }
 
-fn curve_json(parameters: &CurveParameters) -> Canon {
+fn curve_json(parameters: &KernelCurveParameters) -> Canon {
     Canon::object([
         ("curve_kind", Canon::string(&parameters.curve_kind)),
         ("curve_type", Canon::string(&parameters.curve_type)),

@@ -1,8 +1,11 @@
 mod definition;
 mod error;
 mod expectation;
-mod json;
+pub(crate) mod json;
 mod kernel;
+mod kernel_curve;
+#[doc(hidden)]
+pub use kernel_curve::{KernelCurve, KernelCurveParameters};
 mod pushforward;
 pub(crate) mod quadrature;
 mod record;

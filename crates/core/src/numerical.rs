@@ -10,7 +10,7 @@ use crate::impact::quadrature::{GaussKronrod, integrate};
 use crate::{Distribution, DistributionFamily, FittedDistribution};
 
 #[derive(Clone, Debug, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 enum Specification {
     Parametric {
         family: String,
@@ -242,8 +242,31 @@ fn gev_upper_integral(
 
 impl NumericalLaw {
     pub fn from_json(text: &str) -> Result<Self> {
+        // Externally tagged decoding dispatches typed fields directly. Serde's
+        // internally tagged buffer otherwise turns arbitrary-precision JSON
+        // numbers into private maps before f64 fields can decode them.
+        fn tagged(value: serde_json::Value) -> Result<serde_json::Value> {
+            let mut data = value
+                .as_object()
+                .ok_or_else(|| invalid("expected a numerical object"))?
+                .clone();
+            let kind = data
+                .remove("kind")
+                .and_then(|v| v.as_str().map(str::to_string))
+                .ok_or_else(|| invalid("missing numerical kind"))?;
+            if kind == "hurdle" {
+                let base = data
+                    .remove("base")
+                    .ok_or_else(|| invalid("missing hurdle base"))?;
+                data.insert("base".into(), tagged(base)?);
+            }
+            let mut result = serde_json::Map::new();
+            result.insert(kind, serde_json::Value::Object(data));
+            Ok(serde_json::Value::Object(result))
+        }
+        let value = serde_json::from_str(text).map_err(|e| invalid(&e.to_string()))?;
         let specification: Specification =
-            serde_json::from_str(text).map_err(|e| invalid(&e.to_string()))?;
+            serde_json::from_value(tagged(value)?).map_err(|e| invalid(&e.to_string()))?;
         Self::from_specification(specification)
     }
 

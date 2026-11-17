@@ -1,0 +1,40 @@
+{
+  "asset_types": {
+    "agricultural_building": "Agricultural buildings",
+    "agricultural_land": "Agriculture",
+    "commercial": "Commercial buildings",
+    "industrial": "Industrial buildings",
+    "residential": "Residential buildings",
+    "roads": "Infrastructure - roads",
+    "transport": "Transport"
+  },
+  "fixed_context": {
+    "crc:consecutive_dry_days": {
+      "asset_type": "agricultural_building"
+    }
+  },
+  "models": {
+    "crc:coastal_flood": "cflood",
+    "crc:consecutive_dry_days": "maximum_consecutive_dry_days",
+    "crc:cooling_degree_days": "cooling_degree_days",
+    "crc:cyclone": "cyclone",
+    "crc:fire_weather_index": "fwi",
+    "crc:freeze_thaw_cycles": "daily_freezethaw_cycles",
+    "crc:frost_days": "frost_days",
+    "crc:hot_days": "hot_days",
+    "crc:inundation": "inundation",
+    "crc:maximum_daily_precipitation": "rx1day",
+    "crc:maximum_daily_wind_speed": "wind_max_daily_max",
+    "crc:river_flood": "rflood",
+    "crc:standardized_precipitation_evapotranspiration_index": "spei"
+  },
+  "regions": {
+    "africa": "Africa",
+    "asia": "Asia",
+    "europe": "Europe",
+    "global": "Global",
+    "north_america": "North America",
+    "oceania": "Oceania",
+    "south_america": "South America"
+  }
+}

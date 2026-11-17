@@ -1,85 +1,65 @@
-use crc_framework_core::CurveParameters;
-use serde_json::{Value, json};
-
-fn reconstruct(row: Value) -> crc_framework_core::Result<crc_framework_core::CanonicalCurve> {
-    serde_json::from_value::<CurveParameters>(row)
-        .unwrap()
-        .reconstruct()
-}
+//! Current numerical documents have one shared admission and query contract.
+use crc_framework_core::{CrcError, Numerical};
+use serde_json::Value;
+const FIXTURES: &str =
+    include_str!("../../../python/crc_framework/contracts/numerical/fixtures-1.0.json");
 
 #[test]
-fn native_python_reference_quantiles() {
-    let cases: Value = serde_json::from_str(include_str!(
-        "../../../tests/fixtures/canonical-quantiles.json"
-    ))
-    .unwrap();
-    for case in cases.as_array().unwrap() {
-        let curve = reconstruct(case["properties"].clone()).unwrap();
-        for (q, expected) in case["probabilities"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .zip(case["expected"].as_array().unwrap())
-        {
-            let actual = curve.quantile(q.as_f64().unwrap()).unwrap();
-            if expected.is_null() {
-                assert_eq!(actual, None);
-            } else {
-                let expected = expected.as_f64().unwrap();
-                assert!(
-                    (actual.unwrap() - expected).abs() <= 2e-10 * expected.abs().max(1.0),
-                    "{} q={q}",
+fn numerical_admission_and_queries_agree_with_python() {
+    let cases: Value = serde_json::from_str(FIXTURES).unwrap();
+    for case in cases["accepted"].as_array().unwrap() {
+        let numerical = Numerical::from_value(case["document"].clone())
+            .unwrap_or_else(|e| panic!("{}: {e}", case["name"]));
+        for query in case["queries"].as_array().unwrap() {
+            let actual = numerical.quantile(query["probability"].as_f64().unwrap());
+            match query["outcome"].as_str() {
+                Some("out_of_support") => assert!(
+                    matches!(actual, Err(CrcError::OutOfSupport { .. })),
+                    "{}",
                     case["name"]
-                );
+                ),
+                Some("positive_infinity") => assert_eq!(actual.unwrap(), f64::INFINITY),
+                Some("negative_infinity") => assert_eq!(actual.unwrap(), f64::NEG_INFINITY),
+                _ => {
+                    let expected = query["value"].as_f64().unwrap();
+                    let actual = actual.unwrap();
+                    assert!(
+                        (actual - expected).abs() <= 2e-10 * expected.abs().max(1.0),
+                        "{}: {query}: {actual}",
+                        case["name"]
+                    );
+                }
             }
         }
     }
-}
-
-#[test]
-fn canonical_schema_rejects_malformed_records_even_outside_support() {
-    let valid =
-        json!({"curve_kind":"fitted","curve_type":"gumbel_r","curve_location":0,"curve_scale":1});
-    let mut bad_rows = vec![
-        json!({"curve_kind":"other","curve_type":"gumbel_r"}),
-        json!({"curve_kind":"no_data","curve_type":"unknown"}),
-        json!({"curve_kind":"point_mass","curve_type":"point_mass","curve_location":0}),
-        json!({"curve_kind":"tabulated","curve_type":"linear_probability","curve_probabilities":[0.1,0.1],"curve_values":[1,2]}),
-    ];
-    for (field, value) in [
-        ("curve_scale", json!(0)),
-        ("curve_type", json!("unknown")),
-        ("curve_atom_probability", json!(0.2)),
-        ("curve_probabilities", json!([0, 1])),
-    ] {
-        let mut row = valid.clone();
-        row[field] = value;
-        bad_rows.push(row);
+    for case in cases["rejected"].as_array().unwrap() {
+        assert!(
+            Numerical::from_value(case["document"].clone()).is_err(),
+            "{}",
+            case["name"]
+        );
     }
-    for row in bad_rows {
-        assert!(reconstruct(row.clone()).is_err(), "{row}");
-    }
-    let curve = reconstruct(valid).unwrap();
-    for q in [f64::NAN, f64::INFINITY, -0.1, 1.1] {
-        assert!(curve.quantile(q).is_err());
+    for case in cases["rejected_text"].as_array().unwrap() {
+        assert!(Numerical::from_json(case["text"].as_str().unwrap()).is_err());
     }
 }
 
 #[test]
-fn gumbel_shape_normalization_and_signed_zero() {
-    let curve = CurveParameters {
-        curve_kind: "fitted".into(),
-        curve_type: "gumbel_r".into(),
-        curve_shape: Some(f64::NAN),
-        curve_location: Some(0.0),
-        curve_scale: Some(1.0),
-        ..Default::default()
+fn scientific_admission_agrees_with_python() {
+    let cases: Value = serde_json::from_str(include_str!(
+        "../../../python/crc_framework/contracts/scientific/fixtures-1.0.json"
+    ))
+    .unwrap();
+    for case in cases["cases"].as_array().unwrap() {
+        let result = crc_framework_core::canonical::validate_document(
+            case["schema"].as_str().unwrap(),
+            &case["document"].to_string(),
+        );
+        assert_eq!(
+            result.is_ok(),
+            case["valid"].as_bool().unwrap(),
+            "{}: {result:?}",
+            case["name"]
+        );
     }
-    .reconstruct()
-    .unwrap();
-    assert!(curve.quantile(0.5).unwrap().is_some());
-    let curve = reconstruct(json!({"curve_kind":"point_mass","curve_type":"point_mass",
-        "curve_location":-0.0,"curve_scale":0,"curve_atom_probability":1,"curve_atom_location":0}))
-    .unwrap();
-    assert!(curve.quantile(0.5).unwrap().unwrap().is_sign_negative());
 }

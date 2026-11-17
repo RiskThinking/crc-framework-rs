@@ -1,0 +1,558 @@
+{
+  "$id": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "description": "Open user-owned scientific meaning.",
+      "properties": {
+        "fields": {
+          "type": "object"
+        },
+        "kind": {
+          "const": "measurement"
+        },
+        "quantity": {
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "schema": {
+          "type": "object"
+        },
+        "unit": {
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "Measurement",
+      "type": "object",
+      "x-crc-calibration": {
+        "quantity_field": "quantity",
+        "unit_field": "unit"
+      }
+    },
+    {
+      "additionalProperties": false,
+      "description": "Depth measured above the local ground surface.",
+      "properties": {
+        "kind": {
+          "const": "depth_above_ground"
+        },
+        "unit": {
+          "enum": [
+            "m",
+            "cm",
+            "mm",
+            "ft"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "unit"
+      ],
+      "title": "DepthAboveGround",
+      "type": "object",
+      "x-crc-calibration": {
+        "quantity": "depth_above_ground",
+        "unit_field": "unit"
+      }
+    },
+    {
+      "additionalProperties": false,
+      "description": "Water surface elevation in the explicitly identified vertical datum.",
+      "properties": {
+        "datum": {
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "kind": {
+          "const": "water_surface_elevation"
+        },
+        "unit": {
+          "enum": [
+            "m",
+            "cm",
+            "mm",
+            "ft"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "unit",
+        "datum"
+      ],
+      "title": "WaterSurfaceElevation",
+      "type": "object",
+      "x-crc-calibration": {
+        "quantity": "water_surface_elevation",
+        "unit_field": "unit"
+      }
+    },
+    {
+      "additionalProperties": false,
+      "description": "Dimensionless ratio in fractions or percent.",
+      "properties": {
+        "kind": {
+          "const": "ratio"
+        },
+        "unit": {
+          "enum": [
+            "1",
+            "percent"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "unit"
+      ],
+      "title": "Ratio",
+      "type": "object",
+      "x-crc-calibration": {
+        "quantity": "ratio",
+        "unit_field": "unit"
+      }
+    },
+    {
+      "additionalProperties": false,
+      "description": "Elapsed time in an explicitly selected time unit.",
+      "properties": {
+        "kind": {
+          "const": "time_duration"
+        },
+        "unit": {
+          "enum": [
+            "s",
+            "h",
+            "d",
+            "month",
+            "yr"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "unit"
+      ],
+      "title": "TimeDuration",
+      "type": "object",
+      "x-crc-calibration": {
+        "quantity": "time_duration",
+        "unit_field": "unit"
+      }
+    },
+    {
+      "additionalProperties": false,
+      "description": "Temperature in the selected scale.",
+      "properties": {
+        "kind": {
+          "const": "temperature"
+        },
+        "unit": {
+          "enum": [
+            "degC",
+            "K",
+            "degF"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "unit"
+      ],
+      "title": "Temperature",
+      "type": "object",
+      "x-crc-calibration": {
+        "quantity": "temperature",
+        "unit_field": "unit"
+      }
+    },
+    {
+      "additionalProperties": false,
+      "description": "Wind speed with optional explicit averaging and reduction facts.",
+      "properties": {
+        "aggregation": {
+          "enum": [
+            "maximum",
+            "minimum",
+            "mean",
+            "sum",
+            "count"
+          ],
+          "type": "string"
+        },
+        "averaging_duration": {
+          "additionalProperties": false,
+          "properties": {
+            "unit": {
+              "enum": [
+                "s",
+                "h",
+                "d",
+                "month",
+                "yr"
+              ],
+              "type": "string"
+            },
+            "value": {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "value",
+            "unit"
+          ],
+          "type": "object"
+        },
+        "kind": {
+          "const": "wind_speed"
+        },
+        "unit": {
+          "enum": [
+            "m/s",
+            "km/h"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "unit"
+      ],
+      "title": "WindSpeed",
+      "type": "object",
+      "x-crc-calibration": {
+        "quantity": "wind_speed",
+        "unit_field": "unit"
+      }
+    },
+    {
+      "additionalProperties": false,
+      "description": "Precipitation rate over an explicit accumulation duration and reduction.",
+      "properties": {
+        "accumulation_duration": {
+          "additionalProperties": false,
+          "properties": {
+            "unit": {
+              "enum": [
+                "s",
+                "h",
+                "d",
+                "month",
+                "yr"
+              ],
+              "type": "string"
+            },
+            "value": {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "value",
+            "unit"
+          ],
+          "type": "object"
+        },
+        "aggregation": {
+          "enum": [
+            "maximum",
+            "minimum",
+            "mean",
+            "sum",
+            "count"
+          ],
+          "type": "string"
+        },
+        "kind": {
+          "const": "precipitation_rate"
+        },
+        "unit": {
+          "enum": [
+            "mm/day",
+            "mm/h"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "unit",
+        "accumulation_duration",
+        "aggregation"
+      ],
+      "title": "PrecipitationRate",
+      "type": "object",
+      "x-crc-calibration": {
+        "quantity": "precipitation_rate",
+        "unit_field": "unit"
+      }
+    },
+    {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "event": {
+                "enum": [
+                  "frost_day",
+                  "hot_day",
+                  "freeze_thaw_cycle"
+                ]
+              }
+            },
+            "required": [
+              "event"
+            ]
+          },
+          "then": {
+            "properties": {
+              "threshold": {
+                "properties": {
+                  "unit": {
+                    "enum": [
+                      "degC",
+                      "K",
+                      "degF"
+                    ],
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "description": "Count of explicitly identified events, with optional threshold and counting duration.",
+      "properties": {
+        "aggregation": {
+          "enum": [
+            "maximum",
+            "minimum",
+            "mean",
+            "sum",
+            "count"
+          ],
+          "type": "string"
+        },
+        "duration": {
+          "additionalProperties": false,
+          "properties": {
+            "unit": {
+              "enum": [
+                "s",
+                "h",
+                "d",
+                "month",
+                "yr"
+              ],
+              "type": "string"
+            },
+            "value": {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "value",
+            "unit"
+          ],
+          "type": "object"
+        },
+        "event": {
+          "enum": [
+            "freeze_thaw_cycle",
+            "frost_day",
+            "hot_day",
+            "dry_day"
+          ],
+          "type": "string"
+        },
+        "kind": {
+          "const": "event_count"
+        },
+        "threshold": {
+          "additionalProperties": false,
+          "properties": {
+            "unit": {
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "value",
+            "unit"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "kind",
+        "event",
+        "aggregation"
+      ],
+      "title": "EventCount",
+      "type": "object",
+      "x-crc-calibration": {
+        "fixed_unit": "count",
+        "quantity": "event_count"
+      }
+    },
+    {
+      "additionalProperties": false,
+      "description": "An identified climate index, with explicit timescale and reference years when known.",
+      "properties": {
+        "accumulation_duration": {
+          "additionalProperties": false,
+          "properties": {
+            "unit": {
+              "enum": [
+                "s",
+                "h",
+                "d",
+                "month",
+                "yr"
+              ],
+              "type": "string"
+            },
+            "value": {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "value",
+            "unit"
+          ],
+          "type": "object"
+        },
+        "index": {
+          "enum": [
+            "fire_weather_index",
+            "standardized_precipitation_evapotranspiration_index"
+          ],
+          "type": "string"
+        },
+        "kind": {
+          "const": "climate_index"
+        },
+        "reference_period": {
+          "additionalProperties": false,
+          "properties": {
+            "end": {
+              "type": "integer"
+            },
+            "start": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "start",
+            "end"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "kind",
+        "index"
+      ],
+      "title": "ClimateIndex",
+      "type": "object",
+      "x-crc-calibration": {
+        "fixed_unit": "1",
+        "quantity": "climate_index"
+      }
+    },
+    {
+      "additionalProperties": false,
+      "description": "Integrated temperature departures from a declared threshold over a declared duration.",
+      "properties": {
+        "duration": {
+          "additionalProperties": false,
+          "properties": {
+            "unit": {
+              "enum": [
+                "s",
+                "h",
+                "d",
+                "month",
+                "yr"
+              ],
+              "type": "string"
+            },
+            "value": {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "value",
+            "unit"
+          ],
+          "type": "object"
+        },
+        "kind": {
+          "const": "degree_days"
+        },
+        "threshold": {
+          "additionalProperties": false,
+          "properties": {
+            "unit": {
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "value",
+            "unit"
+          ],
+          "type": "object"
+        },
+        "unit": {
+          "enum": [
+            "K.d",
+            "degC.d"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "unit",
+        "threshold",
+        "duration"
+      ],
+      "title": "DegreeDays",
+      "type": "object",
+      "x-crc-calibration": {
+        "quantity": "degree_days",
+        "unit_field": "unit"
+      }
+    }
+  ],
+  "title": "Measurement"
+}

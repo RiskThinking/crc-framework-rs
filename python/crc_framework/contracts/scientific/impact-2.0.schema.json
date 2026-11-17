@@ -1,0 +1,409 @@
+{
+  "$defs": {
+    "crop_vector": {
+      "additionalProperties": false,
+      "description": "Per-crop coefficient vector with exactly maize, rice and wheat.",
+      "properties": {
+        "maize": {
+          "$ref": "#/$defs/number",
+          "description": "Maize coefficient."
+        },
+        "rice": {
+          "$ref": "#/$defs/number",
+          "description": "Rice coefficient."
+        },
+        "wheat": {
+          "$ref": "#/$defs/number",
+          "description": "Wheat coefficient."
+        }
+      },
+      "required": [
+        "maize",
+        "rice",
+        "wheat"
+      ],
+      "type": "object"
+    },
+    "crop_weights": {
+      "additionalProperties": false,
+      "description": "Per-crop coefficient vector with exactly maize, rice and wheat.",
+      "properties": {
+        "maize": {
+          "$ref": "#/$defs/non_negative_number",
+          "description": "Maize coefficient."
+        },
+        "rice": {
+          "$ref": "#/$defs/non_negative_number",
+          "description": "Rice coefficient."
+        },
+        "wheat": {
+          "$ref": "#/$defs/non_negative_number",
+          "description": "Wheat coefficient."
+        }
+      },
+      "required": [
+        "maize",
+        "rice",
+        "wheat"
+      ],
+      "type": "object"
+    },
+    "model_binned": {
+      "additionalProperties": false,
+      "description": "Interval lookup over [edge_i, edge_(i+1)); the final interval includes the final edge and interior edges select the interval to their right.",
+      "properties": {
+        "bin_edges": {
+          "description": "Strictly increasing interval edges.",
+          "items": {
+            "$ref": "#/$defs/number"
+          },
+          "minItems": 2,
+          "type": "array"
+        },
+        "kind": {
+          "const": "binned",
+          "description": "Variant tag 'binned'.",
+          "type": "string"
+        },
+        "outside_domain": {
+          "description": "Below or above the table domain: clamp returns the nearest endpoint response; error rejects the exposure.",
+          "enum": [
+            "clamp",
+            "error"
+          ],
+          "type": "string"
+        },
+        "values": {
+          "description": "One finite response per interval.",
+          "items": {
+            "$ref": "#/$defs/number"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "bin_edges",
+        "values"
+      ],
+      "type": "object"
+    },
+    "model_cooling": {
+      "additionalProperties": false,
+      "description": "Registry snapshot: raw = 0 for x <= 1, else cooling_cost * x / (historic_mean * 10_000_000).",
+      "properties": {
+        "cooling_cost": {
+          "$ref": "#/$defs/non_negative_number",
+          "description": "Cooling cost coefficient."
+        },
+        "historic_mean": {
+          "$ref": "#/$defs/positive_number",
+          "description": "Historical baseline exposure."
+        },
+        "kind": {
+          "const": "cooling",
+          "description": "Variant tag 'cooling'.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "cooling_cost",
+        "historic_mean"
+      ],
+      "type": "object"
+    },
+    "model_crop": {
+      "additionalProperties": false,
+      "description": "Registry snapshot: weighted historical/future crop response with reference year 2010.",
+      "properties": {
+        "country": {
+          "$ref": "#/$defs/crop_vector",
+          "description": "Country coefficients."
+        },
+        "historic_mean": {
+          "$ref": "#/$defs/number",
+          "description": "Historical baseline exposure."
+        },
+        "index": {
+          "$ref": "#/$defs/crop_vector",
+          "description": "Exposure index coefficients."
+        },
+        "kind": {
+          "const": "crop",
+          "description": "Variant tag 'crop'.",
+          "type": "string"
+        },
+        "weights": {
+          "$ref": "#/$defs/crop_weights",
+          "description": "Non-negative crop weights with positive total; never renormalized."
+        },
+        "yearly": {
+          "$ref": "#/$defs/crop_vector",
+          "description": "Yearly trend coefficients."
+        }
+      },
+      "required": [
+        "kind",
+        "weights",
+        "country",
+        "yearly",
+        "index",
+        "historic_mean"
+      ],
+      "type": "object"
+    },
+    "model_linear": {
+      "additionalProperties": false,
+      "description": "raw(x) = slope * x + intercept.",
+      "properties": {
+        "intercept": {
+          "$ref": "#/$defs/number",
+          "description": "Intercept."
+        },
+        "kind": {
+          "const": "linear",
+          "description": "Variant tag 'linear'.",
+          "type": "string"
+        },
+        "slope": {
+          "$ref": "#/$defs/number",
+          "description": "Slope; positive, zero or negative."
+        }
+      },
+      "required": [
+        "kind",
+        "slope"
+      ],
+      "type": "object"
+    },
+    "model_sigmoid": {
+      "additionalProperties": false,
+      "description": "raw(x) = offset + amplitude * (L(steepness * (x - midpoint)) - [L(-steepness * midpoint) if subtract_at_zero]); raw(x) = 0 when zero_below is present and x < zero_below.",
+      "properties": {
+        "amplitude": {
+          "$ref": "#/$defs/non_negative_number",
+          "description": "Curve height (legacy maximum minus minimum)."
+        },
+        "kind": {
+          "const": "sigmoid",
+          "description": "Variant tag 'sigmoid'.",
+          "type": "string"
+        },
+        "midpoint": {
+          "$ref": "#/$defs/number",
+          "description": "Logistic midpoint."
+        },
+        "offset": {
+          "$ref": "#/$defs/number",
+          "description": "Lower curve level (legacy minimum)."
+        },
+        "origin_adjustment": {
+          "description": "subtract_at_zero subtracts the unit logistic at x = 0 without renormalizing the upper asymptote.",
+          "enum": [
+            "none",
+            "subtract_at_zero"
+          ],
+          "type": "string"
+        },
+        "steepness": {
+          "$ref": "#/$defs/number",
+          "description": "Logistic steepness; zero gives a constant response."
+        },
+        "zero_below": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Strict threshold: x < zero_below gives raw response 0; equality evaluates the sigmoid."
+        }
+      },
+      "required": [
+        "kind",
+        "midpoint",
+        "steepness"
+      ],
+      "type": "object"
+    },
+    "model_spei": {
+      "additionalProperties": false,
+      "description": "Registry snapshot: water-cost response with the fixed crc-impact/1 SPEI constants.",
+      "properties": {
+        "kind": {
+          "const": "spei",
+          "description": "Variant tag 'spei'.",
+          "type": "string"
+        },
+        "original_water_unit_cost": {
+          "$ref": "#/$defs/non_negative_number",
+          "description": "Water unit cost before drought scaling."
+        },
+        "water_consumption_asset": {
+          "$ref": "#/$defs/non_negative_number",
+          "description": "Asset water consumption."
+        }
+      },
+      "required": [
+        "kind",
+        "water_consumption_asset",
+        "original_water_unit_cost"
+      ],
+      "type": "object"
+    },
+    "model_tabulated": {
+      "additionalProperties": false,
+      "description": "Response table with strictly increasing x knots. Between knots: linear interpolates, step_left returns y_i, step_right returns y_(i+1); every mode returns y_i at x_i.",
+      "properties": {
+        "interpolation": {
+          "description": "Interpolation between adjacent knots.",
+          "enum": [
+            "linear",
+            "step_left",
+            "step_right"
+          ],
+          "type": "string"
+        },
+        "kind": {
+          "const": "tabulated",
+          "description": "Variant tag 'tabulated'.",
+          "type": "string"
+        },
+        "outside_domain": {
+          "description": "Below or above the table domain: clamp returns the nearest endpoint response; error rejects the exposure.",
+          "enum": [
+            "clamp",
+            "error"
+          ],
+          "type": "string"
+        },
+        "points": {
+          "description": "Ordered knots; order is preserved and never sorted.",
+          "items": {
+            "$ref": "#/$defs/point"
+          },
+          "minItems": 2,
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "points"
+      ],
+      "type": "object"
+    },
+    "non_negative_number": {
+      "minimum": 0,
+      "type": "number"
+    },
+    "number": {
+      "description": "JSON number converted once to finite IEEE binary64; booleans and strings are rejected.",
+      "type": "number"
+    },
+    "point": {
+      "additionalProperties": false,
+      "description": "One tabulated knot.",
+      "properties": {
+        "x": {
+          "$ref": "#/$defs/number",
+          "description": "Exposure in the calibrated exposure unit."
+        },
+        "y": {
+          "$ref": "#/$defs/number",
+          "description": "Raw response at x."
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "type": "object"
+    },
+    "positive_number": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+    }
+  },
+  "$id": "https://climateriskcommons.org/schemas/impact-2.0.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "clamp": {
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "maximum": {
+          "type": "number"
+        },
+        "minimum": {
+          "type": "number"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "input": {
+      "$ref": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json"
+    },
+    "model": {
+      "description": "Tagged numerical model containing every coefficient needed for evaluation.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/model_linear"
+        },
+        {
+          "$ref": "#/$defs/model_sigmoid"
+        },
+        {
+          "$ref": "#/$defs/model_tabulated"
+        },
+        {
+          "$ref": "#/$defs/model_binned"
+        },
+        {
+          "$ref": "#/$defs/model_spei"
+        },
+        {
+          "$ref": "#/$defs/model_cooling"
+        },
+        {
+          "$ref": "#/$defs/model_crop"
+        }
+      ]
+    },
+    "output": {
+      "$ref": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json"
+    },
+    "provenance": {
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json"
+        },
+        "model": {
+          "$ref": "https://climateriskcommons.org/schemas/impact-reference-2.0.schema.json"
+        }
+      },
+      "required": [
+        "model",
+        "context"
+      ],
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "2.0"
+    }
+  },
+  "required": [
+    "schema_version",
+    "input",
+    "output",
+    "model"
+  ],
+  "title": "Impact",
+  "type": "object"
+}
