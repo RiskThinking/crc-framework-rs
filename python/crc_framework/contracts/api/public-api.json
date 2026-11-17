@@ -56,7 +56,8 @@
       "members": {
         "RESIDENTIAL": "residential",
         "COMMERCIAL": "commercial",
-        "INDUSTRIAL": "industrial"
+        "INDUSTRIAL": "industrial",
+        "AGRICULTURAL": "agricultural"
       }
     },
     "BuiltinImpact": {
@@ -484,6 +485,15 @@
         "require_sample_support": "bool"
       }
     },
+    "FitError": {
+      "kind": "class",
+      "properties": {
+        "code": "str",
+        "message": "str",
+        "record": "FitRecord",
+        "diagnostics": "tuple[Diagnostic, ...]"
+      }
+    },
     "FitKind": {
       "kind": "enum",
       "members": {
@@ -506,7 +516,8 @@
         "excluded_count": "int",
         "weights": "tuple[float, ...] | None",
         "evidence_support": "tuple[float, float] | None",
-        "engine_version": "str"
+        "engine_version": "str",
+        "selected_attempt": "int | None"
       }
     },
     "FitResult": {
@@ -1276,7 +1287,8 @@
     "SelectionCriterion": {
       "kind": "enum",
       "members": {
-        "KOLMOGOROV_SMIRNOV": "ks"
+        "KOLMOGOROV_SMIRNOV": "ks",
+        "NORMALIZED_ROOT_MEAN_SQUARE_ERROR": "normalized_rmse"
       }
     },
     "SpeedUnit": {
@@ -1330,7 +1342,22 @@
       }
     },
     "TailCompletion": {
-      "kind": "protocol",
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "lower",
+            "kind": "keyword_only",
+            "annotation": "float"
+          },
+          {
+            "name": "upper",
+            "kind": "keyword_only",
+            "annotation": "float"
+          }
+        ],
+        "returns": "TailCompletion"
+      },
       "methods": {
         "to_json": {
           "parameters": [],
@@ -1339,7 +1366,9 @@
         }
       },
       "properties": {
-        "name": "str"
+        "name": "str",
+        "lower": "float",
+        "upper": "float"
       }
     },
     "TemperatureUnit": {
@@ -1500,7 +1529,10 @@
     "measurement": "Custom quantity and unit identifiers are data; specialized measurement requirements apply only to operations that need them.",
     "immutability": "Public scientific objects and returned array snapshots are immutable.",
     "protocols": "Unresolved context references and resolved point functions have distinct call contracts.",
-    "enum_inputs": "Closed Python choices require the declared enum; schema loaders hydrate canonical serialized values without aliases."
+    "enum_inputs": "Closed Python choices require the declared enum; schema loaders hydrate canonical serialized values without aliases.",
+    "risk_aggregation": "Independent binary outcomes contribute additive impacts in their supplied units; there is no implicit weighting or averaging. Tied VaR states use probability-weighted attribution.",
+    "hurdle": "The base is conditioned strictly above atom_location before mixing the declared atom. For atom_probability < 1 a positive base survival mass is required; the truncation is explicit in the representation.",
+    "selection_criterion": "Kolmogorov-Smirnov selection applies only to observed samples. Quantile model selection explicitly requests normalized RMSE; probability-labelled evidence is not treated as an empirical sample."
   },
   "removals": {
     "modules": [

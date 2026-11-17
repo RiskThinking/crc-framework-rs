@@ -259,6 +259,21 @@ struct PyImpactSource {
 #[pymethods]
 impl PyImpactSource {
     #[staticmethod]
+    fn segments(py: Python<'_>, probabilities: Vec<f64>, values: Vec<f64>) -> PyResult<Self> {
+        let distribution =
+            crc_framework_core::TabulatedDistribution::from_segments(probabilities, values)
+                .map_err(|error| {
+                    impact_error(py, value_error("invalid_value", "", &error.to_string()))
+                })?;
+        Ok(Self {
+            inner: ImpactSource::Tabulated(distribution),
+            recorded: RecordedSource::Untracked {
+                description: "exact numerical segments".into(),
+            },
+        })
+    }
+
+    #[staticmethod]
     fn histogram(py: Python<'_>, edges: Vec<f64>, weights: Vec<f64>) -> PyResult<Self> {
         let histogram =
             HistogramExposure::new(edges, weights).map_err(|error| impact_error(py, error))?;
@@ -491,6 +506,36 @@ impl PyImpactDistribution {
     fn quantiles(&self, py: Python<'_>, probabilities: Vec<f64>) -> PyResult<Vec<f64>> {
         self.inner
             .quantiles(&probabilities)
+            .map_err(|error| impact_error(py, error))
+    }
+
+    fn integral(
+        &self,
+        py: Python<'_>,
+        lo: f64,
+        hi: f64,
+        center: f64,
+        square: bool,
+    ) -> PyResult<f64> {
+        py.detach(|| self.inner.integral(lo, hi, center, square))
+            .map_err(|error| impact_error(py, error))
+    }
+
+    fn inverse_survival(&self, py: Python<'_>, survival: f64) -> PyResult<f64> {
+        self.inner
+            .inverse_survival(survival)
+            .map_err(|error| impact_error(py, error))
+    }
+
+    fn tail_integral(
+        &self,
+        py: Python<'_>,
+        s_min: f64,
+        s_max: f64,
+        center: f64,
+        square: bool,
+    ) -> PyResult<f64> {
+        py.detach(|| self.inner.tail_integral(s_min, s_max, center, square))
             .map_err(|error| impact_error(py, error))
     }
 

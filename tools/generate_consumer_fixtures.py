@@ -6,9 +6,7 @@ Run from the repository root after rebuilding the Python extension:
 import json
 from pathlib import Path
 
-from crc_framework.distributions import (
-    FittedDistribution, HurdleDistribution, PointMassDistribution, TabulatedDistribution,
-)
+from crc_framework import Distribution, DistributionFamily, QuantileCurve
 
 
 def distribution(row):
@@ -16,17 +14,17 @@ def distribution(row):
     if kind == 'no_data':
         return None
     if kind == 'point_mass':
-        return PointMassDistribution(row['curve_location'])
+        return Distribution.point_mass(row['curve_location'])
     if kind == 'tabulated':
-        return TabulatedDistribution(row['curve_probabilities'], row['curve_values'])
-    base = FittedDistribution.from_parameters(
-        row['curve_type'], shape=row.get('curve_shape'),
+        return QuantileCurve(row['curve_probabilities'], row['curve_values'])
+    base = Distribution.parametric(
+        DistributionFamily(row['curve_type']), shape=row.get('curve_shape'),
         location=row['curve_location'], scale=row['curve_scale'],
     )
     if kind == 'fitted':
         return base
-    return HurdleDistribution(base, atom_probability=row['curve_atom_probability'],
-                              atom_location=row['curve_atom_location'])
+    return Distribution.hurdle(base, atom_probability=row['curve_atom_probability'],
+                               atom_location=row['curve_atom_location'])
 
 
 def expected(row, q):
@@ -35,7 +33,7 @@ def expected(row, q):
         return None
     if kind == 'tabulated' and not row['curve_probabilities'][0] <= q <= row['curve_probabilities'][-1]:
         return None
-    return float(distribution(row).ppf(q))
+    return float(distribution(row).quantile(q))
 
 
 def cases():

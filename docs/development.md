@@ -89,22 +89,23 @@ regenerate the artifact from the repository root:
 ```
 
 Commit the generator sources and generated artifact together. The generator and
-reference implementation are development tooling; Python consumers load the
-generated resources through `crc_framework.contracts`. No separate tools package
-is needed. When the manifest changes, update the SDK's pinned manifest digest
-together with any required consumer changes.
+reference implementation are development tooling. Generated native-kernel
+resources are loaded internally; the public Python numerical interface lives at
+the `crc_framework` root. When reference tables change, review their pinned
+identities and numerical conformance fixtures together.
 
 After the Python setup above, run the focused checks:
 
 ```sh
 .venv/bin/python tools/impact_contracts/generate.py --check
-.venv/bin/python -m pytest tests/test_impact_contracts.py -q
+.venv/bin/python -m pytest tests/test_kernel_artifacts.py tests/test_numerical_impacts.py -q
 cargo test -p crc-framework-core --test impact_contract_canonical --locked
 cargo test -p crc-framework-core --no-default-features --test impact_contract_canonical --locked
 ```
 
-The Python suite checks generation freshness, schema agreement, canonical
-identities, validation errors, numerical reference cases, and provenance rules.
+The Python suites check generation freshness, calibrated impact identities,
+validation errors, point values, exact expectations, pushforward atoms, and
+representation-independent distribution capabilities.
 Numerical cases specify tolerances; canonical bytes and hashes require exact
 agreement. Monotonicity cases allow documented weaker classifications, including
 both monotone directions for constant functions. Rust tests consume the same

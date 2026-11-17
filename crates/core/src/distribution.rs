@@ -124,6 +124,47 @@ impl TabulatedDistribution {
         })
     }
 
+    /// Private exact quantile segments. Equal probabilities describe a
+    /// zero-mass support gap; equal values describe an atom.
+    pub fn from_segments(probabilities: Vec<f64>, values: Vec<f64>) -> Result<Self> {
+        if probabilities.len() != values.len()
+            || probabilities.len() < 2
+            || probabilities.first() != Some(&0.0)
+            || probabilities.last() != Some(&1.0)
+            || probabilities
+                .iter()
+                .any(|q| !q.is_finite() || !(0.0..=1.0).contains(q))
+            || values.iter().any(|x| !x.is_finite())
+            || probabilities.windows(2).any(|p| p[0] > p[1])
+            || values.windows(2).any(|p| p[0] > p[1])
+        {
+            return Err(CrcError::InvalidInput(
+                "exact segments require ordered finite full-support coordinates".into(),
+            ));
+        }
+        Ok(Self {
+            probabilities,
+            values,
+            interpolation: Interpolation::LinearProbability,
+            extrapolate: false,
+            return_period_tail: Tail::Upper,
+        })
+    }
+
+    /// Right-continuous inverse, which skips zero-mass support gaps.
+    pub fn upper_quantile(&self, probability: f64) -> Result<f64> {
+        if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
+            return Err(CrcError::InvalidInput(
+                "probability must be finite and in [0,1]".into(),
+            ));
+        }
+        let after = self.probabilities.partition_point(|q| *q <= probability);
+        if after > 0 && self.probabilities[after - 1] == probability {
+            return Ok(self.values[after - 1]);
+        }
+        self.interpolate(probability)
+    }
+
     pub fn from_return_periods(
         periods: Vec<f64>,
         values: Vec<f64>,
@@ -230,7 +271,7 @@ impl Distribution for TabulatedDistribution {
         }
         let lower = upper - 1;
         let span = self.values[upper] - self.values[lower];
-        if span.abs() < EPS {
+        if span == 0.0 {
             return self.probabilities[upper];
         }
         let weight = (x - self.values[lower]) / span;
@@ -256,7 +297,7 @@ impl Distribution for TabulatedDistribution {
         }
         let lower = upper - 1;
         let span = self.values[upper] - self.values[lower];
-        if span.abs() < EPS {
+        if span == 0.0 {
             return self.probabilities[lower];
         }
         let weight = (x - self.values[lower]) / span;
@@ -292,9 +333,9 @@ pub struct EmpiricalDistribution {
 
 impl EmpiricalDistribution {
     pub fn new(mut samples: Vec<f64>) -> Result<Self> {
-        if samples.len() < 2 || samples.iter().any(|value| !value.is_finite()) {
+        if samples.is_empty() || samples.iter().any(|value| !value.is_finite()) {
             return Err(CrcError::InvalidInput(
-                "an empirical distribution requires at least two finite samples".into(),
+                "an empirical distribution requires nonempty finite samples".into(),
             ));
         }
         samples.sort_by(f64::total_cmp);
@@ -316,11 +357,9 @@ impl Distribution for EmpiricalDistribution {
 
     fn ppf(&self, q: f64) -> Result<f64> {
         validate_probability(q)?;
-        let position = q * (self.samples.len() - 1) as f64;
-        let lower = position.floor() as usize;
-        let upper = position.ceil() as usize;
-        let weight = position - lower as f64;
-        Ok(self.samples[lower] + weight * (self.samples[upper] - self.samples[lower]))
+        // Generalized inverse of the ECDF: ties remain their observed atoms.
+        let index = (q * self.samples.len() as f64).ceil() as usize;
+        Ok(self.samples[index.saturating_sub(1).min(self.samples.len() - 1)])
     }
 
     fn probability_atom(&self, x: f64) -> f64 {
@@ -746,10 +785,24 @@ impl Distribution for FittedDistribution {
 
     fn ppf(&self, q: f64) -> Result<f64> {
         validate_probability(q)?;
-        if q <= 0.0 || q >= 1.0 {
-            return Err(CrcError::InvalidInput(
-                "parametric ppf requires probability strictly between zero and one".into(),
-            ));
+        if q == 0.0 || q == 1.0 {
+            return Ok(match (self.family, q == 0.0) {
+                (DistributionFamily::WeibullMin | DistributionFamily::GenPareto, true) => {
+                    self.location
+                }
+                (DistributionFamily::WeibullMax, false) => self.location,
+                (DistributionFamily::GenPareto, false) if self.shape.expect("validated") < 0.0 => {
+                    self.location - self.scale / self.shape.expect("validated")
+                }
+                (DistributionFamily::GenExtreme, true) if self.shape.expect("validated") < 0.0 => {
+                    self.location + self.scale / self.shape.expect("validated")
+                }
+                (DistributionFamily::GenExtreme, false) if self.shape.expect("validated") > 0.0 => {
+                    self.location + self.scale / self.shape.expect("validated")
+                }
+                (_, true) => f64::NEG_INFINITY,
+                (_, false) => f64::INFINITY,
+            });
         }
         let value = match self.family {
             DistributionFamily::GumbelRight => self.location - self.scale * (-q.ln()).ln(),
@@ -888,10 +941,8 @@ impl Distribution for HurdleDistribution {
         if q <= self.atom_probability {
             return Ok(self.atom_location);
         }
-        if q >= 1.0 {
-            return Err(CrcError::InvalidInput(
-                "hurdle ppf requires probability below one".into(),
-            ));
+        if q == 1.0 {
+            return self.base.ppf(1.0);
         }
         let conditional_probability = (q - self.atom_probability) / (1.0 - self.atom_probability);
         truncated_ppf(
@@ -915,6 +966,132 @@ pub struct DiagnosticMetrics {
 pub struct FitResult {
     pub distribution: FittedDistribution,
     pub diagnostics: DiagnosticMetrics,
+    pub iterations: usize,
+    pub evaluations: usize,
+}
+
+/// Constraints on the selected law, enforced inside optimization.
+/// With no probability, limits bound the complete support. Otherwise both
+/// limits bound the quantile at that probability.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct FitBounds {
+    pub minimum_value: Option<f64>,
+    pub maximum_value: Option<f64>,
+    pub probability: Option<f64>,
+    pub require_sample_support: bool,
+}
+
+impl FitBounds {
+    pub fn validate(&self) -> Result<()> {
+        if self.minimum_value.is_some_and(|x| !x.is_finite())
+            || self.maximum_value.is_some_and(|x| !x.is_finite())
+            || self
+                .probability
+                .is_some_and(|q| !q.is_finite() || !(0.0..=1.0).contains(&q))
+            || matches!((self.minimum_value, self.maximum_value), (Some(a), Some(b)) if a > b)
+        {
+            return Err(CrcError::InvalidInput("invalid fitting constraints".into()));
+        }
+        Ok(())
+    }
+
+    pub fn accepts(&self, law: &dyn Distribution, samples: &[f64]) -> bool {
+        let lower = law
+            .ppf(self.probability.unwrap_or(0.0))
+            .unwrap_or(f64::NEG_INFINITY);
+        let upper = law
+            .ppf(self.probability.unwrap_or(1.0))
+            .unwrap_or(f64::INFINITY);
+        self.minimum_value.is_none_or(|minimum| lower >= minimum)
+            && self.maximum_value.is_none_or(|maximum| upper <= maximum)
+            && (!self.require_sample_support
+                || samples.iter().all(|&value| {
+                    let a = law.ppf(0.0).unwrap_or(f64::NEG_INFINITY);
+                    let b = law.ppf(1.0).unwrap_or(f64::INFINITY);
+                    value >= a && value <= b
+                }))
+    }
+}
+
+fn project_fit_bounds(
+    family: DistributionFamily,
+    bounds: FitBounds,
+    parameters: &mut [f64],
+    log_scale: bool,
+) {
+    let shaped = !matches!(
+        family,
+        DistributionFamily::GumbelRight | DistributionFamily::GumbelLeft
+    );
+    let location_index = usize::from(shaped);
+    let shape = shaped.then_some(parameters[0]);
+    let scale = if log_scale {
+        parameters[location_index + 1].exp()
+    } else {
+        parameters[location_index + 1]
+    };
+    // A location shift moves every unconditional quantile by that exact amount.
+    // Project before scoring to let the optimizer converge on an active limit.
+    if let Ok(law) =
+        FittedDistribution::from_parameters(family, shape, parameters[location_index], scale)
+    {
+        let mut shift: f64 = 0.0;
+        if let Some(minimum) = bounds.minimum_value {
+            if let Ok(q) = law.ppf(bounds.probability.unwrap_or(0.0)) {
+                if q.is_finite() && q < minimum {
+                    shift = minimum - q + 1e-12 * scale;
+                }
+            }
+        }
+        if let Some(maximum) = bounds.maximum_value {
+            if let Ok(q) = law.ppf(bounds.probability.unwrap_or(1.0)) {
+                if q + shift > maximum {
+                    shift = maximum - q - 1e-12 * scale;
+                }
+            }
+        }
+        parameters[location_index] += shift;
+    }
+}
+
+pub fn fit_samples_mle(
+    samples: &[f64],
+    family: DistributionFamily,
+    bounds: FitBounds,
+) -> Result<FitResult> {
+    if samples.len() < 3 || samples.iter().any(|x| !x.is_finite()) {
+        return Err(CrcError::InvalidInput(
+            "MLE requires at least three finite observations".into(),
+        ));
+    }
+    bounds.validate()?;
+    let kind = reference_curve_fitting::DistributionKind::from_name(family.name())
+        .expect("shared family names");
+    let optimized = reference_curve_fitting::fit_sample_likelihood(kind, samples, bounds)
+        .ok_or_else(|| {
+            CrcError::Unsupported(format!(
+                "{} has no feasible likelihood fit under the supplied constraints",
+                family.name()
+            ))
+        })?;
+    if !optimized.converged {
+        return Err(CrcError::ConvergenceFailed {
+            family: family.name().into(),
+            iterations: optimized.iterations,
+        });
+    }
+    let distribution = FittedDistribution::from_parameters(
+        family,
+        optimized.shape,
+        optimized.loc,
+        optimized.scale,
+    )?;
+    Ok(FitResult {
+        diagnostics: diagnostics(samples, &distribution),
+        distribution,
+        iterations: optimized.iterations,
+        evaluations: optimized.evaluations,
+    })
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -991,6 +1168,8 @@ pub fn fit_lmoments(samples: &[f64], family: DistributionFamily) -> Result<FitRe
     Ok(FitResult {
         diagnostics: diagnostics_sorted(&sorted, &distribution),
         distribution,
+        iterations: 0,
+        evaluations: 0,
     })
 }
 
@@ -1000,8 +1179,19 @@ pub fn fit_quantiles(
     weights: Option<&[f64]>,
     family: DistributionFamily,
 ) -> Result<QuantileFitResult> {
+    fit_quantiles_with_bounds(probabilities, values, weights, family, FitBounds::default())
+}
+
+pub fn fit_quantiles_with_bounds(
+    probabilities: &[f64],
+    values: &[f64],
+    weights: Option<&[f64]>,
+    family: DistributionFamily,
+    bounds: FitBounds,
+) -> Result<QuantileFitResult> {
+    bounds.validate()?;
     let weights = validate_quantile_points(probabilities, values, weights)?;
-    fit_quantile_points_internal(probabilities, values, &weights, family, None)
+    fit_quantile_points_internal(probabilities, values, &weights, family, None, None, bounds)
 }
 
 pub fn fit_censored_quantiles(
@@ -1012,6 +1202,27 @@ pub fn fit_censored_quantiles(
     censor_location: f64,
     residual_scale_floor_ratio: f64,
 ) -> Result<CensoredQuantileFitResult> {
+    fit_censored_quantiles_with_bounds(
+        probabilities,
+        values,
+        weights,
+        family,
+        censor_location,
+        residual_scale_floor_ratio,
+        FitBounds::default(),
+    )
+}
+
+pub fn fit_censored_quantiles_with_bounds(
+    probabilities: &[f64],
+    values: &[f64],
+    weights: Option<&[f64]>,
+    family: DistributionFamily,
+    censor_location: f64,
+    residual_scale_floor_ratio: f64,
+    bounds: FitBounds,
+) -> Result<CensoredQuantileFitResult> {
+    bounds.validate()?;
     let weights = validate_quantile_points(probabilities, values, weights)?;
     if !censor_location.is_finite() {
         return Err(CrcError::InvalidInput(
@@ -1057,6 +1268,8 @@ pub fn fit_censored_quantiles(
         &weights,
         censor_location,
         residual_scale_floor,
+        Some(&|law| bounds.accepts(law, values)),
+        Some(&|parameters| project_fit_bounds(family, bounds, parameters, true)),
     )
     .ok_or_else(|| CrcError::Unsupported(format!("{} could not be fitted", family.name())))?;
     if !optimized.converged {
@@ -1123,6 +1336,27 @@ pub fn fit_hurdle_quantiles(
     atom_location: f64,
     atom_probability: f64,
 ) -> Result<HurdleQuantileFitResult> {
+    fit_hurdle_quantiles_with_bounds(
+        probabilities,
+        values,
+        weights,
+        family,
+        atom_location,
+        atom_probability,
+        FitBounds::default(),
+    )
+}
+
+pub fn fit_hurdle_quantiles_with_bounds(
+    probabilities: &[f64],
+    values: &[f64],
+    weights: Option<&[f64]>,
+    family: DistributionFamily,
+    atom_location: f64,
+    atom_probability: f64,
+    bounds: FitBounds,
+) -> Result<HurdleQuantileFitResult> {
+    bounds.validate()?;
     let weights = validate_quantile_points(probabilities, values, weights)?;
     if !atom_location.is_finite()
         || values
@@ -1177,6 +1411,8 @@ pub fn fit_hurdle_quantiles(
         &tail_weights,
         family,
         Some(atom_location),
+        Some(atom_probability),
+        bounds,
     )?;
     let distribution =
         HurdleDistribution::new(atom_location, atom_probability, tail_result.distribution)?;
@@ -1198,6 +1434,8 @@ fn fit_quantile_points_internal(
     weights: &[f64],
     family: DistributionFamily,
     truncation_atom: Option<f64>,
+    atom_probability: Option<f64>,
+    bounds: FitBounds,
 ) -> Result<QuantileFitResult> {
     let conditioning_scale = robust_value_scale(values, weights);
     let kind = reference_curve_fitting::DistributionKind::from_name(family.name())
@@ -1209,6 +1447,23 @@ fn fit_quantile_points_internal(
         weights,
         conditioning_scale,
         truncation_atom,
+        Some(&|law| {
+            if let Some(atom) = truncation_atom {
+                HurdleDistribution::new(
+                    atom,
+                    atom_probability.expect("hurdle probability"),
+                    law.clone(),
+                )
+                .is_ok_and(|hurdle| bounds.accepts(&hurdle, values))
+            } else {
+                bounds.accepts(law, values)
+            }
+        }),
+        Some(&|parameters| {
+            if truncation_atom.is_none() {
+                project_fit_bounds(family, bounds, parameters, false);
+            }
+        }),
     )
     .ok_or_else(|| CrcError::Unsupported(format!("{} could not be fitted", family.name())))?;
     if !optimized.converged {
@@ -1268,16 +1523,7 @@ pub fn calculate_diagnostics(
 }
 
 fn fit_family(samples: &[f64], family: DistributionFamily) -> Result<FitResult> {
-    reference_curve_fitting::fit_all_candidates_diagnostic(samples)
-        .into_iter()
-        .find(|candidate| candidate.name == family.name())
-        .ok_or_else(|| {
-            CrcError::Unsupported(format!(
-                "{} could not be fitted to the samples",
-                family.name()
-            ))
-        })
-        .and_then(reference_diagnostic)
+    fit_samples_mle(samples, family, FitBounds::default())
 }
 
 fn reference_diagnostic(diagnostic: reference_curve_fitting::DiagnosticFit) -> Result<FitResult> {
@@ -1300,6 +1546,8 @@ fn reference_diagnostic(diagnostic: reference_curve_fitting::DiagnosticFit) -> R
             rmse: diagnostic.rmse,
             r_squared: diagnostic.r_squared,
         },
+        iterations: 0,
+        evaluations: 0,
     })
 }
 
@@ -1607,6 +1855,24 @@ fn skew_normal_cdf(z: f64, alpha: f64) -> f64 {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn empirical_quantile_is_the_generalized_inverse_of_its_ecdf() {
+        use super::{Distribution, EmpiricalDistribution};
+        let law = EmpiricalDistribution::new(vec![0.0, 0.0, 2.0, 10.0]).unwrap();
+        assert_eq!(law.ppf(0.0).unwrap(), 0.0);
+        assert_eq!(law.ppf(0.5).unwrap(), 0.0);
+        assert_eq!(law.ppf(0.50001).unwrap(), 2.0);
+        assert_eq!(law.ppf(1.0).unwrap(), 10.0);
+        assert_eq!(law.cdf(0.0), 0.5);
+        assert_eq!(law.probability_atom(0.0), 0.5);
+        assert_eq!(
+            EmpiricalDistribution::new(vec![3.0])
+                .unwrap()
+                .ppf(0.5)
+                .unwrap(),
+            3.0
+        );
+    }
     use super::*;
 
     #[test]
@@ -1829,15 +2095,56 @@ mod tests {
     }
 
     #[test]
-    fn sample_mle_gumbel_regression_is_unchanged() {
-        let result = fit_distribution(
-            &[0.0, 0.2, 0.7, 1.1, 1.9, 2.4, 3.2, 4.8],
-            Some(DistributionFamily::GumbelRight),
+    fn sample_mle_gumbel_solves_the_likelihood_score() {
+        let samples = [0.0, 0.2, 0.7, 1.1, 1.9, 2.4, 3.2, 4.8];
+        let result = fit_samples_mle(
+            &samples,
+            DistributionFamily::GumbelRight,
+            FitBounds::default(),
         )
         .unwrap();
-        assert!((result.distribution.location - 1.077_032_290_250_686_6).abs() < 1.0e-12);
-        assert!((result.distribution.scale - 1.173_589_689_864_434_2).abs() < 1.0e-12);
-        assert!((result.diagnostics.ks_statistic - 0.128_920_449_165_263_24).abs() < 1.0e-12);
+        let law = result.distribution;
+        let score_location = samples
+            .iter()
+            .map(|x| 1.0 - (-((x - law.location) / law.scale)).exp())
+            .sum::<f64>();
+        let score_scale = samples
+            .iter()
+            .map(|x| {
+                let z = (x - law.location) / law.scale;
+                -1.0 + z * (1.0 - (-z).exp())
+            })
+            .sum::<f64>();
+        assert!(
+            score_location.abs() < 1e-5,
+            "location score {score_location}"
+        );
+        assert!(score_scale.abs() < 1e-5, "scale score {score_scale}");
+        assert!(result.iterations > 0 && result.evaluations > 0);
+    }
+
+    #[test]
+    fn fixed_family_mle_enforces_quantile_bounds_during_optimization() {
+        let samples = [0.0, 0.2, 0.7, 1.1, 1.9, 2.4, 3.2, 4.8];
+        let bounds = FitBounds {
+            maximum_value: Some(4.0),
+            probability: Some(0.99),
+            ..FitBounds::default()
+        };
+        let result = fit_samples_mle(&samples, DistributionFamily::GumbelRight, bounds).unwrap();
+        assert_eq!(result.distribution.family, DistributionFamily::GumbelRight);
+        assert!(result.distribution.ppf(0.99).unwrap() <= 4.0);
+        assert!(result.evaluations > 0);
+    }
+
+    #[test]
+    fn infeasible_support_constraint_cannot_return_an_mle() {
+        let samples = [0.0, 0.2, 0.7, 1.1, 1.9, 2.4, 3.2, 4.8];
+        let bounds = FitBounds {
+            minimum_value: Some(0.0),
+            ..FitBounds::default()
+        };
+        assert!(fit_samples_mle(&samples, DistributionFamily::GumbelRight, bounds).is_err());
     }
 
     #[test]

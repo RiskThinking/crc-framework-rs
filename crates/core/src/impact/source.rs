@@ -355,7 +355,10 @@ impl ImpactSource {
 
     /// Quantile is constant on finitely many probability intervals.
     pub(crate) fn has_piecewise_constant_quantile(&self) -> bool {
-        matches!(self, Self::Discrete(_) | Self::PointMass(_))
+        matches!(
+            self,
+            Self::Discrete(_) | Self::PointMass(_) | Self::Empirical(_)
+        )
     }
 
     /// Quantile is piecewise linear or piecewise constant on `[0, 1]`.
@@ -416,7 +419,136 @@ impl ImpactSource {
             {
                 Ok(histogram.upper_quantile(probability))
             }
+            Self::Tabulated(distribution) => distribution
+                .upper_quantile(probability)
+                .map_err(distribution_error),
             _ => self.quantile(probability),
+        }
+    }
+
+    /// Direct survival coordinates avoid losing deep tails to `1 - s`.
+    pub(crate) fn inverse_survival(&self, survival: f64) -> ContractResult<f64> {
+        if !survival.is_finite() || !(0.0..=1.0).contains(&survival) {
+            return Err(fail(
+                "invalid_value",
+                "",
+                "survival must be finite and in [0,1]",
+            ));
+        }
+        match self {
+            Self::Fitted(distribution) => distribution.isf(survival).map_err(distribution_error),
+            Self::Hurdle(distribution) => {
+                let weight = 1.0 - distribution.atom_probability();
+                if survival >= weight || weight == 0.0 {
+                    return Ok(distribution.atom_location());
+                }
+                distribution
+                    .base()
+                    .isf(survival / weight * distribution.base().sf(distribution.atom_location()))
+                    .map_err(distribution_error)
+            }
+            Self::Histogram(histogram) => {
+                let mut consumed = 0.0;
+                for index in (0..histogram.normalized.len()).rev() {
+                    let mass = histogram.normalized[index];
+                    if mass > 0.0 && (survival < consumed + mass || survival == 0.0) {
+                        return Ok(histogram.edges[index + 1]
+                            - (survival - consumed) / mass
+                                * (histogram.edges[index + 1] - histogram.edges[index]));
+                    }
+                    consumed += mass;
+                }
+                Ok(histogram.edges[histogram
+                    .normalized
+                    .iter()
+                    .position(|p| *p > 0.0)
+                    .expect("positive mass")])
+            }
+            Self::Tabulated(distribution) => {
+                let mut consumed = 0.0;
+                let q = distribution.probabilities();
+                let x = distribution.values();
+                for index in (0..q.len() - 1).rev() {
+                    let mass = q[index + 1] - q[index];
+                    if mass > 0.0 && (survival < consumed + mass || survival == 0.0) {
+                        return Ok(
+                            x[index + 1] - (survival - consumed) / mass * (x[index + 1] - x[index])
+                        );
+                    }
+                    consumed += mass;
+                }
+                Ok(x[0])
+            }
+            Self::PointMass(distribution) => Ok(distribution.location()),
+            Self::Discrete(_) | Self::Empirical(_) => {
+                let atoms = self.point_atoms();
+                let mut consumed = 0.0;
+                for &(value, mass) in atoms.iter().rev() {
+                    if survival < consumed + mass || survival == 0.0 {
+                        return Ok(value);
+                    }
+                    consumed += mass;
+                }
+                Ok(atoms[0].0)
+            }
+        }
+    }
+
+    /// `P(X > x)`, or `P(X >= x)` when inclusive, without CDF subtraction.
+    pub(crate) fn survival_at(&self, x: f64, inclusive: bool) -> f64 {
+        match self {
+            Self::Fitted(distribution) => distribution.sf(x),
+            Self::Hurdle(distribution) => {
+                if x < distribution.atom_location()
+                    || inclusive && x == distribution.atom_location()
+                {
+                    1.0
+                } else {
+                    (1.0 - distribution.atom_probability()) * distribution.base().sf(x)
+                        / distribution.base().sf(distribution.atom_location())
+                }
+            }
+            Self::Histogram(histogram) => {
+                neumaier(histogram.edges.windows(2).zip(&histogram.normalized).map(
+                    |(bounds, p)| {
+                        p * if x <= bounds[0] {
+                            1.0
+                        } else if x >= bounds[1] {
+                            0.0
+                        } else {
+                            (bounds[1] - x) / (bounds[1] - bounds[0])
+                        }
+                    },
+                ))
+            }
+            Self::Tabulated(distribution) => neumaier(
+                distribution
+                    .values()
+                    .windows(2)
+                    .zip(distribution.probabilities().windows(2))
+                    .map(|(bounds, q)| {
+                        let fraction = if bounds[0] == bounds[1] {
+                            f64::from(if inclusive {
+                                bounds[0] >= x
+                            } else {
+                                bounds[0] > x
+                            })
+                        } else if x <= bounds[0] {
+                            1.0
+                        } else if x >= bounds[1] {
+                            0.0
+                        } else {
+                            (bounds[1] - x) / (bounds[1] - bounds[0])
+                        };
+                        (q[1] - q[0]) * fraction
+                    }),
+            ),
+            Self::Discrete(_) | Self::Empirical(_) | Self::PointMass(_) => neumaier(
+                self.point_atoms()
+                    .iter()
+                    .filter(|(v, _)| if inclusive { *v >= x } else { *v > x })
+                    .map(|(_, p)| *p),
+            ),
         }
     }
 
@@ -428,7 +560,7 @@ impl ImpactSource {
             Self::Tabulated(distribution) => distribution.cdf(x),
             Self::Fitted(distribution) => distribution.cdf(x),
             Self::Hurdle(distribution) => distribution.cdf(x),
-            Self::Empirical(distribution) => empirical_cdf(distribution.samples(), x, false),
+            Self::Empirical(distribution) => distribution.cdf(x),
         }
     }
 
@@ -440,7 +572,7 @@ impl ImpactSource {
             Self::Tabulated(distribution) => distribution.cdf_below(x),
             Self::Fitted(distribution) => distribution.cdf_below(x),
             Self::Hurdle(distribution) => distribution.cdf_below(x),
-            Self::Empirical(distribution) => empirical_cdf(distribution.samples(), x, true),
+            Self::Empirical(distribution) => distribution.cdf_below(x),
         }
     }
 
@@ -459,7 +591,7 @@ impl ImpactSource {
             }
             Self::Empirical(distribution) => {
                 let samples = distribution.samples();
-                let last_gap = (samples.len() - 1) as f64;
+                let count_total = samples.len() as f64;
                 let mut atoms = Vec::new();
                 let mut index = 0;
                 while index < samples.len() {
@@ -468,11 +600,7 @@ impl ImpactSource {
                     while index + count < samples.len() && samples[index + count] == location {
                         count += 1;
                     }
-                    if count > 1 {
-                        // Under the interpolated quantile, `count` equal order
-                        // statistics span `count - 1` of the `n - 1` gaps.
-                        atoms.push((location, (count - 1) as f64 / last_gap));
-                    }
+                    atoms.push((location, count as f64 / count_total));
                     index += count;
                 }
                 atoms
@@ -497,9 +625,9 @@ impl ImpactSource {
                 knots
             }
             Self::Empirical(distribution) => {
-                let last = (distribution.samples().len() - 1) as f64;
-                (0..distribution.samples().len())
-                    .map(|index| index as f64 / last)
+                let count = distribution.samples().len();
+                (0..=count)
+                    .map(|index| index as f64 / count as f64)
                     .collect()
             }
             Self::Fitted(_) | Self::Hurdle(_) => vec![0.0, 1.0],
@@ -509,8 +637,21 @@ impl ImpactSource {
     pub(crate) fn support(&self) -> (Tail, Tail) {
         match self {
             Self::Histogram(histogram) => (
-                Tail::Finite(histogram.edges[0]),
-                Tail::Finite(*histogram.edges.last().expect("histogram has edges")),
+                Tail::Finite(
+                    histogram.edges[histogram
+                        .normalized
+                        .iter()
+                        .position(|p| *p > 0.0)
+                        .expect("positive mass")],
+                ),
+                Tail::Finite(
+                    histogram.edges[histogram
+                        .normalized
+                        .iter()
+                        .rposition(|p| *p > 0.0)
+                        .expect("positive mass")
+                        + 1],
+                ),
             ),
             Self::Discrete(discrete) => (
                 Tail::Finite(discrete.pairs[0].0),
@@ -557,32 +698,6 @@ impl ImpactSource {
             Self::Hurdle(distribution) => fitted_mean_is_finite(distribution.base()),
         }
     }
-}
-
-/// Cdf of the law whose quantile interpolates the order statistics linearly
-/// (Hyndman-Fan type 7, the empirical `ppf`). Order statistic `k` sits at
-/// probability `k / (n - 1)`, so tied samples form an atom. `strict` gives
-/// `P(X < x)` instead of `P(X <= x)`.
-fn empirical_cdf(samples: &[f64], x: f64, strict: bool) -> f64 {
-    let count = if strict {
-        samples.partition_point(|sample| *sample < x)
-    } else {
-        samples.partition_point(|sample| *sample <= x)
-    };
-    if count == 0 {
-        return 0.0;
-    }
-    if count == samples.len() {
-        return 1.0;
-    }
-    let lower = count - 1;
-    let (left, right) = (samples[lower], samples[count]);
-    let fraction = if x > left {
-        ((x - left) / (right - left)).min(1.0)
-    } else {
-        0.0
-    };
-    (lower as f64 + fraction) / (samples.len() - 1) as f64
 }
 
 fn flat_knots(probabilities: &[f64], values: &[f64]) -> Vec<(f64, f64)> {
