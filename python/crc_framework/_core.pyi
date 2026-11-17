@@ -3,6 +3,8 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import numpy as np
 import numpy.typing as npt
 
+__version__: str
+
 class NativeDistribution:
     family: Optional[str]
     shape: Optional[float]

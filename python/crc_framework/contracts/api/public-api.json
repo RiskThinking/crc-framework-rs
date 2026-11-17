@@ -1,0 +1,1621 @@
+{
+  "schema_version": "1.0",
+  "package": "crc-framework",
+  "canonical_module": "crc_framework",
+  "type_aliases": {
+    "ArrayLike": "Sequence[float] | FloatArray",
+    "Values": "float | ArrayLike",
+    "ValueResult": "float | FloatArray",
+    "FloatArray": "numpy.typing.NDArray[numpy.float64]",
+    "Unit": "LengthUnit | TimeUnit | RatioUnit | TemperatureUnit | SpeedUnit | PrecipitationRateUnit",
+    "ScientificValue": "None | bool | int | float | str | Sequence[ScientificValue] | Mapping[str, ScientificValue]"
+  },
+  "exports": {
+    "BinaryOutcome": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "id",
+            "kind": "positional_or_keyword",
+            "annotation": "str"
+          },
+          {
+            "name": "lower_rank_mass",
+            "kind": "keyword_only",
+            "annotation": "float"
+          },
+          {
+            "name": "lower_impact",
+            "kind": "keyword_only",
+            "annotation": "float"
+          },
+          {
+            "name": "upper_rank_mass",
+            "kind": "keyword_only",
+            "annotation": "float"
+          },
+          {
+            "name": "upper_impact",
+            "kind": "keyword_only",
+            "annotation": "float"
+          }
+        ],
+        "returns": "BinaryOutcome"
+      },
+      "properties": {
+        "id": "str",
+        "lower_rank_mass": "float",
+        "lower_impact": "float",
+        "upper_rank_mass": "float",
+        "upper_impact": "float"
+      }
+    },
+    "BuildingType": {
+      "kind": "enum",
+      "members": {
+        "RESIDENTIAL": "residential",
+        "COMMERCIAL": "commercial",
+        "INDUSTRIAL": "industrial"
+      }
+    },
+    "BuiltinImpact": {
+      "kind": "enum",
+      "members": {
+        "FREEZE_THAW_CYCLES": "crc:freeze_thaw_cycles",
+        "FROST_DAYS": "crc:frost_days",
+        "MAXIMUM_DAILY_PRECIPITATION": "crc:maximum_daily_precipitation",
+        "CYCLONE": "crc:cyclone",
+        "MAXIMUM_DAILY_WIND_SPEED": "crc:maximum_daily_wind_speed",
+        "FIRE_WEATHER_INDEX": "crc:fire_weather_index",
+        "HOT_DAYS": "crc:hot_days",
+        "COASTAL_FLOOD": "crc:coastal_flood",
+        "RIVER_FLOOD": "crc:river_flood",
+        "INUNDATION": "crc:inundation",
+        "STANDARDIZED_PRECIPITATION_EVAPOTRANSPIRATION_INDEX": "crc:standardized_precipitation_evapotranspiration_index",
+        "COOLING_DEGREE_DAYS": "crc:cooling_degree_days",
+        "CONSECUTIVE_DRY_DAYS": "crc:consecutive_dry_days"
+      }
+    },
+    "CensoredQuantileFit": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "family",
+            "kind": "keyword_only",
+            "annotation": "DistributionFamily"
+          },
+          {
+            "name": "censor_location",
+            "kind": "keyword_only",
+            "annotation": "float"
+          },
+          {
+            "name": "minimum_knots",
+            "kind": "keyword_only",
+            "annotation": "int",
+            "default": 4
+          },
+          {
+            "name": "residual_scale_floor_ratio",
+            "kind": "keyword_only",
+            "annotation": "float",
+            "default": 0.001
+          },
+          {
+            "name": "constraints",
+            "kind": "keyword_only",
+            "annotation": "FitConstraints | None",
+            "default": null
+          }
+        ],
+        "returns": "CensoredQuantileFit"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        }
+      },
+      "properties": {
+        "kind": "FitKind",
+        "family": "DistributionFamily",
+        "censor_location": "float",
+        "minimum_knots": "int",
+        "residual_scale_floor_ratio": "float",
+        "constraints": "FitConstraints | None"
+      }
+    },
+    "ContextField": {
+      "kind": "class",
+      "properties": {
+        "name": "str",
+        "annotation": "str",
+        "required": "bool",
+        "choices": "tuple[str, ...]"
+      }
+    },
+    "ContextValue": {
+      "kind": "protocol",
+      "properties": {
+        "name": "str"
+      }
+    },
+    "DepthAboveGround": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "unit",
+            "kind": "keyword_only",
+            "annotation": "LengthUnit"
+          }
+        ],
+        "returns": "DepthAboveGround"
+      },
+      "properties": {
+        "quantity": "str",
+        "unit": "LengthUnit",
+        "fields": "Mapping[str, ScientificValue]",
+        "schema": "Mapping[str, ScientificValue] | None"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        }
+      }
+    },
+    "Diagnostic": {
+      "kind": "class",
+      "properties": {
+        "code": "str",
+        "message": "str",
+        "severity": "DiagnosticSeverity",
+        "path": "str",
+        "details": "Mapping[str, ScientificValue]"
+      }
+    },
+    "DiagnosticSeverity": {
+      "kind": "enum",
+      "members": {
+        "ERROR": "error",
+        "WARNING": "warning",
+        "INFO": "info"
+      }
+    },
+    "Distribution": {
+      "kind": "class",
+      "methods": {
+        "parametric": {
+          "parameters": [
+            {
+              "name": "family",
+              "kind": "positional_or_keyword",
+              "annotation": "DistributionFamily"
+            },
+            {
+              "name": "location",
+              "kind": "keyword_only",
+              "annotation": "float"
+            },
+            {
+              "name": "scale",
+              "kind": "keyword_only",
+              "annotation": "float"
+            },
+            {
+              "name": "shape",
+              "kind": "keyword_only",
+              "annotation": "float | None",
+              "default": null
+            }
+          ],
+          "returns": "Distribution",
+          "binding": "class"
+        },
+        "empirical": {
+          "parameters": [
+            {
+              "name": "samples",
+              "kind": "positional_or_keyword",
+              "annotation": "ArrayLike"
+            }
+          ],
+          "returns": "Distribution",
+          "binding": "class"
+        },
+        "discrete": {
+          "parameters": [
+            {
+              "name": "values",
+              "kind": "positional_or_keyword",
+              "annotation": "ArrayLike"
+            },
+            {
+              "name": "probabilities",
+              "kind": "positional_or_keyword",
+              "annotation": "ArrayLike"
+            }
+          ],
+          "returns": "Distribution",
+          "binding": "class"
+        },
+        "histogram": {
+          "parameters": [
+            {
+              "name": "edges",
+              "kind": "positional_or_keyword",
+              "annotation": "ArrayLike"
+            },
+            {
+              "name": "probabilities",
+              "kind": "positional_or_keyword",
+              "annotation": "ArrayLike"
+            }
+          ],
+          "returns": "Distribution",
+          "binding": "class"
+        },
+        "point_mass": {
+          "parameters": [
+            {
+              "name": "value",
+              "kind": "positional_or_keyword",
+              "annotation": "float"
+            }
+          ],
+          "returns": "Distribution",
+          "binding": "class"
+        },
+        "hurdle": {
+          "parameters": [
+            {
+              "name": "base",
+              "kind": "positional_or_keyword",
+              "annotation": "Distribution"
+            },
+            {
+              "name": "atom_probability",
+              "kind": "keyword_only",
+              "annotation": "float"
+            },
+            {
+              "name": "atom_location",
+              "kind": "keyword_only",
+              "annotation": "float",
+              "default": 0.0
+            }
+          ],
+          "returns": "Distribution",
+          "binding": "class"
+        },
+        "quantile": {
+          "parameters": [
+            {
+              "name": "probabilities",
+              "kind": "positional_or_keyword",
+              "annotation": "Values"
+            }
+          ],
+          "returns": "ValueResult",
+          "binding": "instance"
+        },
+        "cdf": {
+          "parameters": [
+            {
+              "name": "values",
+              "kind": "positional_or_keyword",
+              "annotation": "Values"
+            },
+            {
+              "name": "inclusive",
+              "kind": "keyword_only",
+              "annotation": "bool",
+              "default": true
+            }
+          ],
+          "returns": "ValueResult",
+          "binding": "instance"
+        },
+        "exceedance": {
+          "parameters": [
+            {
+              "name": "values",
+              "kind": "positional_or_keyword",
+              "annotation": "Values"
+            },
+            {
+              "name": "inclusive",
+              "kind": "keyword_only",
+              "annotation": "bool",
+              "default": false
+            }
+          ],
+          "returns": "ValueResult",
+          "binding": "instance"
+        },
+        "mass": {
+          "parameters": [
+            {
+              "name": "values",
+              "kind": "positional_or_keyword",
+              "annotation": "Values"
+            }
+          ],
+          "returns": "ValueResult",
+          "binding": "instance"
+        },
+        "sample": {
+          "parameters": [
+            {
+              "name": "size",
+              "kind": "positional_or_keyword",
+              "annotation": "int | tuple[int, ...]"
+            },
+            {
+              "name": "seed",
+              "kind": "keyword_only",
+              "annotation": "int | None",
+              "default": null
+            }
+          ],
+          "returns": "FloatArray",
+          "binding": "instance"
+        },
+        "statistics": {
+          "parameters": [
+            {
+              "name": "metrics",
+              "kind": "keyword_only",
+              "annotation": "Sequence[Statistic]"
+            },
+            {
+              "name": "level",
+              "kind": "keyword_only",
+              "annotation": "float",
+              "default": 0.95
+            },
+            {
+              "name": "tail",
+              "kind": "keyword_only",
+              "annotation": "Tail",
+              "default": {
+                "enum": "Tail.UPPER"
+              }
+            }
+          ],
+          "returns": "StatisticalSummary",
+          "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "Distribution",
+          "binding": "class"
+        },
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        }
+      },
+      "properties": {
+        "kind": "DistributionKind",
+        "support": "tuple[float, float]"
+      }
+    },
+    "DistributionFamily": {
+      "kind": "enum",
+      "members": {
+        "GENERALIZED_EXTREME_VALUE": "genextreme",
+        "WEIBULL_MINIMUM": "weibull_min",
+        "WEIBULL_MAXIMUM": "weibull_max",
+        "SKEW_NORMAL": "skewnorm",
+        "GUMBEL_RIGHT": "gumbel_r",
+        "GUMBEL_LEFT": "gumbel_l",
+        "GENERALIZED_PARETO": "genpareto"
+      }
+    },
+    "DistributionKind": {
+      "kind": "enum",
+      "members": {
+        "PARAMETRIC": "parametric",
+        "DISCRETE": "discrete",
+        "HISTOGRAM": "histogram",
+        "POINT_MASS": "point_mass",
+        "HURDLE": "hurdle",
+        "QUANTILE": "quantile",
+        "TRANSFORMED": "transformed"
+      }
+    },
+    "FitAttempt": {
+      "kind": "class",
+      "properties": {
+        "specification": "FitSpec",
+        "status": "FitStatus",
+        "reason": "str | None",
+        "diagnostics": "tuple[Diagnostic, ...]"
+      }
+    },
+    "FitConstraints": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "minimum_value",
+            "kind": "keyword_only",
+            "annotation": "float | None",
+            "default": null
+          },
+          {
+            "name": "maximum_value",
+            "kind": "keyword_only",
+            "annotation": "float | None",
+            "default": null
+          },
+          {
+            "name": "probability",
+            "kind": "keyword_only",
+            "annotation": "float | None",
+            "default": null
+          },
+          {
+            "name": "require_sample_support",
+            "kind": "keyword_only",
+            "annotation": "bool",
+            "default": false
+          }
+        ],
+        "returns": "FitConstraints"
+      },
+      "properties": {
+        "minimum_value": "float | None",
+        "maximum_value": "float | None",
+        "probability": "float | None",
+        "require_sample_support": "bool"
+      }
+    },
+    "FitKind": {
+      "kind": "enum",
+      "members": {
+        "SAMPLES": "samples",
+        "QUANTILES": "quantiles",
+        "CENSORED_QUANTILES": "censored_quantiles",
+        "HURDLE_QUANTILES": "hurdle_quantiles",
+        "MODEL_SELECTION": "model_selection"
+      }
+    },
+    "FitRecord": {
+      "kind": "class",
+      "properties": {
+        "specification": "FitSpec",
+        "attempts": "tuple[FitAttempt, ...]",
+        "estimator": "SampleEstimator | None",
+        "converged": "bool",
+        "evidence_count": "int",
+        "used_count": "int",
+        "excluded_count": "int",
+        "weights": "tuple[float, ...] | None",
+        "evidence_support": "tuple[float, float] | None",
+        "engine_version": "str"
+      }
+    },
+    "FitResult": {
+      "kind": "class",
+      "properties": {
+        "distribution": "Distribution",
+        "diagnostics": "tuple[Diagnostic, ...]",
+        "record": "FitRecord"
+      }
+    },
+    "FitSpec": {
+      "kind": "protocol",
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        }
+      },
+      "properties": {
+        "kind": "FitKind"
+      }
+    },
+    "FitStatus": {
+      "kind": "enum",
+      "members": {
+        "CONVERGED": "converged",
+        "REJECTED": "rejected",
+        "FAILED": "failed"
+      }
+    },
+    "Geography": {
+      "kind": "class",
+      "properties": {
+        "continent": "str",
+        "countries": "tuple[str, ...]"
+      }
+    },
+    "HurdleQuantileFit": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "family",
+            "kind": "keyword_only",
+            "annotation": "DistributionFamily"
+          },
+          {
+            "name": "atom_probability",
+            "kind": "keyword_only",
+            "annotation": "float"
+          },
+          {
+            "name": "atom_location",
+            "kind": "keyword_only",
+            "annotation": "float",
+            "default": 0.0
+          },
+          {
+            "name": "minimum_knots",
+            "kind": "keyword_only",
+            "annotation": "int",
+            "default": 4
+          },
+          {
+            "name": "constraints",
+            "kind": "keyword_only",
+            "annotation": "FitConstraints | None",
+            "default": null
+          }
+        ],
+        "returns": "HurdleQuantileFit"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        }
+      },
+      "properties": {
+        "kind": "FitKind",
+        "family": "DistributionFamily",
+        "atom_probability": "float",
+        "atom_location": "float",
+        "minimum_knots": "int",
+        "constraints": "FitConstraints | None"
+      }
+    },
+    "Impact": {
+      "kind": "class",
+      "methods": {
+        "builtin": {
+          "parameters": [
+            {
+              "name": "model",
+              "kind": "positional_or_keyword",
+              "annotation": "BuiltinImpact"
+            }
+          ],
+          "returns": "ImpactReference",
+          "binding": "class"
+        },
+        "linear": {
+          "parameters": [
+            {
+              "name": "slope",
+              "kind": "keyword_only",
+              "annotation": "float"
+            },
+            {
+              "name": "input",
+              "kind": "keyword_only",
+              "annotation": "Measurement"
+            },
+            {
+              "name": "output",
+              "kind": "keyword_only",
+              "annotation": "Measurement"
+            },
+            {
+              "name": "intercept",
+              "kind": "keyword_only",
+              "annotation": "float",
+              "default": 0.0
+            },
+            {
+              "name": "minimum",
+              "kind": "keyword_only",
+              "annotation": "float | None",
+              "default": null
+            },
+            {
+              "name": "maximum",
+              "kind": "keyword_only",
+              "annotation": "float | None",
+              "default": null
+            }
+          ],
+          "returns": "Impact",
+          "binding": "class"
+        },
+        "sigmoid": {
+          "parameters": [
+            {
+              "name": "midpoint",
+              "kind": "keyword_only",
+              "annotation": "float"
+            },
+            {
+              "name": "steepness",
+              "kind": "keyword_only",
+              "annotation": "float"
+            },
+            {
+              "name": "input",
+              "kind": "keyword_only",
+              "annotation": "Measurement"
+            },
+            {
+              "name": "output",
+              "kind": "keyword_only",
+              "annotation": "Measurement"
+            },
+            {
+              "name": "offset",
+              "kind": "keyword_only",
+              "annotation": "float",
+              "default": 0.0
+            },
+            {
+              "name": "amplitude",
+              "kind": "keyword_only",
+              "annotation": "float",
+              "default": 1.0
+            }
+          ],
+          "returns": "Impact",
+          "binding": "class"
+        },
+        "tabulated": {
+          "parameters": [
+            {
+              "name": "points",
+              "kind": "positional_or_keyword",
+              "annotation": "Sequence[tuple[float, float]]"
+            },
+            {
+              "name": "input",
+              "kind": "keyword_only",
+              "annotation": "Measurement"
+            },
+            {
+              "name": "output",
+              "kind": "keyword_only",
+              "annotation": "Measurement"
+            }
+          ],
+          "returns": "Impact",
+          "binding": "class"
+        },
+        "binned": {
+          "parameters": [
+            {
+              "name": "edges",
+              "kind": "positional_or_keyword",
+              "annotation": "ArrayLike"
+            },
+            {
+              "name": "values",
+              "kind": "positional_or_keyword",
+              "annotation": "ArrayLike"
+            },
+            {
+              "name": "input",
+              "kind": "keyword_only",
+              "annotation": "Measurement"
+            },
+            {
+              "name": "output",
+              "kind": "keyword_only",
+              "annotation": "Measurement"
+            }
+          ],
+          "returns": "Impact",
+          "binding": "class"
+        },
+        "evaluate": {
+          "parameters": [
+            {
+              "name": "values",
+              "kind": "positional_or_keyword",
+              "annotation": "Values"
+            }
+          ],
+          "returns": "ValueResult",
+          "binding": "instance"
+        },
+        "expectation": {
+          "parameters": [
+            {
+              "name": "distribution",
+              "kind": "positional_or_keyword",
+              "annotation": "Distribution"
+            }
+          ],
+          "returns": "float",
+          "binding": "instance"
+        },
+        "pushforward": {
+          "parameters": [
+            {
+              "name": "distribution",
+              "kind": "positional_or_keyword",
+              "annotation": "Distribution"
+            }
+          ],
+          "returns": "Distribution",
+          "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "Impact",
+          "binding": "class"
+        },
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        }
+      },
+      "properties": {
+        "input": "Measurement",
+        "output": "Measurement",
+        "sha256": "str"
+      }
+    },
+    "ImpactContext": {
+      "kind": "protocol",
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        }
+      },
+      "properties": {
+        "schema": "Mapping[str, ScientificValue]"
+      }
+    },
+    "ImpactError": {
+      "kind": "class",
+      "properties": {
+        "code": "str",
+        "path": "str",
+        "message": "str"
+      }
+    },
+    "ImpactReference": {
+      "kind": "class",
+      "methods": {
+        "resolve": {
+          "parameters": [
+            {
+              "name": "context",
+              "kind": "positional_or_keyword",
+              "annotation": "ImpactContext | None",
+              "default": null
+            }
+          ],
+          "returns": "Impact",
+          "binding": "instance"
+        },
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "ImpactReference",
+          "binding": "class"
+        }
+      },
+      "properties": {
+        "requirements": "ImpactRequirements",
+        "id": "str",
+        "version": "str",
+        "sha256": "str"
+      }
+    },
+    "ImpactRequirements": {
+      "kind": "class",
+      "properties": {
+        "measurement_type": "type[Measurement]",
+        "accepted_units": "tuple[Unit, ...]",
+        "context_type": "type[ImpactContext]",
+        "context_fields": "tuple[ContextField, ...]",
+        "output": "Measurement"
+      }
+    },
+    "InundationContext": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "country",
+            "kind": "keyword_only",
+            "annotation": "str | ContextValue | None",
+            "default": null
+          },
+          {
+            "name": "continent",
+            "kind": "keyword_only",
+            "annotation": "str | ContextValue | None",
+            "default": null
+          },
+          {
+            "name": "building_type",
+            "kind": "keyword_only",
+            "annotation": "BuildingType | ContextValue | None",
+            "default": null
+          }
+        ],
+        "returns": "InundationContext"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        }
+      },
+      "properties": {
+        "schema": "Mapping[str, ScientificValue]",
+        "country": "str | ContextValue | None",
+        "continent": "str | ContextValue | None",
+        "building_type": "BuildingType | ContextValue | None"
+      }
+    },
+    "LengthUnit": {
+      "kind": "enum",
+      "members": {
+        "METRE": "m",
+        "CENTIMETRE": "cm",
+        "MILLIMETRE": "mm",
+        "FOOT": "ft"
+      }
+    },
+    "Measurement": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "quantity",
+            "kind": "keyword_only",
+            "annotation": "str | None",
+            "default": null
+          },
+          {
+            "name": "unit",
+            "kind": "keyword_only",
+            "annotation": "Unit | str | None",
+            "default": null
+          },
+          {
+            "name": "fields",
+            "kind": "keyword_only",
+            "annotation": "Mapping[str, ScientificValue] | None",
+            "default": null
+          },
+          {
+            "name": "schema",
+            "kind": "keyword_only",
+            "annotation": "Mapping[str, ScientificValue] | None",
+            "default": null
+          }
+        ],
+        "returns": "Measurement"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        }
+      },
+      "properties": {
+        "quantity": "str | None",
+        "unit": "Unit | str | None",
+        "fields": "Mapping[str, ScientificValue]",
+        "schema": "Mapping[str, ScientificValue] | None"
+      }
+    },
+    "ModelSelection": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "candidates",
+            "kind": "keyword_only",
+            "annotation": "tuple[FitSpec, ...]"
+          },
+          {
+            "name": "criterion",
+            "kind": "keyword_only",
+            "annotation": "SelectionCriterion",
+            "default": {
+              "enum": "SelectionCriterion.KOLMOGOROV_SMIRNOV"
+            }
+          }
+        ],
+        "returns": "ModelSelection"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        }
+      },
+      "properties": {
+        "kind": "FitKind",
+        "candidates": "tuple[FitSpec, ...]",
+        "criterion": "SelectionCriterion"
+      }
+    },
+    "PrecipitationRateUnit": {
+      "kind": "enum",
+      "members": {
+        "MILLIMETRES_PER_DAY": "mm/day",
+        "MILLIMETRES_PER_HOUR": "mm/h"
+      }
+    },
+    "QuantileCurve": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "probabilities",
+            "kind": "positional_or_keyword",
+            "annotation": "ArrayLike"
+          },
+          {
+            "name": "values",
+            "kind": "positional_or_keyword",
+            "annotation": "ArrayLike"
+          }
+        ],
+        "returns": "QuantileCurve"
+      },
+      "methods": {
+        "quantile": {
+          "parameters": [
+            {
+              "name": "probabilities",
+              "kind": "positional_or_keyword",
+              "annotation": "Values"
+            }
+          ],
+          "returns": "ValueResult",
+          "binding": "instance"
+        },
+        "condition": {
+          "parameters": [
+            {
+              "name": "q_min",
+              "kind": "keyword_only",
+              "annotation": "float"
+            },
+            {
+              "name": "q_max",
+              "kind": "keyword_only",
+              "annotation": "float"
+            }
+          ],
+          "returns": "Distribution",
+          "binding": "instance"
+        },
+        "complete": {
+          "parameters": [
+            {
+              "name": "policy",
+              "kind": "positional_or_keyword",
+              "annotation": "TailCompletion"
+            }
+          ],
+          "returns": "Distribution",
+          "binding": "instance"
+        },
+        "from_samples": {
+          "parameters": [
+            {
+              "name": "samples",
+              "kind": "positional_or_keyword",
+              "annotation": "ArrayLike"
+            }
+          ],
+          "returns": "QuantileCurve",
+          "binding": "class"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "QuantileCurve",
+          "binding": "class"
+        },
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        }
+      },
+      "properties": {
+        "probabilities": "FloatArray",
+        "values": "FloatArray",
+        "probability_interval": "tuple[float, float]"
+      }
+    },
+    "QuantileFit": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "family",
+            "kind": "keyword_only",
+            "annotation": "DistributionFamily"
+          },
+          {
+            "name": "weights",
+            "kind": "keyword_only",
+            "annotation": "tuple[float, ...] | None",
+            "default": null
+          },
+          {
+            "name": "minimum_knots",
+            "kind": "keyword_only",
+            "annotation": "int",
+            "default": 4
+          },
+          {
+            "name": "constraints",
+            "kind": "keyword_only",
+            "annotation": "FitConstraints | None",
+            "default": null
+          }
+        ],
+        "returns": "QuantileFit"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        }
+      },
+      "properties": {
+        "kind": "FitKind",
+        "family": "DistributionFamily",
+        "weights": "tuple[float, ...] | None",
+        "minimum_knots": "int",
+        "constraints": "FitConstraints | None"
+      }
+    },
+    "RankScenario": {
+      "kind": "class",
+      "properties": {
+        "probability": "float",
+        "value": "float",
+        "lower_rank_mass": "float",
+        "upper_rank_mass": "float"
+      }
+    },
+    "Ratio": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "unit",
+            "kind": "keyword_only",
+            "annotation": "RatioUnit",
+            "default": {
+              "enum": "RatioUnit.FRACTION"
+            }
+          }
+        ],
+        "returns": "Ratio"
+      },
+      "properties": {
+        "quantity": "str",
+        "unit": "RatioUnit",
+        "fields": "Mapping[str, ScientificValue]",
+        "schema": "Mapping[str, ScientificValue] | None"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        }
+      }
+    },
+    "RatioUnit": {
+      "kind": "enum",
+      "members": {
+        "FRACTION": "1",
+        "PERCENT": "percent"
+      }
+    },
+    "RiskAttribution": {
+      "kind": "class",
+      "properties": {
+        "id": "str",
+        "value_at_risk": "float",
+        "conditional_value_at_risk": "float"
+      }
+    },
+    "RiskLevel": {
+      "kind": "class",
+      "properties": {
+        "probability": "float",
+        "value_at_risk": "float",
+        "conditional_value_at_risk": "float",
+        "attribution": "tuple[RiskAttribution, ...]"
+      }
+    },
+    "RiskResult": {
+      "kind": "class",
+      "methods": {
+        "at": {
+          "parameters": [
+            {
+              "name": "probability",
+              "kind": "positional_or_keyword",
+              "annotation": "float"
+            }
+          ],
+          "returns": "RiskLevel",
+          "binding": "instance"
+        }
+      },
+      "properties": {
+        "levels": "tuple[RiskLevel, ...]",
+        "branch_count": "int"
+      }
+    },
+    "SampleEstimator": {
+      "kind": "enum",
+      "members": {
+        "MAXIMUM_LIKELIHOOD": "mle",
+        "L_MOMENTS": "lmoments"
+      }
+    },
+    "SampleFit": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "family",
+            "kind": "keyword_only",
+            "annotation": "DistributionFamily"
+          },
+          {
+            "name": "estimator",
+            "kind": "keyword_only",
+            "annotation": "SampleEstimator",
+            "default": {
+              "enum": "SampleEstimator.MAXIMUM_LIKELIHOOD"
+            }
+          },
+          {
+            "name": "minimum_samples",
+            "kind": "keyword_only",
+            "annotation": "int",
+            "default": 3
+          },
+          {
+            "name": "constraints",
+            "kind": "keyword_only",
+            "annotation": "FitConstraints | None",
+            "default": null
+          },
+          {
+            "name": "fallbacks",
+            "kind": "keyword_only",
+            "annotation": "tuple[SampleFit, ...]",
+            "default": {
+              "tuple": []
+            }
+          }
+        ],
+        "returns": "SampleFit"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        }
+      },
+      "properties": {
+        "kind": "FitKind",
+        "family": "DistributionFamily",
+        "estimator": "SampleEstimator",
+        "minimum_samples": "int",
+        "constraints": "FitConstraints | None",
+        "fallbacks": "tuple[SampleFit, ...]"
+      }
+    },
+    "SelectionCriterion": {
+      "kind": "enum",
+      "members": {
+        "KOLMOGOROV_SMIRNOV": "ks"
+      }
+    },
+    "SpeedUnit": {
+      "kind": "enum",
+      "members": {
+        "METRES_PER_SECOND": "m/s",
+        "KILOMETRES_PER_HOUR": "km/h"
+      }
+    },
+    "Statistic": {
+      "kind": "enum",
+      "members": {
+        "MEAN": "mean",
+        "VARIANCE": "variance",
+        "STANDARD_DEVIATION": "standard_deviation",
+        "MINIMUM": "minimum",
+        "MAXIMUM": "maximum",
+        "CVAR": "cvar"
+      }
+    },
+    "StatisticStatus": {
+      "kind": "enum",
+      "members": {
+        "FINITE": "finite",
+        "POSITIVE_INFINITY": "positive_infinity",
+        "NEGATIVE_INFINITY": "negative_infinity",
+        "UNDEFINED": "undefined"
+      }
+    },
+    "StatisticValue": {
+      "kind": "class",
+      "properties": {
+        "status": "StatisticStatus",
+        "value": "float | None",
+        "diagnostics": "tuple[Diagnostic, ...]"
+      }
+    },
+    "StatisticalSummary": {
+      "kind": "class",
+      "properties": {
+        "values": "Mapping[Statistic, StatisticValue]",
+        "level": "float | None",
+        "tail": "Tail | None"
+      }
+    },
+    "Tail": {
+      "kind": "enum",
+      "members": {
+        "UPPER": "upper",
+        "LOWER": "lower"
+      }
+    },
+    "TailCompletion": {
+      "kind": "protocol",
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        }
+      },
+      "properties": {
+        "name": "str"
+      }
+    },
+    "TemperatureUnit": {
+      "kind": "enum",
+      "members": {
+        "CELSIUS": "degC",
+        "KELVIN": "K",
+        "FAHRENHEIT": "degF"
+      }
+    },
+    "TimeDuration": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "unit",
+            "kind": "keyword_only",
+            "annotation": "TimeUnit"
+          }
+        ],
+        "returns": "TimeDuration"
+      },
+      "properties": {
+        "quantity": "str",
+        "unit": "TimeUnit",
+        "fields": "Mapping[str, ScientificValue]",
+        "schema": "Mapping[str, ScientificValue] | None"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        }
+      }
+    },
+    "TimeUnit": {
+      "kind": "enum",
+      "members": {
+        "SECOND": "s",
+        "HOUR": "h",
+        "DAY": "d",
+        "YEAR": "yr"
+      }
+    },
+    "compute_risk": {
+      "kind": "function",
+      "parameters": [
+        {
+          "name": "outcomes",
+          "kind": "positional_or_keyword",
+          "annotation": "Sequence[BinaryOutcome]"
+        },
+        {
+          "name": "levels",
+          "kind": "keyword_only",
+          "annotation": "Sequence[float]"
+        },
+        {
+          "name": "max_branches",
+          "kind": "keyword_only",
+          "annotation": "int | None",
+          "default": null
+        }
+      ],
+      "returns": "RiskResult"
+    },
+    "fit_quantiles": {
+      "kind": "function",
+      "parameters": [
+        {
+          "name": "curve",
+          "kind": "positional_or_keyword",
+          "annotation": "QuantileCurve"
+        },
+        {
+          "name": "specification",
+          "kind": "positional_or_keyword",
+          "annotation": "QuantileFit | CensoredQuantileFit | HurdleQuantileFit | ModelSelection"
+        }
+      ],
+      "returns": "FitResult"
+    },
+    "fit_samples": {
+      "kind": "function",
+      "parameters": [
+        {
+          "name": "samples",
+          "kind": "positional_or_keyword",
+          "annotation": "ArrayLike"
+        },
+        {
+          "name": "specification",
+          "kind": "positional_or_keyword",
+          "annotation": "SampleFit | ModelSelection"
+        }
+      ],
+      "returns": "FitResult"
+    },
+    "lookup_continent": {
+      "kind": "function",
+      "parameters": [
+        {
+          "name": "cell",
+          "kind": "positional_or_keyword",
+          "annotation": "int"
+        }
+      ],
+      "returns": "str | None"
+    },
+    "lookup_geography": {
+      "kind": "function",
+      "parameters": [
+        {
+          "name": "cell",
+          "kind": "positional_or_keyword",
+          "annotation": "int"
+        }
+      ],
+      "returns": "Geography | None"
+    },
+    "lookup_ipcc_region": {
+      "kind": "function",
+      "parameters": [
+        {
+          "name": "cell",
+          "kind": "positional_or_keyword",
+          "annotation": "int"
+        }
+      ],
+      "returns": "str | None"
+    },
+    "rank_scenarios": {
+      "kind": "function",
+      "parameters": [
+        {
+          "name": "distribution",
+          "kind": "positional_or_keyword",
+          "annotation": "Distribution"
+        },
+        {
+          "name": "probabilities",
+          "kind": "keyword_only",
+          "annotation": "Sequence[float]"
+        }
+      ],
+      "returns": "tuple[RankScenario, ...]"
+    }
+  },
+  "semantics": {
+    "canonical_imports": "Every public symbol is imported from crc_framework; implementation modules expose no alternate public aliases.",
+    "empirical_law": "Empirical observations always form the ECDF; interpolated sample quantiles form a QuantileCurve explicitly.",
+    "partial_curve": "A QuantileCurve has no whole-law statistics or sampling; queries outside its actual interval fail.",
+    "statistics": "Statistics use the complete law, preserve atoms and rare masses, and explicitly represent divergent or undefined outcomes.",
+    "impacts": "Event evaluation, expectation, and exact pushforward are separate operations; approximate transforms and context resolution are never implicit.",
+    "mle": "An MLE result requires successful likelihood optimization; alternative estimators run only when explicitly configured and appear in the fit record.",
+    "fitting_scope": "Only the requested family or explicit candidate specifications execute.",
+    "measurement": "Custom quantity and unit identifiers are data; specialized measurement requirements apply only to operations that need them.",
+    "immutability": "Public scientific objects and returned array snapshots are immutable.",
+    "protocols": "Unresolved context references and resolved point functions have distinct call contracts.",
+    "enum_inputs": "Closed Python choices require the declared enum; schema loaders hydrate canonical serialized values without aliases."
+  },
+  "removals": {
+    "modules": [
+      "crc_framework.constants",
+      "crc_framework.distributions",
+      "crc_framework.transforms",
+      "crc_framework.metrics",
+      "crc_framework.statistics",
+      "crc_framework.models",
+      "crc_framework.spatial"
+    ],
+    "methods": {
+      "Distribution": [
+        "ppf",
+        "quantiles",
+        "pdf",
+        "as_ecdf",
+        "as_interpolated"
+      ],
+      "QuantileCurve": [
+        "ppf",
+        "quantiles",
+        "cdf",
+        "sample",
+        "statistics"
+      ],
+      "Impact": [
+        "__call__",
+        "transform_distribution",
+        "expected_value",
+        "quantile_curve",
+        "image_curve"
+      ]
+    },
+    "wire_formats": [
+      "Historical curve parameter dictionaries and abbreviated point-mass records",
+      "Impact schema 1.0 definitions, references and records",
+      "Legacy summary and approximation modes"
+    ],
+    "symbols": [
+      "crc_framework.HORIZONS",
+      "crc_framework.PATHWAYS",
+      "crc_framework.RISK_FACTORS",
+      "crc_framework.Pathway",
+      "crc_framework.RiskFactor",
+      "crc_framework.EmpiricalDistribution",
+      "crc_framework.FittedDistribution",
+      "crc_framework.HurdleDistribution",
+      "crc_framework.PointMassDistribution",
+      "crc_framework.TabulatedDistribution",
+      "crc_framework.StatisticalLaw",
+      "crc_framework.ProbabilitySupport",
+      "crc_framework.QuantileFunction",
+      "crc_framework.ImpactSource",
+      "crc_framework.as_impact_source",
+      "crc_framework.statistical_law",
+      "crc_framework.distribution_statistics",
+      "crc_framework.interval_statistics",
+      "crc_framework.probability_masses",
+      "crc_framework.approximate_quantile_law",
+      "crc_framework.complete_quantile_tails",
+      "crc_framework.fit_distribution",
+      "crc_framework.fit_all",
+      "crc_framework.fit_censored_quantiles",
+      "crc_framework.fit_hurdle_quantiles",
+      "crc_framework.quality_metrics",
+      "crc_framework.CensoredQuantileFitDiagnostics",
+      "crc_framework.CensoredQuantileFitResult",
+      "crc_framework.HurdleQuantileFitDiagnostics",
+      "crc_framework.HurdleQuantileFitResult",
+      "crc_framework.QuantileFitDiagnostics",
+      "crc_framework.QuantileFitResult",
+      "crc_framework.FitDiagnostics",
+      "crc_framework.ImpactExpression",
+      "crc_framework.ImpactFunction",
+      "crc_framework.ImpactDistribution",
+      "crc_framework.HistogramExposure",
+      "crc_framework.DiscreteDistribution",
+      "crc_framework.ImpactRegistry",
+      "crc_framework.RegistryImpactReference",
+      "crc_framework.LinearImpact",
+      "crc_framework.SigmoidImpact",
+      "crc_framework.PiecewiseLinearImpact",
+      "crc_framework.CallableImpact",
+      "crc_framework.CallableTransform",
+      "crc_framework.ClimateImpact",
+      "crc_framework.TransformContext",
+      "crc_framework.ScenarioMetadata",
+      "crc_framework.generate_microscores",
+      "crc_framework.Microscore",
+      "crc_framework.MicroscoreSuite",
+      "crc_framework.compute_spanning_set",
+      "crc_framework.impact_registry_manifest",
+      "crc_framework.ImpactEvaluationRecord",
+      "crc_framework.ImpactEvaluationResult",
+      "crc_framework.GaussKronrodOptions",
+      "crc_framework.impacts"
+    ],
+    "schema_fields": [
+      "curve_kind",
+      "curve_type",
+      "curve_shape",
+      "curve_location",
+      "curve_scale",
+      "curve_atom_probability",
+      "curve_atom_location",
+      "curve_probabilities",
+      "curve_values"
+    ],
+    "replacement_tests": {
+      "tests/test_impacts.py": "Delete import/name retention assertions; port scientific point and distribution behavior to Impact.",
+      "tests/test_sdk.py": "Use the coherent Distribution and QuantileCurve operations and explicit fit specifications.",
+      "tests/test_impact_expression.py": "Use Impact event evaluation, expectation, exact pushforward, and typed requirements.",
+      "tests/test_core_numerics.py": "Retain numerical correctness, atoms, tiny probability masses, endpoint, and safety regressions through the new interfaces.",
+      "tests/test_consumer_parity.py": "Consume current numerical representation fixtures in Python, Rust and WASM."
+    }
+  }
+}

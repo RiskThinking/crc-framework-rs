@@ -14,9 +14,11 @@ contributors, and runnable quick starts. Then follow the guide for your task:
 | --- | --- |
 | Numerical algorithms, canonical validation, reference data | `crates/core/` |
 | Typed Python interface and native binding | `python/crc_framework/`, `src/` |
+| Public Python names, signatures, enum members, and removals | `python/crc_framework/contracts/api/public-api.json` |
+| Package and artifact versions | `python/crc_framework/contracts/api/release.json` |
 | WASM exports and JavaScript adapter | `crates/wasm/`, `js/src/` |
 | Impact schemas, catalogs, fixtures, manifest | Generated `python/crc_framework/contracts/impact/`; edit `tools/impact_contracts/` |
-| Package version | Root `Cargo.toml`, `[workspace.package].version` |
+| Package version declaration | Root `Cargo.toml`, `[workspace.package].version`; must match the release ledger |
 | Contributor roster | `.all-contributorsrc`; generate both package READMEs |
 
 Paths above are relative to the repository root. Humans and agents should use

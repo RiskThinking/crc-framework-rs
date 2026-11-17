@@ -9,6 +9,32 @@ permissions:
   id-token: write
 jobs:
 
+  runtime-contract:
+    name: Installed Python release contract
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Validate release tag and declared contract
+        env:
+          RELEASE_REF_TYPE: ${{ github.ref_type }}
+          RELEASE_REF_NAME: ${{ github.ref_name }}
+        run: |
+          uv run --no-project --python 3.12 python tools/api_contracts/check.py
+          uv run --no-project --python 3.12 python -c 'import os, tomllib; version=tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["version"]; assert os.environ["RELEASE_REF_TYPE"] == "tag" and os.environ["RELEASE_REF_NAME"] == "v" + version, "Release must run from the matching version tag"'
+      - name: Build and install isolated wheel
+        run: |
+          uv build --wheel --python 3.12 --out-dir "$RUNNER_TEMP/contract-wheel"
+          uv venv --python 3.12 "$RUNNER_TEMP/contract-venv"
+          uv pip install --python "$RUNNER_TEMP/contract-venv/bin/python" "$RUNNER_TEMP"/contract-wheel/*.whl
+      - name: Verify installed runtime before publication
+        working-directory: ${{ runner.temp }}
+        run: '"$RUNNER_TEMP/contract-venv/bin/python" -I "$GITHUB_WORKSPACE/tools/api_contracts/check.py" --runtime'
+
   linux:
     runs-on: ubuntu-22.04
     env:
@@ -158,7 +184,7 @@ jobs:
     name: Release
     environment: production
     runs-on: ubuntu-latest
-    needs: [linux, macos, windows, sdist]
+    needs: [runtime-contract, linux, macos, windows, sdist]
     steps:
       - uses: actions/checkout@v4
 

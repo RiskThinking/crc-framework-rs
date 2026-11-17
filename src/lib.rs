@@ -1046,6 +1046,7 @@ fn risk_factors() -> Vec<(i32, &'static str)> {
 
 #[pymodule(gil_used = false)]
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     m.add_class::<PyDistribution>()?;
     m.add_class::<PyFitResult>()?;
     m.add_class::<PyQuantileFitResult>()?;

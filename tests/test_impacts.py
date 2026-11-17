@@ -4,7 +4,6 @@ import numpy as np
 
 from crc_framework import (
     CallableImpact,
-    CallableTransform,
     ImpactFunction,
     LinearImpact,
     PiecewiseLinearImpact,
@@ -68,15 +67,6 @@ class PointImpactTests(unittest.TestCase):
             impact.evaluate([np.nan])
         with self.assertRaisesRegex(ValueError, "preserve"):
             CallableImpact(lambda exposure: np.array([1.0])).evaluate([1.0, 2.0])
-
-    def test_callable_transform_remains_distribution_compatible(self):
-        exposure = TabulatedDistribution([0.1, 0.5, 0.9], [0.0, 1.0, 2.0])
-        impact = CallableTransform(lambda values: values / 2.0)
-
-        np.testing.assert_allclose(impact.evaluate([0.0, 1.0]), [0.0, 0.5])
-        np.testing.assert_allclose(
-            impact(exposure).quantiles([0.1, 0.5, 0.9]), [0.0, 0.5, 1.0]
-        )
 
     def test_registry_evaluate_uses_native_vector_path_and_call_context(self):
         impact = impacts.for_factor("inundation")
