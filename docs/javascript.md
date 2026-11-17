@@ -1,86 +1,73 @@
-# JavaScript / WebAssembly guide
+# JavaScript and WebAssembly
 
-[Documentation index](README.md) · [Project README](../README.md)
+Consume the same current numerical and scientific documents used by Python and
+canonical datasets. The package includes WebAssembly, TypeScript declarations,
+and the current JSON Schemas. Dataset workflows and data acquisition belong to
+CRC-SDK.
 
-For installation and a runnable first example, start with the
-[JavaScript package README](../js/README.md). The examples below assume the
-package exports have been imported as shown there.
-
-## Initialization
-
-`q` is a non-exceedance probability in `[0, 1]`. Evaluation is synchronous after
-initialization. Concurrent calls to `init` share a promise; failed loads can be
-retried. The package is ESM, requires WebAssembly, has no runtime npm dependencies,
-and does not initialize on import. Vite handles the WASM asset through `new URL`.
-Other bundlers must copy/serve that asset or pass an explicit URL:
-
-```js
-await init({ module_or_path: new URL('/assets/crc_framework_bg.wasm', location.href) });
+```sh
+npm install @climateriskcommons/crc-framework
 ```
 
-Serve `.wasm` as `application/wasm` for streaming compilation. Follow the host
-application's CSP policy for WebAssembly execution. Node and SSR code that
-explicitly needs evaluation can load bytes instead of fetching a `file:` URL:
+Create numerical evidence in Python without authoring a serialization envelope:
 
-```js
-import { readFile } from 'node:fs/promises';
-const bytes = await readFile(new URL(import.meta.resolve('@climateriskcommons/crc-framework/crc_framework_bg.wasm')));
-await init({ module_or_path: bytes });
-// Or initSync({ module: bytes }) for synchronous startup.
+```python
+from pathlib import Path
+from crc_framework import QuantileCurve
+
+curve = QuantileCurve([0.9, 0.99, 0.999], [0.5, 2, 5])
+Path("depth.numerical.json").write_text(curve.to_json(), encoding="utf-8")
 ```
 
-## Input and errors
+Read that document in Node:
 
-For repeated tile queries or percentile changes, prepare the collection once:
+```javascript
+import { readFileSync } from "node:fs";
+import init, { prepareNumerical } from "@climateriskcommons/crc-framework";
 
-```js
-const curves = prepareCurves(propertiesArray);
+const wasm = readFileSync(new URL(import.meta.resolve(
+  "@climateriskcommons/crc-framework/crc_framework_bg.wasm"
+)));
+await init({ module_or_path: wasm });
+const text = readFileSync("depth.numerical.json", "utf8");
+const curve = prepareNumerical(text);
 try {
-  const median = curves.evaluate(0.5);
-  const tail = curves.evaluate(0.99);
+  console.log(curve.quantile(0.99)); // 2: the supplied 100-year upper-tail level
+  console.log(curve.quantile([0.9, 0.99])); // Float64Array
 } finally {
-  curves.free();
+  curve.free();
 }
 ```
 
-Preparation validates and copies a snapshot of the canonical inputs. Subsequent
-`evaluate(q)` calls process the collection inside one WASM call, preserve input
-order, and return `Array<number | null>`. Changes to the original objects do not
-change the prepared snapshot; prepare a new collection when tile data changes.
-Both prepared APIs require `free()` when finished; double-free is safe and use
-after free throws `Error`. Ordinary `evaluateCurves` is a one-shot convenience API
-that includes conversion/validation on every call.
+Imports are safe during server rendering; operations require initialization.
+`init()` is shared and idempotent. In browsers, its default loads the packaged
+WASM asset; bundlers can also supply bytes through `module_or_path`.
 
-The binding transfers contiguous float64 buffers internally. Optional-field
-presence is explicit, so supplied NaN cannot masquerade as missing input. Rust
-still owns all canonical validation, reconstruction and numerical algorithms.
-Numeric codes/names are supplied by Rust during initialization. The numeric wire
-format is private; consumers continue to pass canonical objects. MVT string-array
-decoding has a bounded internal cache. Public missing values remain null.
+`quantile(text, probabilities)` performs a one-shot query. `prepareNumericals`
+accepts an array of numerical documents as JSON text and returns one result per
+document for each scalar probability query. Prepared handles own their native
+memory; `free()` is idempotent and further queries fail.
 
-The public TypeScript declarations describe `CurveProperties`. Unknown feature
-properties are ignored; omitted optional fields equal null. Numeric fields must
-be numbers, not numeric strings. Array fields accept arrays or MVT JSON strings.
-All rules follow CRC-SDK's canonical representation:
+Partial evidence is queried only on its actual interval. Invalid coordinates,
+malformed documents, historical records, and out-of-support queries fail.
+Mathematical infinite endpoints remain JavaScript infinities. Missing data is a
+retained dataset failure, never a fictional numerical distribution or a silent
+null result.
 
-- Fitted: one of `genextreme`, `genpareto`, `weibull_min`, `weibull_max`, `gumbel_r`,
-  `gumbel_l`, `skewnorm`; finite location, positive scale, required shape except
-  Gumbel. Gumbel shape is normalized away by Rust.
-- Hurdle: fitted base plus finite atom location and atom probability strictly in
-  `(0, 1)`; the base must have positive tail probability above the atom.
-- Point mass: type `point_mass`, finite location, no shape, scale `0`, atom
-  probability `1`, atom location equal to location. Include these canonical fields
-  even though older frontend evaluators accepted abbreviated point masses.
-- Tabulated: type `linear_probability`, at least two finite matching knots,
-  strictly increasing probabilities in `[0,1]`, nondecreasing values; no scalars.
-- No data: a declared canonical reason, no parameters.
+Use shared structural and scientific validation without guessing schema URIs:
 
-Invalid probabilities throw `RangeError`. Malformed records and unsupported
-kinds/families throw `TypeError`. A malformed record aborts the entire batch;
-empty batches still validate `q`. Calls before initialization throw `Error`.
+```javascript
+import { DocumentSchema, validateDocument } from "@climateriskcommons/crc-framework";
+const datasetJSONText = await (await fetch("/dataset.json")).text();
+validateDocument(DocumentSchema.DATASET, datasetJSONText);
+```
 
-`null` means no data or a valid probability outside curve support: fitted excludes
-both endpoints, hurdle excludes `1`, point mass includes both, and tabulated
-supports only its stored knot interval (including endpoints). No clamping or
-extrapolation occurs. Malformed records are validated even outside support.
-Native and WASM transcendental math can differ slightly; parity tests use tolerances.
+Supply original JSON text to preserve unsigned64 cell identifiers and arbitrary
+scientific integers. JavaScript's ordinary JSON parser cannot represent every
+integer exactly. Current schemas are also available under the package's
+`contracts/` export. Model provenance, scientific references, fit execution
+records, spatial support, and row-key integrity are validated consistently with
+Python.
+
+See the repository's [scientific measurement reference](measurements.md)
+and [Python guide](python.md) for scientific declarations and fitting.

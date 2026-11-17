@@ -4,11 +4,12 @@
 //! Canonical curves are accepted only as full distributions.
 
 use crate::{
-    CanonicalCurve, Distribution, EmpiricalDistribution, FittedDistribution, HurdleDistribution,
+    Distribution, EmpiricalDistribution, FittedDistribution, HurdleDistribution,
     PointMassDistribution, TabulatedDistribution,
 };
 
 use super::error::{ContractResult, fail};
+use super::kernel_curve::KernelCurve;
 use super::quadrature::neumaier;
 
 const MASS_TOLERANCE: f64 = 1e-12;
@@ -319,13 +320,13 @@ pub enum ImpactSource {
 }
 
 impl ImpactSource {
-    pub fn from_curve(curve: CanonicalCurve) -> ContractResult<Self> {
+    pub fn from_curve(curve: KernelCurve) -> ContractResult<Self> {
         match curve {
-            CanonicalCurve::Fitted(distribution) => Ok(Self::Fitted(distribution)),
-            CanonicalCurve::Hurdle(distribution) => Ok(Self::Hurdle(distribution)),
-            CanonicalCurve::PointMass(distribution) => Ok(Self::PointMass(distribution)),
-            CanonicalCurve::Tabulated(distribution) => Ok(Self::Tabulated(distribution)),
-            CanonicalCurve::NoData => Err(fail(
+            KernelCurve::Fitted(distribution) => Ok(Self::Fitted(distribution)),
+            KernelCurve::Hurdle(distribution) => Ok(Self::Hurdle(distribution)),
+            KernelCurve::PointMass(distribution) => Ok(Self::PointMass(distribution)),
+            KernelCurve::Tabulated(distribution) => Ok(Self::Tabulated(distribution)),
+            KernelCurve::NoData => Err(fail(
                 "missing_probability_support",
                 "",
                 "a no-data curve does not define a distribution",

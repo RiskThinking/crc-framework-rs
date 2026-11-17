@@ -1,0 +1,368 @@
+{
+  "$id": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "empty_context"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "cell": {
+          "oneOf": [
+            {
+              "maximum": 18446744073709551615,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "column": {
+                  "minLength": 1,
+                  "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "kind": {
+          "const": "cell_context"
+        }
+      },
+      "required": [
+        "kind",
+        "cell"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "country": {
+          "oneOf": [
+            {
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "column": {
+                  "minLength": 1,
+                  "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "kind": {
+          "const": "country_context"
+        }
+      },
+      "required": [
+        "kind",
+        "country"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "asset_type": {
+          "oneOf": [
+            {
+              "enum": [
+                "residential",
+                "commercial",
+                "industrial",
+                "transport",
+                "roads",
+                "agricultural_land"
+              ]
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "column": {
+                  "minLength": 1,
+                  "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "kind": {
+          "const": "inundation_context"
+        },
+        "region": {
+          "oneOf": [
+            {
+              "enum": [
+                "africa",
+                "asia",
+                "europe",
+                "north_america",
+                "south_america",
+                "oceania",
+                "global"
+              ],
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "column": {
+                  "minLength": 1,
+                  "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "region",
+        "asset_type"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "asset_type": {
+          "oneOf": [
+            {
+              "enum": [
+                "residential",
+                "commercial",
+                "industrial"
+              ]
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "column": {
+                  "minLength": 1,
+                  "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "country": {
+          "oneOf": [
+            {
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "column": {
+                  "minLength": 1,
+                  "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "kind": {
+          "const": "water_cost_context"
+        }
+      },
+      "required": [
+        "kind",
+        "country",
+        "asset_type"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "asset_type": {
+          "oneOf": [
+            {
+              "enum": [
+                "residential",
+                "commercial",
+                "industrial",
+                "agricultural_building"
+              ]
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "column": {
+                  "minLength": 1,
+                  "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "country": {
+          "oneOf": [
+            {
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "column": {
+                  "minLength": 1,
+                  "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "historic_mean": {
+          "oneOf": [
+            {
+              "type": "number"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "column": {
+                  "minLength": 1,
+                  "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "kind": {
+          "const": "cooling_cost_context"
+        }
+      },
+      "required": [
+        "kind",
+        "country",
+        "asset_type",
+        "historic_mean"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "country": {
+          "oneOf": [
+            {
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "column": {
+                  "minLength": 1,
+                  "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "historic_mean": {
+          "oneOf": [
+            {
+              "type": "number"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "column": {
+                  "minLength": 1,
+                  "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "kind": {
+          "const": "crop_context"
+        }
+      },
+      "required": [
+        "kind",
+        "country",
+        "historic_mean"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "ImpactContext"
+}

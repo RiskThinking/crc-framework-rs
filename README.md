@@ -86,25 +86,24 @@ exposure = QuantileCurve(
 print(exposure.quantile(0.99))  # 100-year upper-tail return level: 0.9
 ```
 
-### JavaScript: consume a canonical curve
+### JavaScript: consume a numerical document
 
-```js
-import init, { evaluateCurve } from '@climateriskcommons/crc-framework';
+```javascript
+import init, { prepareNumerical } from "@climateriskcommons/crc-framework";
 
-await init(); // initialize once at client startup
-const properties = {
-  curve_kind: 'fitted',
-  curve_type: 'gumbel_r',
-  curve_location: 1,
-  curve_scale: 2,
-};
-const value = evaluateCurve(properties, 0.99);
+await init();
+const text = await (await fetch("/depth.numerical.json")).text();
+const curve = prepareNumerical(text);
+try {
+  console.log(curve.quantile(0.99));
+} finally {
+  curve.free();
+}
 ```
 
-Evaluation is synchronous after initialization. Imports are SSR-safe; initialize
-in the client, or load WASM bytes explicitly for Node evaluation. For repeated
-viewport or percentile queries, use `prepareCurves` to validate and transfer a
-collection once, then call `evaluate(q)` and free the handle when finished.
+Create `depth.numerical.json` with Python's `QuantileCurve.to_json()` or use an
+existing current numerical document. The [JavaScript guide](docs/javascript.md)
+covers Node initialization, array queries, and shared schema validation.
 
 ## Guides and next steps
 

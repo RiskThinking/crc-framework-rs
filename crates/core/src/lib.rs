@@ -1,6 +1,7 @@
 pub mod canonical;
-pub use canonical::{CanonicalCurve, CurveParameters};
+pub use canonical::Numerical;
 pub mod constants;
+pub mod dataset;
 pub mod distribution;
 pub mod error;
 pub mod impact;

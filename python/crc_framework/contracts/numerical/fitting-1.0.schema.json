@@ -1,0 +1,1051 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://climateriskcommons.org/schemas/fitting/1.0",
+  "$defs": {
+    "specification": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "samples"
+            },
+            "family": {
+              "enum": [
+                "genextreme",
+                "weibull_min",
+                "weibull_max",
+                "skewnorm",
+                "gumbel_r",
+                "gumbel_l",
+                "genpareto"
+              ]
+            },
+            "constraints": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "minimum_value": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": -1.7976931348623157e+308,
+                          "maximum": 1.7976931348623157e+308
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "maximum_value": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": -1.7976931348623157e+308,
+                          "maximum": 1.7976931348623157e+308
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "probability": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "require_sample_support": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "estimator": {
+              "enum": [
+                "mle",
+                "lmoments"
+              ]
+            },
+            "minimum_samples": {
+              "type": "integer",
+              "minimum": 3
+            },
+            "fallbacks": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/sample_specification"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "family"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "quantiles"
+            },
+            "family": {
+              "enum": [
+                "genextreme",
+                "weibull_min",
+                "weibull_max",
+                "skewnorm",
+                "gumbel_r",
+                "gumbel_l",
+                "genpareto"
+              ]
+            },
+            "constraints": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "minimum_value": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": -1.7976931348623157e+308,
+                          "maximum": 1.7976931348623157e+308
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "maximum_value": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": -1.7976931348623157e+308,
+                          "maximum": 1.7976931348623157e+308
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "probability": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "require_sample_support": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "weights": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "minItems": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minimum_knots": {
+              "type": "integer",
+              "minimum": 4
+            }
+          },
+          "required": [
+            "kind",
+            "family"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "censored_quantiles"
+            },
+            "family": {
+              "enum": [
+                "genextreme",
+                "weibull_min",
+                "weibull_max",
+                "skewnorm",
+                "gumbel_r",
+                "gumbel_l",
+                "genpareto"
+              ]
+            },
+            "constraints": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "minimum_value": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": -1.7976931348623157e+308,
+                          "maximum": 1.7976931348623157e+308
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "maximum_value": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": -1.7976931348623157e+308,
+                          "maximum": 1.7976931348623157e+308
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "probability": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "require_sample_support": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "censor_location": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            },
+            "residual_scale_floor_ratio": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308,
+              "exclusiveMinimum": 0
+            },
+            "minimum_knots": {
+              "type": "integer",
+              "minimum": 4
+            }
+          },
+          "required": [
+            "kind",
+            "family",
+            "censor_location"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "hurdle_quantiles"
+            },
+            "family": {
+              "enum": [
+                "genextreme",
+                "weibull_min",
+                "weibull_max",
+                "skewnorm",
+                "gumbel_r",
+                "gumbel_l",
+                "genpareto"
+              ]
+            },
+            "constraints": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "minimum_value": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": -1.7976931348623157e+308,
+                          "maximum": 1.7976931348623157e+308
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "maximum_value": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": -1.7976931348623157e+308,
+                          "maximum": 1.7976931348623157e+308
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "probability": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "require_sample_support": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "atom_probability": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "exclusiveMinimum": 0,
+              "exclusiveMaximum": 1
+            },
+            "atom_location": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            },
+            "minimum_knots": {
+              "type": "integer",
+              "minimum": 4
+            }
+          },
+          "required": [
+            "kind",
+            "family",
+            "atom_probability"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "model_selection"
+            },
+            "candidates": {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "const": "samples"
+                      },
+                      "family": {
+                        "enum": [
+                          "genextreme",
+                          "weibull_min",
+                          "weibull_max",
+                          "skewnorm",
+                          "gumbel_r",
+                          "gumbel_l",
+                          "genpareto"
+                        ]
+                      },
+                      "constraints": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "minimum_value": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": -1.7976931348623157e+308,
+                                    "maximum": 1.7976931348623157e+308
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "maximum_value": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": -1.7976931348623157e+308,
+                                    "maximum": 1.7976931348623157e+308
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "probability": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "require_sample_support": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "estimator": {
+                        "enum": [
+                          "mle",
+                          "lmoments"
+                        ]
+                      },
+                      "minimum_samples": {
+                        "type": "integer",
+                        "minimum": 3
+                      },
+                      "fallbacks": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/sample_specification"
+                        }
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "family"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "const": "quantiles"
+                      },
+                      "family": {
+                        "enum": [
+                          "genextreme",
+                          "weibull_min",
+                          "weibull_max",
+                          "skewnorm",
+                          "gumbel_r",
+                          "gumbel_l",
+                          "genpareto"
+                        ]
+                      },
+                      "constraints": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "minimum_value": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": -1.7976931348623157e+308,
+                                    "maximum": 1.7976931348623157e+308
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "maximum_value": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": -1.7976931348623157e+308,
+                                    "maximum": 1.7976931348623157e+308
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "probability": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "require_sample_support": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "weights": {
+                        "anyOf": [
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1.7976931348623157e+308
+                            },
+                            "minItems": 1
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "minimum_knots": {
+                        "type": "integer",
+                        "minimum": 4
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "family"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "const": "censored_quantiles"
+                      },
+                      "family": {
+                        "enum": [
+                          "genextreme",
+                          "weibull_min",
+                          "weibull_max",
+                          "skewnorm",
+                          "gumbel_r",
+                          "gumbel_l",
+                          "genpareto"
+                        ]
+                      },
+                      "constraints": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "minimum_value": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": -1.7976931348623157e+308,
+                                    "maximum": 1.7976931348623157e+308
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "maximum_value": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": -1.7976931348623157e+308,
+                                    "maximum": 1.7976931348623157e+308
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "probability": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "require_sample_support": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "censor_location": {
+                        "type": "number",
+                        "minimum": -1.7976931348623157e+308,
+                        "maximum": 1.7976931348623157e+308
+                      },
+                      "residual_scale_floor_ratio": {
+                        "type": "number",
+                        "minimum": -1.7976931348623157e+308,
+                        "maximum": 1.7976931348623157e+308,
+                        "exclusiveMinimum": 0
+                      },
+                      "minimum_knots": {
+                        "type": "integer",
+                        "minimum": 4
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "family",
+                      "censor_location"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "const": "hurdle_quantiles"
+                      },
+                      "family": {
+                        "enum": [
+                          "genextreme",
+                          "weibull_min",
+                          "weibull_max",
+                          "skewnorm",
+                          "gumbel_r",
+                          "gumbel_l",
+                          "genpareto"
+                        ]
+                      },
+                      "constraints": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "minimum_value": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": -1.7976931348623157e+308,
+                                    "maximum": 1.7976931348623157e+308
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "maximum_value": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": -1.7976931348623157e+308,
+                                    "maximum": 1.7976931348623157e+308
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "probability": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "require_sample_support": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "atom_probability": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "exclusiveMinimum": 0,
+                        "exclusiveMaximum": 1
+                      },
+                      "atom_location": {
+                        "type": "number",
+                        "minimum": -1.7976931348623157e+308,
+                        "maximum": 1.7976931348623157e+308
+                      },
+                      "minimum_knots": {
+                        "type": "integer",
+                        "minimum": 4
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "family",
+                      "atom_probability"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "minItems": 1
+            },
+            "criterion": {
+              "enum": [
+                "ks",
+                "normalized_rmse"
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "candidates"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "sample_specification": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "samples"
+        },
+        "family": {
+          "enum": [
+            "genextreme",
+            "weibull_min",
+            "weibull_max",
+            "skewnorm",
+            "gumbel_r",
+            "gumbel_l",
+            "genpareto"
+          ]
+        },
+        "constraints": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "minimum_value": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": -1.7976931348623157e+308,
+                      "maximum": 1.7976931348623157e+308
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "maximum_value": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": -1.7976931348623157e+308,
+                      "maximum": 1.7976931348623157e+308
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "probability": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "require_sample_support": {
+                  "type": "boolean"
+                }
+              },
+              "required": [],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "estimator": {
+          "enum": [
+            "mle",
+            "lmoments"
+          ]
+        },
+        "minimum_samples": {
+          "type": "integer",
+          "minimum": 3
+        },
+        "fallbacks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sample_specification"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "family"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "properties": {
+    "specification": {
+      "$ref": "#/$defs/specification"
+    },
+    "attempts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "specification": {
+            "$ref": "#/$defs/specification"
+          },
+          "status": {
+            "enum": [
+              "converged",
+              "rejected",
+              "failed"
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "diagnostics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "message": {
+                  "type": "string"
+                },
+                "severity": {
+                  "enum": [
+                    "error",
+                    "warning",
+                    "info"
+                  ]
+                },
+                "path": {
+                  "type": "string"
+                },
+                "details": {
+                  "type": "object"
+                }
+              },
+              "required": [
+                "code",
+                "message",
+                "severity",
+                "path",
+                "details"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "specification",
+          "status",
+          "reason",
+          "diagnostics"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1
+    },
+    "selected_attempt": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "estimator": {
+      "anyOf": [
+        {
+          "enum": [
+            "mle",
+            "lmoments"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "converged": {
+      "type": "boolean"
+    },
+    "evidence_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "used_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "excluded_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "weights": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1.7976931348623157e+308
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "evidence_support": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": -1.7976931348623157e+308,
+            "maximum": 1.7976931348623157e+308
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "engine_version": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "specification",
+    "attempts",
+    "selected_attempt",
+    "estimator",
+    "converged",
+    "evidence_count",
+    "used_count",
+    "excluded_count",
+    "weights",
+    "evidence_support",
+    "engine_version"
+  ],
+  "additionalProperties": false
+}

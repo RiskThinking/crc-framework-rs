@@ -9,11 +9,12 @@ from typing import cast
 import numpy as np
 import pytest
 from crc_framework import (
-    BuildingType,
+    AssetType,
     BuiltinImpact,
     DepthAboveGround,
     Distribution,
     DistributionFamily,
+    FloodRegion,
     Impact,
     ImpactError,
     ImpactReference,
@@ -224,15 +225,15 @@ def test_model_requirements_and_typed_context_are_discoverable() -> None:
     assert requirements.context_type is InundationContext
     resolved = reference.resolve(
         requirements.context_type(
-            continent="Europe", building_type=BuildingType.COMMERCIAL
+            region=FloodRegion.EUROPE, asset_type=AssetType.COMMERCIAL
         )
     )
     assert isinstance(resolved, Impact)
     assert resolved.input == DepthAboveGround(unit=LengthUnit.METRE)
     assert 0 <= cast(float, resolved.evaluate(1.5)) <= 1
     assert ImpactReference.from_json(reference.to_json()).sha256 == reference.sha256
-    with pytest.raises(ImpactError, match="InundationContext.continent"):
-        reference.resolve(InundationContext(building_type=BuildingType.RESIDENTIAL))
+    with pytest.raises(ImpactError, match="InundationContext"):
+        reference.resolve()
 
 
 @pytest.mark.parametrize("model", list(BuiltinImpact))
@@ -242,12 +243,12 @@ def test_every_builtin_identity_resolves_with_its_discovered_context(
     reference = Impact.builtin(model)
     requirements = reference.requirements
     data = {
-        "cell": "852b83b3fffffff",
+        "cell": int("852b83b3fffffff", 16),
         "country": "USA" if model is BuiltinImpact.CONSECUTIVE_DRY_DAYS else "CAN",
-        "continent": "Europe",
-        "building_type": BuildingType.AGRICULTURAL
+        "region": FloodRegion.EUROPE,
+        "asset_type": AssetType.AGRICULTURAL_BUILDING
         if model is BuiltinImpact.CONSECUTIVE_DRY_DAYS
-        else BuildingType.RESIDENTIAL,
+        else AssetType.RESIDENTIAL,
         "historic_mean": 20.0,
     }
     values = {field.name: data[field.name] for field in requirements.context_fields}

@@ -41,6 +41,9 @@ if (checking) {
   if (wasmManifest.version !== version) throw new Error('wasm-pack version differs from the workspace');
   mkdirSync(path.join(output, 'wasm'), { recursive: true });
   cpSync(path.join(directory, 'src'), path.join(output, 'src'), { recursive: true });
+  for (const group of ['api','numerical','scientific','dataset','taxonomy']) {
+    cpSync(path.join(root,'python/crc_framework/contracts',group),path.join(output,'contracts',group),{recursive:true});
+  }
   for (const name of readdirSync(wasm)) {
     if (/\.(?:js|wasm|ts)$/.test(name)) copyFileSync(path.join(wasm, name), path.join(output, 'wasm', name));
   }

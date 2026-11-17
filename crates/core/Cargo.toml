@@ -12,13 +12,19 @@ default = ["sampling"]
 sampling = ["dep:rand"]
 
 [dependencies]
+geo = { version = "0.32.0", default-features = false }
 h3o = "=0.9.3"
+jsonschema = { version = "0.61.2", default-features = false, features = ["arbitrary-precision"] }
 phf = { version = "0.14.0", features = ["macros"] }
 rand = { version = "0.9", optional = true }
 serde = { version = "1", features = ["derive"] }
-serde_json = { version = "=1.0.154", features = ["float_roundtrip"] }
+serde_json = { version = "=1.0.154", features = ["float_roundtrip", "arbitrary_precision"] }
 sha2 = "0.10"
 
 [dev-dependencies]
 h3o = "=0.9.3"
-serde_json = { version = "=1.0.154", features = ["float_roundtrip"] }
+serde_json = { version = "=1.0.154", features = ["float_roundtrip", "arbitrary_precision"] }
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+getrandom02 = { package = "getrandom", version = "0.2", features = ["js"] }
+getrandom03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }

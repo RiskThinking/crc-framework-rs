@@ -7,7 +7,7 @@ name = "crc-framework"
 description = "Rust computation core and Python bindings for the Climate Risk Commons Framework"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["numpy>=1.23"]
+dependencies = ["numpy>=1.23", "jsonschema>=4.18,<5"]
 authors = [{ name = "Riskthinking.AI" }]
 license = "AGPL-3.0-or-later"
 license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
@@ -34,7 +34,7 @@ Repository = "https://github.com/RiskThinking/crc-framework-rs"
 Issues = "https://github.com/RiskThinking/crc-framework-rs/issues"
 
 [project.optional-dependencies]
-test = ["jsonschema>=4.18", "mypy", "pytest"]
+test = ["mypy", "pytest", "rfc3339-validator>=0.1.4", "types-jsonschema"]
 
 [tool.maturin]
 module-name = "crc_framework._core"
@@ -49,3 +49,4 @@ mypy_path = "python"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]

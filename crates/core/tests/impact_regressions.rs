@@ -1,7 +1,8 @@
 //! Regression tests for expectation and pushforward defects found before v1.
+use crc_framework_core::impact::KernelCurveParameters;
 use crc_framework_core::{
-    CurveParameters, DiscreteDistribution, EmpiricalDistribution, GaussKronrodOptions,
-    HistogramExposure, ImpactDefinition, ImpactSource, MethodRequest, ResolvedMethod,
+    DiscreteDistribution, EmpiricalDistribution, GaussKronrodOptions, HistogramExposure,
+    ImpactDefinition, ImpactSource, MethodRequest, ResolvedMethod,
 };
 
 fn definition(model: &str, extra: &str) -> ImpactDefinition {
@@ -25,13 +26,13 @@ fn definition(model: &str, extra: &str) -> ImpactDefinition {
 
 fn fitted(family: &str, shape: Option<f64>, location: f64, scale: f64) -> ImpactSource {
     ImpactSource::from_curve(
-        CurveParameters {
+        KernelCurveParameters {
             curve_kind: "fitted".into(),
             curve_type: family.into(),
             curve_shape: shape,
             curve_location: Some(location),
             curve_scale: Some(scale),
-            ..CurveParameters::default()
+            ..KernelCurveParameters::default()
         }
         .reconstruct()
         .expect("curve reconstructs"),

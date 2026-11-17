@@ -1,6 +1,31 @@
 use crc_framework_core::numerical::NumericalLaw;
 use pyo3::{exceptions::PyValueError, prelude::*};
 
+#[pyfunction]
+fn validate_document(py: Python<'_>, schema: &str, text: &str) -> PyResult<()> {
+    py.detach(|| crc_framework_core::canonical::validate_document(schema, text))
+        .map_err(error)
+}
+
+#[pyclass(name = "NativeNumericalDocument", frozen)]
+struct PyNumericalDocument {
+    inner: crc_framework_core::Numerical,
+}
+
+#[pymethods]
+impl PyNumericalDocument {
+    #[new]
+    fn new(py: Python<'_>, text: &str) -> PyResult<Self> {
+        py.detach(|| crc_framework_core::Numerical::from_json(text))
+            .map(|inner| Self { inner })
+            .map_err(error)
+    }
+    fn quantile(&self, py: Python<'_>, probability: f64) -> PyResult<f64> {
+        py.detach(|| self.inner.quantile(probability))
+            .map_err(error)
+    }
+}
+
 #[pyclass(name = "NativeNumericalLaw", frozen, from_py_object)]
 #[derive(Clone)]
 struct PyNumericalLaw {
@@ -82,5 +107,8 @@ impl PyNumericalLaw {
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<PyNumericalLaw>()
+    module.add_class::<PyNumericalLaw>()?;
+    module.add_class::<PyNumericalDocument>()?;
+    module.add_function(wrap_pyfunction!(validate_document, module)?)?;
+    Ok(())
 }

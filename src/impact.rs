@@ -1,10 +1,11 @@
-//! Frozen PyO3 expression, source, distribution, and evaluation-record types.
+use crc_framework_core::impact::KernelCurveParameters;
+// Frozen native mathematical kernel bindings.
 
 use crc_framework_core::{
-    CurveParameters, EmpiricalDistribution, GaussKronrodOptions, HistogramExposure,
-    ImpactContractError, ImpactDefinition, ImpactDistribution, ImpactEvaluationRecord,
-    ImpactSource, MethodRequest, RecordedSource, RegistryImpactReference, ResolutionContext,
-    SnapshotRef, array_content_sha256, manifest_json, registry_identity,
+    EmpiricalDistribution, GaussKronrodOptions, HistogramExposure, ImpactContractError,
+    ImpactDefinition, ImpactDistribution, ImpactEvaluationRecord, ImpactSource, MethodRequest,
+    RecordedSource, RegistryImpactReference, ResolutionContext, SnapshotRef, array_content_sha256,
+    manifest_json, registry_identity,
 };
 use pyo3::prelude::*;
 
@@ -341,7 +342,7 @@ impl PyImpactSource {
         curve_probabilities: Option<Vec<f64>>,
         curve_values: Option<Vec<f64>>,
     ) -> PyResult<Self> {
-        let parameters = CurveParameters {
+        let parameters = KernelCurveParameters {
             curve_kind,
             curve_type,
             curve_shape,

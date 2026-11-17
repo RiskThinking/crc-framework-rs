@@ -1,75 +1,73 @@
-# @climateriskcommons/crc-framework
+# CRC Framework for JavaScript
 
-Official JavaScript/WebAssembly bindings for CRC Framework: consume canonical
-climate curves, evaluate quantiles, and reuse prepared collections. The ESM
-package includes TypeScript declarations and has no runtime npm dependencies.
-
-## Contributors
-
-Thanks to the people who shape this project through code, reviews, research,
-and internal discussions and ideas.
-
-<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
-<!-- prettier-ignore-start -->
-<!-- markdownlint-disable -->
-<table>
-  <tbody>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/ChrisHampu"><img src="https://avatars.githubusercontent.com/u/6600532?s=80" width="80" alt="@ChrisHampu" /><br /><sub><b>@ChrisHampu</b></sub></a><br /><a href="https://github.com/RiskThinking/crc-framework-rs/commits?author=ChrisHampu" title="Code">💻</a> <a href="https://github.com/RiskThinking/crc-framework-rs/pulls?q=is%3Apr+reviewed-by%3AChrisHampu" title="Reviewed Pull Requests">👀</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/woozyking"><img src="https://avatars.githubusercontent.com/u/2837532?s=80" width="80" alt="@woozyking" /><br /><sub><b>@woozyking</b></sub></a><br /><a href="https://github.com/RiskThinking/crc-framework-rs/commits?author=woozyking" title="Code">💻</a> <a href="https://github.com/RiskThinking/crc-framework-rs/pulls?q=is%3Apr+reviewed-by%3Awoozyking" title="Reviewed Pull Requests">👀</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/awiebe42"><img src="https://avatars.githubusercontent.com/u/65562157?s=80" width="80" alt="@awiebe42" /><br /><sub><b>@awiebe42</b></sub></a><br /><a href="https://github.com/RiskThinking/crc-framework-rs/commits?author=awiebe42" title="Code">💻</a> <a href="https://github.com/RiskThinking/crc-framework-rs/pulls?q=is%3Apr+reviewed-by%3Aawiebe42" title="Reviewed Pull Requests">👀</a> <a href="https://github.com/awiebe42" title="Research">🔬</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/kylalangotsky"><img src="https://avatars.githubusercontent.com/u/91707255?s=80" width="80" alt="@kylalangotsky" /><br /><sub><b>@kylalangotsky</b></sub></a><br /><a href="https://github.com/kylalangotsky" title="Research">🔬</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/reshmasoman"><img src="https://avatars.githubusercontent.com/u/102987481?s=80" width="80" alt="@reshmasoman" /><br /><sub><b>@reshmasoman</b></sub></a><br /><a href="https://github.com/reshmasoman" title="Research">🔬</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/rkodamana"><img src="https://avatars.githubusercontent.com/u/84455891?s=80" width="80" alt="@rkodamana" /><br /><sub><b>@rkodamana</b></sub></a><br /><a href="https://github.com/rkodamana" title="Research">🔬</a> <a href="https://github.com/RiskThinking/crc-framework-rs/pulls?q=is%3Apr+reviewed-by%3Arkodamana" title="Reviewed Pull Requests">👀</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/dilshank"><img src="https://avatars.githubusercontent.com/u/1534562?s=80" width="80" alt="@dilshank" /><br /><sub><b>@dilshank</b></sub></a><br /><a href="https://github.com/dilshank" title="Research">🔬</a></td>
-    </tr>
-  </tbody>
-</table>
-
-<!-- markdownlint-restore -->
-<!-- prettier-ignore-end -->
-
-<!-- ALL-CONTRIBUTORS-LIST:END -->
-
-Contribution types: 💻 code · 👀 review · 🔬 research. We recognize contributions
-both on and off GitHub using [All Contributors](https://allcontributors.org/).
-
-## Installation and quick start
+Consume the same current numerical and scientific documents used by Python and
+canonical datasets. The package includes WebAssembly, TypeScript declarations,
+and the current JSON Schemas. Dataset workflows and data acquisition belong to
+CRC-SDK.
 
 ```sh
 npm install @climateriskcommons/crc-framework
 ```
 
-```js
-import init, { evaluateCurve, evaluateCurves, prepareCurve, prepareCurves } from '@climateriskcommons/crc-framework';
+Create numerical evidence in Python without authoring a serialization envelope:
 
-await init(); // client startup, once; imports themselves are safe during SSR
-const properties = {
-  curve_kind: 'fitted', curve_type: 'gumbel_r',
-  curve_location: 1, curve_scale: 2,
-};
-const value = evaluateCurve(properties, 0.99);
-const values = evaluateCurves([properties, properties], 0.99);
-const curve = prepareCurve(properties);
+```python
+from pathlib import Path
+from crc_framework import QuantileCurve
+
+curve = QuantileCurve([0.9, 0.99, 0.999], [0.5, 2, 5])
+Path("depth.numerical.json").write_text(curve.to_json(), encoding="utf-8")
+```
+
+Read that document in Node:
+
+```javascript
+import { readFileSync } from "node:fs";
+import init, { prepareNumerical } from "@climateriskcommons/crc-framework";
+
+const wasm = readFileSync(new URL(import.meta.resolve(
+  "@climateriskcommons/crc-framework/crc_framework_bg.wasm"
+)));
+await init({ module_or_path: wasm });
+const text = readFileSync("depth.numerical.json", "utf8");
+const curve = prepareNumerical(text);
 try {
-  const quantiles = curve.quantiles([0.5, 0.9, 0.99]);
+  console.log(curve.quantile(0.99)); // 2: the supplied 100-year upper-tail level
+  console.log(curve.quantile([0.9, 0.99])); // Float64Array
 } finally {
-  curve.free(); // prepared handles own WASM memory
+  curve.free();
 }
 ```
 
-Use `@alpha` for prereleases and omit it for stable releases. Versions before
-0.5.3 were published as `@riskthinking.ai/crc-framework`.
+Imports are safe during server rendering; operations require initialization.
+`init()` is shared and idempotent. In browsers, its default loads the packaged
+WASM asset; bundlers can also supply bytes through `module_or_path`.
 
-## Guides
+`quantile(text, probabilities)` performs a one-shot query. `prepareNumericals`
+accepts an array of numerical documents as JSON text and returns one result per
+document for each scalar probability query. Prepared handles own their native
+memory; `free()` is idempotent and further queries fail.
 
-- [JavaScript guide](../docs/javascript.md): browser/bundler/Node initialization,
-  prepared handles, canonical inputs, support ranges, and errors.
-- [Project README](../README.md): Python quick start and framework scope.
-- [Documentation index](../docs/README.md): reading order and responsibility boundaries.
-- [Development](../docs/development.md): build, test, and packaging.
-- [Releases](../docs/releases.md): versions and publishing.
+Partial evidence is queried only on its actual interval. Invalid coordinates,
+malformed documents, historical records, and out-of-support queries fail.
+Mathematical infinite endpoints remain JavaScript infinities. Missing data is a
+retained dataset failure, never a fictional numerical distribution or a silent
+null result.
 
-## License
+Use shared structural and scientific validation without guessing schema URIs:
 
-AGPL-3.0-or-later. See the packaged `LICENSE` and `THIRD_PARTY_NOTICES.md`.
+```javascript
+import { DocumentSchema, validateDocument } from "@climateriskcommons/crc-framework";
+const datasetJSONText = await (await fetch("/dataset.json")).text();
+validateDocument(DocumentSchema.DATASET, datasetJSONText);
+```
+
+Supply original JSON text to preserve unsigned64 cell identifiers and arbitrary
+scientific integers. JavaScript's ordinary JSON parser cannot represent every
+integer exactly. Current schemas are also available under the package's
+`contracts/` export. Model provenance, scientific references, fit execution
+records, spatial support, and row-key integrity are validated consistently with
+Python.
+
+See the repository's [scientific measurement reference](../docs/measurements.md)
+and [Python guide](../docs/python.md) for scientific declarations and fitting.

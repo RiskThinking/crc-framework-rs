@@ -24,26 +24,25 @@ try {
   await mkdir(packageDirectory,{recursive:true});
   execFileSync('tar',['-xzf',path.join(root,'dist',filename),'-C',packageDirectory,'--strip-components=1']);
   const imported=await import(pathToFileURL(path.join(packageDirectory,'src/index.js')).href);
-  assert.throws(()=>imported.evaluateCurve({},.5),/not initialized/);
+  assert.throws(()=>imported.quantile("{}",.5),/await init/);
   let html=await readFile(new URL('./browser.html',import.meta.url),'utf8');
   html=html.replace("'../src/index.js'","'@climateriskcommons/crc-framework'")
-    .replace("'../../tests/fixtures/canonical-quantiles.json'","'./canonical-quantiles.json'");
+    .replace("'../../python/crc_framework/contracts/numerical/fixtures-1.0.json'","'./numerical-fixtures.json'");
   await writeFile(path.join(directory,'index.html'),html);
   await mkdir(path.join(directory,'public'));
-  await writeFile(path.join(directory,'public/canonical-quantiles.json'),
-    await readFile(new URL('../../tests/fixtures/canonical-quantiles.json',import.meta.url)));
+  await writeFile(path.join(directory,'public/numerical-fixtures.json'),
+    await readFile(new URL('../../python/crc_framework/contracts/numerical/fixtures-1.0.json',import.meta.url)));
   await writeFile(path.join(directory,'smoke.ts'), `
-import init, {evaluateCurve, evaluateCurves, prepareCurve, prepareCurves, type CurveProperties} from '@climateriskcommons/crc-framework';
-const row: CurveProperties = {curve_kind:'fitted',curve_type:'gumbel_r',curve_location:0,curve_scale:1};
+import init, {quantile,prepareNumerical,prepareNumericals,DocumentSchema,validateDocument} from '@climateriskcommons/crc-framework';
+const text='{"schema_version":"1.0","object":"distribution","kind":"point_mass","value":2}';
 await init();
-const value: number | null = evaluateCurve(row, .5);
-const values: Array<number | null> = evaluateCurves([row], .5);
-const handle = prepareCurve(row);
-handle.quantiles(new Float64Array([.5]));
-handle.free();
-const collection = prepareCurves([row]);
-const batch: Array<number | null> = collection.evaluate(.5);
-collection.free();
+const scalar:number=quantile(text,.5);
+const array:Float64Array=quantile(text,new Float64Array([.1,.9]));
+const prepared=prepareNumerical(text);
+prepared.quantile([.1,.9]);prepared.free();
+const batch=prepareNumericals('['+text+']');
+const values:Float64Array=batch.quantile(.5);batch.free();
+validateDocument(DocumentSchema.NUMERICAL,text);
 `);
   execFileSync(process.execPath,[path.join(root,'node_modules/typescript/bin/tsc'),
     '--noEmit','--strict','--module','nodenext','--moduleResolution','nodenext',

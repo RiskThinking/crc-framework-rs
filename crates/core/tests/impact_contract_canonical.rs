@@ -136,7 +136,8 @@ fn native_json_consumer_rejects_non_json_numeric_vectors() {
             .find(|case| case["name"] == name)
             .expect("native parser fixture exists");
         assert!(
-            serde_json::from_str::<Value>(case["input"].as_str().unwrap()).is_err(),
+            crc_framework_core::ImpactDefinition::from_json(case["input"].as_str().unwrap())
+                .is_err(),
             "{name} must not be accepted by serde_json"
         );
     }
@@ -150,7 +151,7 @@ fn accepted_distribution_source_snapshots_reconstruct_in_the_native_core() {
         if record["source"]["kind"] != "canonical_distribution" {
             continue;
         }
-        let parameters: crc_framework_core::CurveParameters =
+        let parameters: crc_framework_core::impact::KernelCurveParameters =
             serde_json::from_value(record["source"]["parameters"].clone()).unwrap();
         let curve = parameters.reconstruct().unwrap_or_else(|error| {
             panic!(
@@ -158,7 +159,10 @@ fn accepted_distribution_source_snapshots_reconstruct_in_the_native_core() {
                 case["name"]
             )
         });
-        assert!(!matches!(curve, crc_framework_core::CanonicalCurve::NoData));
+        assert!(!matches!(
+            curve,
+            crc_framework_core::impact::KernelCurve::NoData
+        ));
     }
 }
 

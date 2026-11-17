@@ -2,9 +2,10 @@
 //!
 //! Reference values come from the published operation fixtures. This runner
 //! does not call the Python reference implementation.
+use crc_framework_core::impact::KernelCurveParameters;
 use crc_framework_core::{
-    CurveParameters, DiscreteDistribution, GaussKronrodOptions, HistogramExposure,
-    ImpactDefinition, ImpactSource, Interpolation, MethodRequest, ResolvedMethod,
+    DiscreteDistribution, GaussKronrodOptions, HistogramExposure, ImpactDefinition, ImpactSource,
+    Interpolation, MethodRequest, ResolvedMethod,
 };
 use serde_json::Value;
 
@@ -49,7 +50,7 @@ fn source(value: &Value) -> Result<ImpactSource, crc_framework_core::ImpactContr
             numbers(&value["probabilities"]),
         )?)),
         Some("canonical_distribution") => {
-            let parameters: CurveParameters =
+            let parameters: KernelCurveParameters =
                 serde_json::from_value(value["parameters"].clone()).expect("curve parameters");
             let curve = parameters
                 .reconstruct()
@@ -263,12 +264,12 @@ fn threshold_tie_uses_the_lower_response() {
     .unwrap();
     assert_eq!(impact.monotonicity(), "non_decreasing");
     let exposure = ImpactSource::from_curve(
-        CurveParameters {
+        KernelCurveParameters {
             curve_kind: "tabulated".into(),
             curve_type: "linear_probability".into(),
             curve_probabilities: Some(vec![0.0, 1.0]),
             curve_values: Some(vec![0.0, 10.0]),
-            ..CurveParameters::default()
+            ..KernelCurveParameters::default()
         }
         .reconstruct()
         .unwrap(),
@@ -307,13 +308,13 @@ fn quadrature_panel_is_exact_for_low_degree_polynomials() {
     )
     .unwrap();
     let exposure = ImpactSource::from_curve(
-        CurveParameters {
+        KernelCurveParameters {
             curve_kind: "fitted".into(),
             curve_type: "genpareto".into(),
             curve_shape: Some(1.0),
             curve_location: Some(0.0),
             curve_scale: Some(1.0),
-            ..CurveParameters::default()
+            ..KernelCurveParameters::default()
         }
         .reconstruct()
         .unwrap(),
@@ -345,13 +346,13 @@ fn divergent_frechet_gev_is_rejected_for_unclamped_linear_expectation() {
     )
     .unwrap();
     let exposure = ImpactSource::from_curve(
-        CurveParameters {
+        KernelCurveParameters {
             curve_kind: "fitted".into(),
             curve_type: "genextreme".into(),
             curve_shape: Some(-1.0),
             curve_location: Some(0.0),
             curve_scale: Some(1.0),
-            ..CurveParameters::default()
+            ..KernelCurveParameters::default()
         }
         .reconstruct()
         .unwrap(),
@@ -382,13 +383,13 @@ fn bounded_weibull_gev_is_integrable_for_unclamped_linear_expectation() {
     )
     .unwrap();
     let exposure = ImpactSource::from_curve(
-        CurveParameters {
+        KernelCurveParameters {
             curve_kind: "fitted".into(),
             curve_type: "genextreme".into(),
             curve_shape: Some(1.0),
             curve_location: Some(0.0),
             curve_scale: Some(1.0),
-            ..CurveParameters::default()
+            ..KernelCurveParameters::default()
         }
         .reconstruct()
         .unwrap(),
