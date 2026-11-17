@@ -723,6 +723,16 @@ fn source_support(row: &Value) -> Result<Option<Geometry>> {
 }
 
 fn validate_report(report: &Value) -> Result<()> {
+    for diagnostic in array(&report["diagnostics"])? {
+        if let Some(record) = diagnostic.get("record") {
+            if diagnostic["stage"] != "fitting" {
+                return Err(invalid(
+                    "fitting records require a fitting-stage diagnostic",
+                ));
+            }
+            validate_fit_record(record)?;
+        }
+    }
     if report["valid"] == true
         && array(&report["diagnostics"])?
             .iter()
@@ -784,6 +794,13 @@ pub fn validate_dataset(value: &Value) -> Result<()> {
                 ));
             }
             units.insert(id.into(), transform["source_unit"].clone());
+        } else if transform["kind"] == "observation_time_selection" {
+            let period = &transform["time"];
+            if period["kind"] != "window" || period_identity(period)? != text(&period["id"])? {
+                return Err(invalid(
+                    "observation time selection has an invalid window identity",
+                ));
+            }
         } else if transform["kind"] == "rename" {
             let mapping = transform["mapping"]
                 .as_object()
