@@ -79,6 +79,8 @@ Statistics integrate the law, including rare atoms, rather than sampling a
 midpoint grid. Each result has an explicit `StatisticStatus`: finite, positive
 infinity, negative infinity, or undefined. Undefined values carry diagnostics;
 they are not replaced with ordinary zeros.
+Standard deviation can remain finite when variance exceeds the floating-point
+range.
 
 ```python
 from crc_framework import Distribution, Statistic, StatisticStatus, Tail
@@ -221,10 +223,11 @@ statistics separately through `Distribution.statistics`.
 
 `BinaryOutcome` declares two states with explicit rank masses and impacts.
 `compute_risk(outcomes, levels=[...])` sums independent contributions in their
-supplied units and returns exact VaR, upper-tail CVaR, and attribution. There is
-no hidden averaging or weighting. VaR attribution averages equally valued
-states by their probability masses. Branch limits are enforced before
-allocation; duplicate outcome identities are rejected.
+supplied units and returns exact VaR, upper-tail CVaR, and attribution. VaR
+attribution averages equally valued states by their probability masses. When
+the CVaR cutoff includes only part of a tied value's mass, each tied state
+contributes the same fraction of its mass. Branch limits are enforced before
+allocation. Outcome identities must be unique.
 
 ## Serialization and reference geography
 

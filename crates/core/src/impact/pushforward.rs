@@ -7,7 +7,8 @@
 
 use crate::Interpolation;
 use crate::numerical::{
-    NumericalLaw, affine_fitted_moments, affine_segment_moments, compensated, segment_moment,
+    IntegralMoment, NumericalLaw, affine_fitted_mean_deviation, affine_segment_mean_deviation,
+    compensated,
 };
 
 use super::definition::{
@@ -75,6 +76,24 @@ impl ImpactDistribution {
     /// Apply the affine scale before evaluating moments, so the variance can
     /// be finite even when the unscaled variance exceeds binary64's range.
     pub fn affine_moments(&self) -> ContractResult<Option<(f64, f64)>> {
+        if !matches!(self.model, Model::Linear { .. }) {
+            return Ok(None);
+        }
+        Ok(self
+            .exact_mean_deviation()?
+            .map(|(mean, deviation)| (mean, deviation.powi(2))))
+    }
+
+    /// Exact moments for finite atomic laws and unclamped affine images.
+    pub fn exact_mean_deviation(&self) -> ContractResult<Option<(f64, f64)>> {
+        if self.is_discrete() {
+            let atoms: Vec<_> = self
+                .atoms
+                .iter()
+                .map(|atom| (atom.value, atom.value, atom.probability))
+                .collect();
+            return Ok(Some(affine_segment_mean_deviation(&atoms, 1.0, 0.0)));
+        }
         let Model::Linear { slope, intercept } = self.model else {
             return Ok(None);
         };
@@ -87,19 +106,13 @@ impl ImpactDistribution {
         if self.clamp.minimum.is_some() || self.clamp.maximum.is_some() {
             return Ok(None);
         }
-        if self.is_discrete() {
-            let atoms: Vec<_> = self
-                .atoms
-                .iter()
-                .map(|atom| (atom.value, atom.value, atom.probability))
-                .collect();
-            return Ok(Some(affine_segment_moments(&atoms, 1.0, 0.0)));
-        }
         if let Some(segments) = self.source.weighted_segments() {
-            return Ok(Some(affine_segment_moments(&segments, slope, intercept)));
+            return Ok(Some(affine_segment_mean_deviation(
+                &segments, slope, intercept,
+            )));
         }
         match &self.source {
-            ImpactSource::Fitted(d) => Ok(Some(affine_fitted_moments(d, slope, intercept))),
+            ImpactSource::Fitted(d) => Ok(Some(affine_fitted_mean_deviation(d, slope, intercept))),
             ImpactSource::Tabulated(d) if d.uses_linear_probability() => {
                 let segments: Vec<_> = d
                     .values()
@@ -107,7 +120,9 @@ impl ImpactDistribution {
                     .zip(d.probabilities().windows(2))
                     .map(|(x, q)| (x[0], x[1], q[1] - q[0]))
                     .collect();
-                Ok(Some(affine_segment_moments(&segments, slope, intercept)))
+                Ok(Some(affine_segment_mean_deviation(
+                    &segments, slope, intercept,
+                )))
             }
             ImpactSource::Hurdle(d) => {
                 let scale = slope.abs();
@@ -128,10 +143,10 @@ impl ImpactDistribution {
                     atom_location,
                 )
                 .map_err(|error| fail("numerical_failure", "", error.to_string()))?;
-                let (mean, variance) = law
-                    .moments()
+                let (mean, deviation) = law
+                    .mean_deviation()
                     .map_err(|error| fail("numerical_failure", "", error.to_string()))?;
-                Ok(Some((mean * slope.signum() + intercept, variance)))
+                Ok(Some((mean * slope.signum() + intercept, deviation)))
             }
             _ => Ok(None),
         }
@@ -191,12 +206,33 @@ impl ImpactDistribution {
     /// Integrate the quantile law, keeping exact atomic slabs and all
     /// source/response breakpoints. Used for moments and rank-tail statistics.
     pub fn integral(&self, lo: f64, hi: f64, center: f64, square: bool) -> ContractResult<f64> {
+        self.scaled_integral(lo, hi, center, square, false, 1.0)
+    }
+
+    pub fn scaled_integral(
+        &self,
+        lo: f64,
+        hi: f64,
+        center: f64,
+        square: bool,
+        survival: bool,
+        scale: f64,
+    ) -> ContractResult<f64> {
+        let moment = IntegralMoment::new(center, square, scale);
+        if survival {
+            self.tail_integral_moment(lo, hi, moment)
+        } else {
+            self.integral_moment(lo, hi, moment)
+        }
+    }
+
+    fn integral_moment(&self, lo: f64, hi: f64, moment: IntegralMoment) -> ContractResult<f64> {
         if !lo.is_finite()
             || !hi.is_finite()
             || lo < 0.0
             || hi > 1.0
             || lo > hi
-            || !center.is_finite()
+            || !moment.center.is_finite()
         {
             return Err(fail(
                 "invalid_value",
@@ -207,14 +243,6 @@ impl ImpactDistribution {
         if lo == hi {
             return Ok(0.0);
         }
-        let power = |value: f64| {
-            let difference = value - center;
-            if square {
-                difference * difference
-            } else {
-                difference
-            }
-        };
         if matches!(self.law, Law::Discrete) {
             let mut start = 0.0;
             let mut contributions = Vec::new();
@@ -225,9 +253,7 @@ impl ImpactDistribution {
                 } else {
                     (hi.min(end) - lo.max(start)).max(0.0)
                 };
-                contributions.push(segment_moment(
-                    width, atom.value, atom.value, center, square,
-                ));
+                contributions.push(moment.segment(width, atom.value, atom.value));
                 start = end;
             }
             return Ok(compensated(contributions.into_iter()));
@@ -284,20 +310,12 @@ impl ImpactDistribution {
                     right - left
                 };
                 let response = kernel::evaluate(&self.model, &self.clamp, x)?;
-                contributions.push(segment_moment(width, response, response, center, square));
+                contributions.push(moment.segment(width, response, response));
             } else if exact_linear {
                 let width = right - left;
-                let first = self.quantile(left + width * 0.25)? - center;
-                let second = self.quantile(left + width * 0.75)? - center;
-                let (a, b) = (1.5 * first - 0.5 * second, 1.5 * second - 0.5 * first);
-                contributions.push(
-                    width
-                        * if square {
-                            (a * a + a * b + b * b) / 3.0
-                        } else {
-                            (a + b) / 2.0
-                        },
-                );
+                let first = self.quantile(left + width * 0.25)?;
+                let third = self.quantile(left + width * 0.75)?;
+                contributions.push(moment.linear_quartiles(width, first, third));
             } else {
                 numerical.push((left, right));
             }
@@ -305,7 +323,8 @@ impl ImpactDistribution {
         if !numerical.is_empty() {
             let options = super::quadrature::GaussKronrod::defaults();
             let integral = super::quadrature::integrate(&numerical, &options, |q| {
-                Ok(power(self.quantile(q)?))
+                let value = self.quantile(q)?;
+                Ok(moment.segment(1.0, value, value))
             })?;
             contributions.push(integral.value);
         }
@@ -577,12 +596,21 @@ impl ImpactDistribution {
         center: f64,
         square: bool,
     ) -> ContractResult<f64> {
+        self.scaled_integral(s_min, s_max, center, square, true, 1.0)
+    }
+
+    fn tail_integral_moment(
+        &self,
+        s_min: f64,
+        s_max: f64,
+        moment: IntegralMoment,
+    ) -> ContractResult<f64> {
         if !s_min.is_finite()
             || !s_max.is_finite()
             || s_min < 0.0
             || s_max > 1.0
             || s_min > s_max
-            || !center.is_finite()
+            || !moment.center.is_finite()
         {
             return Err(fail(
                 "invalid_value",
@@ -593,10 +621,6 @@ impl ImpactDistribution {
         if s_min == s_max {
             return Ok(0.0);
         }
-        let power = |x: f64| {
-            let x = x - center;
-            if square { x * x } else { x }
-        };
         if matches!(self.law, Law::Discrete) {
             let mut contributions = Vec::new();
             let mut consumed = 0.0;
@@ -607,9 +631,7 @@ impl ImpactDistribution {
                 } else {
                     (s_max.min(end) - s_min.max(consumed)).max(0.0)
                 };
-                contributions.push(segment_moment(
-                    width, atom.value, atom.value, center, square,
-                ));
+                contributions.push(moment.segment(width, atom.value, atom.value));
                 consumed = end;
             }
             return Ok(compensated(contributions.into_iter()));
@@ -674,35 +696,29 @@ impl ImpactDistribution {
                     right - left
                 };
                 let response = kernel::evaluate(&self.model, &self.clamp, x)?;
-                contributions.push(segment_moment(width, response, response, center, square));
+                contributions.push(moment.segment(width, response, response));
             } else if exact_linear {
                 let width = right - left;
-                let first = self.inverse_survival(left + width * 0.25)? - center;
-                let second = self.inverse_survival(left + width * 0.75)? - center;
-                let (a, b) = (1.5 * first - 0.5 * second, 1.5 * second - 0.5 * first);
-                contributions.push(
-                    width
-                        * if square {
-                            (a * a + a * b + b * b) / 3.0
-                        } else {
-                            (a + b) / 2.0
-                        },
-                );
+                let first = self.inverse_survival(left + width * 0.25)?;
+                let third = self.inverse_survival(left + width * 0.75)?;
+                contributions.push(moment.linear_quartiles(width, first, third));
             } else {
-                let integrated = super::quadrature::integrate(
-                    &[(0.0, 1.0)],
-                    &super::quadrature::GaussKronrod::defaults(),
-                    |t| {
-                        let width = right - left;
-                        let (s, jac) = if left == 0.0 {
-                            (width * t.powi(4), 4.0 * t.powi(3))
-                        } else {
-                            (left + width * t, 1.0)
-                        };
-                        Ok(power(self.inverse_survival(s)?) * jac)
-                    },
-                )?;
-                contributions.push((right - left) * integrated.value);
+                let width = right - left;
+                let mut options = super::quadrature::GaussKronrod::defaults();
+                // The integrand includes the interval mass before squaring.
+                // Apply absolute error control to the conditional interval.
+                options.absolute_tolerance =
+                    (width * options.absolute_tolerance).max(f64::from_bits(1));
+                let integrated = super::quadrature::integrate(&[(0.0, 1.0)], &options, |t| {
+                    let (s, jac) = if left == 0.0 {
+                        (width * t.powi(4), 4.0 * t.powi(3))
+                    } else {
+                        (left + width * t, 1.0)
+                    };
+                    let value = self.inverse_survival(s)?;
+                    Ok(moment.segment(width * jac, value, value))
+                })?;
+                contributions.push(integrated.value);
             }
         }
         Ok(compensated(contributions.into_iter()))
@@ -783,6 +799,33 @@ pub(crate) fn transform(
             "distribution transformation requires a full probability distribution",
         ));
     }
+    // Put fitted laws in response units before taking a quantile. The
+    // unscaled quantile can overflow even when its affine image is finite.
+    // Keep the reflection separate so every fitted family stays supported.
+    let adjusted = match (source, model) {
+        (ImpactSource::Fitted(d), Model::Linear { slope, intercept })
+            if *slope != 0.0 && (slope.abs() != 1.0 || *intercept != 0.0) =>
+        {
+            let direction = slope.signum();
+            let adjusted = crate::FittedDistribution::from_parameters(
+                d.family,
+                d.shape,
+                slope.abs().mul_add(d.location, direction * intercept),
+                slope.abs() * d.scale,
+            );
+            adjusted.ok().map(|d| {
+                (
+                    ImpactSource::Fitted(d),
+                    Model::Linear {
+                        slope: direction,
+                        intercept: 0.0,
+                    },
+                )
+            })
+        }
+        _ => None,
+    };
+    let (source, model) = adjusted.as_ref().map_or((source, model), |(s, m)| (s, m));
     // Any finite atomic source has an exact image, including under a
     // non-monotone response. Preserve every positive atom rather than sampling
     // the quantile law or discarding small probabilities.

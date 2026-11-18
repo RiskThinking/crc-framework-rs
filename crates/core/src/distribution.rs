@@ -10,6 +10,7 @@ use crate::{
 };
 
 mod lmoments;
+pub(crate) use lmoments::log_gamma_one_plus;
 
 const EPS: f64 = 1.0e-12;
 

@@ -8,8 +8,8 @@ use crate::impact::{
     quadrature::{GaussKronrod, integrate},
 };
 use crate::numerical::{
-    NumericalLaw, ProbabilitySegment, compensated, condition_segments, linear_interpolate,
-    segment_integral, segment_inverse_survival, segment_moment, segment_probability,
+    IntegralMoment, NumericalLaw, ProbabilitySegment, compensated, condition_segments,
+    linear_interpolate, segment_integral, segment_inverse_survival, segment_probability,
     segment_quantile,
 };
 use crate::{
@@ -267,11 +267,18 @@ fn validate_reference(value: &Value) -> Result<()> {
 
 pub(crate) fn scientific_equal(a: &Value, b: &Value) -> bool {
     match (a, b) {
-        (Value::Number(a), Value::Number(b)) => {
-            a == b
-                || a.as_f64()
-                    .zip(b.as_f64())
-                    .is_some_and(|(x, y)| x == y && x.abs() <= 9_007_199_254_740_992.0)
+        (Value::Number(left), Value::Number(right)) => {
+            // Python treats decimals as binary64 and keeps integer tokens exact.
+            // Compare integral values without collapsing adjacent large integers.
+            left == right
+                || left.as_f64().zip(right.as_f64()).is_some_and(|(x, y)| {
+                    x == y
+                        && (x.fract() != 0.0
+                            || crate::dataset::integer(a)
+                                .ok()
+                                .zip(crate::dataset::integer(b).ok())
+                                .is_some_and(|(a, b)| a == b))
+                })
         }
         (Value::Array(a), Value::Array(b)) => {
             a.len() == b.len() && a.iter().zip(b).all(|(a, b)| scientific_equal(a, b))
@@ -732,18 +739,26 @@ impl Numerical {
         square: bool,
         survival: bool,
     ) -> Result<f64> {
+        self.scaled_hurdle_integral(lo, hi, center, square, survival, 1.0)
+    }
+    pub fn scaled_hurdle_integral(
+        &self,
+        lo: f64,
+        hi: f64,
+        center: f64,
+        square: bool,
+        survival: bool,
+        scale: f64,
+    ) -> Result<f64> {
         if !lo.is_finite() || !hi.is_finite() || lo < 0.0 || hi > 1.0 || hi < lo {
             return Err(invalid("invalid integration probability interval"));
         }
         if let Compiled::Law(law @ NumericalLaw::Hurdle { .. }) = &self.compiled {
-            return if survival {
-                law.tail_integral(lo, hi, center, square)
-            } else {
-                law.integral(lo, hi, center, square)
-            };
+            return law.scaled_integral(lo, hi, center, square, survival, scale);
         }
+        let moment = IntegralMoment::new(center, square, scale);
         if let Some(segments) = self.finite_hurdle_segments() {
-            return Ok(segment_integral(segments, lo, hi, center, square, survival));
+            return Ok(segment_integral(segments, lo, hi, moment, survival));
         }
         let (lo, hi) = if survival {
             (lo, hi)
@@ -762,23 +777,23 @@ impl Numerical {
                 continue;
             }
             if start < left {
-                contributions.push(self.integrate_survival(start, left, center, square)?);
+                contributions.push(self.integrate_survival(start, left, moment)?);
             }
             let width = if lo <= left && hi >= right {
                 mass
             } else {
                 (hi.min(right) - lo.max(left)).max(0.0)
             };
-            contributions.push(segment_moment(width, value, value, center, square));
+            contributions.push(moment.segment(width, value, value));
             start = start.max(right);
         }
         if start < hi {
-            contributions.push(self.integrate_survival(start, hi, center, square)?);
+            contributions.push(self.integrate_survival(start, hi, moment)?);
         }
         Ok(compensated(contributions.into_iter()))
     }
 
-    fn integrate_survival(&self, lo: f64, hi: f64, center: f64, square: bool) -> Result<f64> {
+    fn integrate_survival(&self, lo: f64, hi: f64, moment: IntegralMoment) -> Result<f64> {
         let width = hi - lo;
         let result = integrate(&[(0.0, 1.0)], &GaussKronrod::defaults(), |t| {
             // Integrating after conditioning avoids dividing by the (possibly
@@ -791,7 +806,7 @@ impl Numerical {
             let value = self.inverse_log_survival(logarithm).map_err(|error| {
                 ImpactContractError::new("numerical_failure", "", error.to_string())
             })?;
-            Ok(segment_moment(weight, value, value, center, square))
+            Ok(moment.segment(weight, value, value))
         })
         .map_err(invalid)?;
         Ok(result.value)

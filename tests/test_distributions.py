@@ -14,6 +14,7 @@ from crc_framework import (
     Impact,
     Measurement,
     QuantileCurve,
+    Ratio,
     Statistic,
     StatisticStatus,
     Tail,
@@ -575,6 +576,97 @@ def test_probability_weighting_retains_large_finite_second_moments(
     assert values[Statistic.STANDARD_DEVIATION].value == pytest.approx(
         math.sqrt(variance), rel=1e-14
     )
+
+
+@pytest.mark.parametrize(
+    ("law", "deviation"),
+    [
+        (Distribution.empirical([-1e200, 1e200]), 1e200),
+        (Distribution.histogram([-1e200, 1e200], [1]), 1e200 / math.sqrt(3)),
+        (
+            Distribution.parametric(
+                DistributionFamily.GUMBEL_RIGHT, location=0, scale=1e200
+            ),
+            math.pi * 1e200 / math.sqrt(6),
+        ),
+    ],
+)
+def test_law_standard_deviation_stays_finite_when_variance_overflows(
+    law: Distribution, deviation: float
+) -> None:
+    values = law.statistics(
+        metrics=[Statistic.VARIANCE, Statistic.STANDARD_DEVIATION]
+    ).values
+    assert values[Statistic.VARIANCE].status is StatisticStatus.POSITIVE_INFINITY
+    assert values[Statistic.STANDARD_DEVIATION].status is StatisticStatus.FINITE
+    assert values[Statistic.STANDARD_DEVIATION].value == pytest.approx(
+        deviation, rel=1e-14
+    )
+
+
+def test_standard_deviation_survives_variance_underflow() -> None:
+    law = Distribution.empirical([-1e-200, 1e-200])
+    values = law.statistics(
+        metrics=[Statistic.VARIANCE, Statistic.STANDARD_DEVIATION]
+    ).values
+    assert values[Statistic.VARIANCE].value == 0
+    assert values[Statistic.STANDARD_DEVIATION].value == pytest.approx(
+        1e-200, rel=1e-14, abs=0
+    )
+
+
+@pytest.mark.parametrize(
+    "shape,scale", [(0.05, 1e-20), (0.01, 1e-100), (0.004, 1e-300)]
+)
+@pytest.mark.parametrize(
+    "family,orientation",
+    [
+        (DistributionFamily.WEIBULL_MINIMUM, 1.0),
+        (DistributionFamily.WEIBULL_MAXIMUM, -1.0),
+    ],
+)
+def test_weibull_moments_scale_raw_gamma_values_before_overflow(
+    family: DistributionFamily, orientation: float, shape: float, scale: float
+) -> None:
+    law = Distribution.parametric(family, location=0, scale=scale, shape=shape)
+    first = math.lgamma(1 + 1 / shape)
+    second = math.lgamma(1 + 2 / shape)
+    log_variance = second + math.log(-math.expm1(2 * first - second))
+    mean = orientation * math.exp(math.log(scale) + first)
+    deviation = math.exp(math.log(scale) + log_variance / 2)
+    statistics = law.statistics(
+        metrics=[Statistic.MEAN, Statistic.VARIANCE, Statistic.STANDARD_DEVIATION]
+    ).values
+    assert statistics[Statistic.MEAN].value == pytest.approx(mean, rel=1e-12)
+    assert statistics[Statistic.STANDARD_DEVIATION].value == pytest.approx(
+        deviation, rel=1e-12
+    )
+    variance = deviation * deviation
+    if math.isinf(variance):
+        assert (
+            statistics[Statistic.VARIANCE].status is StatisticStatus.POSITIVE_INFINITY
+        )
+    else:
+        assert statistics[Statistic.VARIANCE].value == pytest.approx(
+            variance, rel=1e-12
+        )
+
+
+@pytest.mark.parametrize("transformed", [False, True])
+def test_zero_atom_hurdle_at_support_boundary_keeps_base_statistics(
+    transformed: bool,
+) -> None:
+    base = Distribution.parametric(
+        DistributionFamily.GENERALIZED_PARETO, location=0, scale=1, shape=1.2
+    )
+    if transformed:
+        measurement = Ratio()
+        base = Impact.linear(
+            input=measurement, output=measurement, slope=2
+        ).pushforward(base)
+    hurdle = Distribution.hurdle(base, atom_probability=0, atom_location=0)
+    metrics = [Statistic.MEAN, Statistic.VARIANCE, Statistic.STANDARD_DEVIATION]
+    assert hurdle.statistics(metrics=metrics) == base.statistics(metrics=metrics)
 
 
 def test_nonlinear_image_retains_the_weighted_variance_of_a_rare_atom() -> None:

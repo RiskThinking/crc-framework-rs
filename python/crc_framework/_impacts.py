@@ -96,18 +96,6 @@ def _error(error: Exception) -> ImpactError:
     return ImpactError(str(code), str(path), message.removeprefix(prefix))
 
 
-def _scaled_square(scale: float, value: float) -> float:
-    """Scale nonnegative moments without squaring the scale prematurely."""
-    if value == 0.0 or scale == 0.0:
-        return 0.0
-    if math.isinf(value):
-        return value
-    if value < 0 or math.isnan(value):
-        return math.nan
-    scaled = abs(scale) * math.sqrt(value)
-    return scaled * scaled
-
-
 def _dumps(value: object) -> str:
     return json.dumps(
         _canonical_value(cast(ScientificValue, value)),
@@ -325,8 +313,8 @@ class Impact:
         output: Measurement,
     ) -> Impact:
         edge_array, value_array = (
-            np.asarray(edges, dtype=np.float64),
-            np.asarray(values, dtype=np.float64),
+            _real_array(edges, "bin edges"),
+            _real_array(values, "bin values"),
         )
         if edge_array.ndim != 1 or value_array.ndim != 1:
             raise ValueError("binned edges and values must be one-dimensional")
@@ -368,7 +356,9 @@ class Impact:
             return float(result)
         return _snapshot(result)
 
-    def _moments(self, source: Distribution) -> tuple[float, float] | None:
+    def _mean_deviation(
+        self, source: Distribution, image: Distribution
+    ) -> tuple[float, float] | None:
         """Affine moments inherit the source's explicit finite/infinite outcomes."""
         document = _load(self.to_json())
         model = cast(dict[str, object], document["model"])
@@ -379,17 +369,14 @@ class Impact:
         if slope == 0:
             return float(self.evaluate(0.0)), 0.0
         if document.get("clamp") is None:
-            mean, variance = source._moments()
-            return slope * mean + intercept, _scaled_square(slope, variance)
+            mean, deviation = source._mean_deviation()
+            return slope * mean + intercept, abs(slope) * deviation
         clamped_mean = self._integral(source, 0.0, 1.0)
-        assert clamped_mean is not None
+        if clamped_mean is None:
+            return None
         if not math.isfinite(clamped_mean):
             return clamped_mean, math.inf if math.isinf(clamped_mean) else math.nan
-        clamped_variance = self._integral(
-            source, 0.0, 1.0, center=clamped_mean, square=True
-        )
-        assert clamped_variance is not None
-        return clamped_mean, clamped_variance
+        return clamped_mean, image._deviation(clamped_mean)
 
     def _integral(
         self,
@@ -400,6 +387,7 @@ class Impact:
         center: float = 0.0,
         square: bool = False,
         survival: bool = False,
+        scale: float = 1.0,
     ) -> float | None:
         """Integrate affine ranks in the nearer tail's probability coordinates."""
         document = _load(self.to_json())
@@ -412,12 +400,12 @@ class Impact:
         minimum, maximum = clamp.get("minimum"), clamp.get("maximum")
 
         def constant(value: float, width: float) -> float:
-            scale = math.sqrt(width) if square else width
+            weighted_scale = scale * (math.sqrt(width) if square else width)
             difference = value - center
             scaled = (
-                difference * scale
+                difference * weighted_scale
                 if math.isfinite(difference)
-                else value * scale - center * scale
+                else value * weighted_scale - center * weighted_scale
             )
             return scaled * scaled if square else scaled
 
@@ -425,6 +413,19 @@ class Impact:
             return 0.0
         if slope == 0 or minimum == maximum and minimum is not None:
             return constant(float(self.evaluate(0.0)), hi - lo)
+
+        source_scale = abs(slope) * scale
+        source_center = (center - intercept) / slope if square else 0.0
+        if (
+            source_scale == 0
+            or not math.isfinite(source_scale)
+            or not math.isfinite(source_center)
+            or any(
+                bound is not None and not math.isfinite((bound - intercept) / slope)
+                for bound in (minimum, maximum)
+            )
+        ):
+            return None
 
         def add(values: Sequence[float]) -> float:
             try:
@@ -436,7 +437,6 @@ class Impact:
             if right <= left:
                 return 0.0
             source_upper = from_upper if slope > 0 else not from_upper
-            integrate = source._tail_integral if source_upper else source._integral
 
             def cut(value: float) -> float:
                 threshold = (value - intercept) / slope
@@ -459,20 +459,18 @@ class Impact:
                     contributions.append(constant(last, right - max(left, boundary)))
                 right = min(right, boundary)
             if right > left:
-                if square:
-                    contribution = _scaled_square(
-                        slope,
-                        integrate(
-                            left,
-                            right,
-                            center=(center - intercept) / slope,
-                            square=True,
-                        ),
-                    )
-                else:
-                    contribution = slope * integrate(left, right) + (
+                contribution = source._integral(
+                    left,
+                    right,
+                    center=source_center,
+                    square=square,
+                    survival=source_upper,
+                    scale=source_scale,
+                )
+                if not square:
+                    contribution = math.copysign(1.0, slope) * contribution + (
                         intercept - center
-                    ) * (right - left)
+                    ) * scale * (right - left)
                 contributions.append(contribution)
             return add(contributions)
 

@@ -712,6 +712,99 @@
       ]
     },
     {
+      "name": "equivalent-scientific-numbers",
+      "document": {
+        "impact": {
+          "input": {
+            "fields": {
+              "value": 9007199254740994.0
+            },
+            "kind": "measurement",
+            "quantity": "custom:depth",
+            "unit": "m"
+          },
+          "model": {
+            "intercept": 0,
+            "kind": "linear",
+            "slope": 1
+          },
+          "output": {
+            "fields": {
+              "value": 9007199254740994
+            },
+            "kind": "measurement",
+            "quantity": "custom:depth",
+            "unit": "m"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "impact": {
+            "input": {
+              "fields": {
+                "value": 9007199254740994
+              },
+              "kind": "measurement",
+              "quantity": "custom:depth",
+              "unit": "m"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 1
+            },
+            "output": {
+              "fields": {
+                "value": 9007199254740994
+              },
+              "kind": "measurement",
+              "quantity": "custom:depth",
+              "unit": "m"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "object": "distribution",
+          "schema_version": "1.0",
+          "source": {
+            "kind": "point_mass",
+            "object": "distribution",
+            "schema_version": "1.0",
+            "value": 5.0
+          }
+        }
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 5.0
+        },
+        {
+          "probability": 0.1,
+          "value": 5.0
+        },
+        {
+          "probability": 0.5,
+          "value": 5.0
+        },
+        {
+          "probability": 0.9,
+          "value": 5.0
+        },
+        {
+          "probability": 0.99,
+          "value": 5.0
+        },
+        {
+          "probability": 1,
+          "value": 5.0
+        }
+      ]
+    },
+    {
       "name": "completed",
       "document": {
         "evidence": {
@@ -2479,7 +2572,7 @@
         },
         {
           "probability": 0.5,
-          "value": -6.919755290644205
+          "value": -6.919755290644206
         },
         {
           "probability": 0.9,
@@ -2492,6 +2585,71 @@
         {
           "probability": 1,
           "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "downscaled-clamped-parametric",
+      "document": {
+        "impact": {
+          "clamp": {
+            "maximum": 10
+          },
+          "input": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "model": {
+            "intercept": 0,
+            "kind": "linear",
+            "slope": 1e-308
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "family": "gumbel_r",
+          "kind": "parametric",
+          "location": 1e+308,
+          "object": "distribution",
+          "scale": 1e+308,
+          "schema_version": "1.0"
+        }
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.1,
+          "value": 0.16596755475204428
+        },
+        {
+          "probability": 0.5,
+          "value": 1.3665129205816642
+        },
+        {
+          "probability": 0.9,
+          "value": 3.250367327312445
+        },
+        {
+          "probability": 0.99,
+          "value": 5.600149226776578
+        },
+        {
+          "probability": 0.99999,
+          "value": 10.0
+        },
+        {
+          "probability": 1,
+          "value": 10.0
         }
       ]
     },
@@ -2614,6 +2772,142 @@
     }
   ],
   "rejected": [
+    {
+      "name": "scientific-number-rounding-alias-integer",
+      "document": {
+        "impact": {
+          "input": {
+            "fields": {
+              "value": 9007199254740992
+            },
+            "kind": "measurement",
+            "quantity": "custom:depth",
+            "unit": "m"
+          },
+          "model": {
+            "intercept": 0,
+            "kind": "linear",
+            "slope": 1
+          },
+          "output": {
+            "fields": {
+              "value": 9007199254740994
+            },
+            "kind": "measurement",
+            "quantity": "custom:depth",
+            "unit": "m"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "impact": {
+            "input": {
+              "fields": {
+                "value": 9007199254740994
+              },
+              "kind": "measurement",
+              "quantity": "custom:depth",
+              "unit": "m"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 1
+            },
+            "output": {
+              "fields": {
+                "value": 9007199254740993
+              },
+              "kind": "measurement",
+              "quantity": "custom:depth",
+              "unit": "m"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "object": "distribution",
+          "schema_version": "1.0",
+          "source": {
+            "kind": "point_mass",
+            "object": "distribution",
+            "schema_version": "1.0",
+            "value": 5.0
+          }
+        }
+      },
+      "structural": false
+    },
+    {
+      "name": "scientific-number-rounding-alias-decimal",
+      "document": {
+        "impact": {
+          "input": {
+            "fields": {
+              "value": 9007199254740992.0
+            },
+            "kind": "measurement",
+            "quantity": "custom:depth",
+            "unit": "m"
+          },
+          "model": {
+            "intercept": 0,
+            "kind": "linear",
+            "slope": 1
+          },
+          "output": {
+            "fields": {
+              "value": 9007199254740994
+            },
+            "kind": "measurement",
+            "quantity": "custom:depth",
+            "unit": "m"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "impact": {
+            "input": {
+              "fields": {
+                "value": 9007199254740994
+              },
+              "kind": "measurement",
+              "quantity": "custom:depth",
+              "unit": "m"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 1
+            },
+            "output": {
+              "fields": {
+                "value": 9007199254740993
+              },
+              "kind": "measurement",
+              "quantity": "custom:depth",
+              "unit": "m"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "object": "distribution",
+          "schema_version": "1.0",
+          "source": {
+            "kind": "point_mass",
+            "object": "distribution",
+            "schema_version": "1.0",
+            "value": 5.0
+          }
+        }
+      },
+      "structural": false
+    },
     {
       "name": "boolean-curve-probabilities",
       "document": {

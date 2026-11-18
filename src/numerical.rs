@@ -147,12 +147,15 @@ impl PyNumericalDocument {
         py: Python<'_>,
         lo: f64,
         hi: f64,
-        center: f64,
-        square: bool,
+        moment: (f64, bool, f64),
         survival: bool,
     ) -> PyResult<f64> {
-        py.detach(|| self.inner.hurdle_integral(lo, hi, center, square, survival))
-            .map_err(error)
+        let (center, square, scale) = moment;
+        py.detach(|| {
+            self.inner
+                .scaled_hurdle_integral(lo, hi, center, square, survival, scale)
+        })
+        .map_err(error)
     }
 }
 
@@ -213,28 +216,21 @@ impl PyNumericalLaw {
         py: Python<'_>,
         lo: f64,
         hi: f64,
-        center: f64,
-        square: bool,
+        moment: (f64, bool, f64),
+        survival: bool,
     ) -> PyResult<f64> {
-        py.detach(|| self.inner.integral(lo, hi, center, square))
-            .map_err(error)
+        let (center, square, scale) = moment;
+        py.detach(|| {
+            self.inner
+                .scaled_integral(lo, hi, center, square, survival, scale)
+        })
+        .map_err(error)
     }
-    fn moments(&self, py: Python<'_>) -> PyResult<(f64, f64)> {
-        py.detach(|| self.inner.moments()).map_err(error)
+    fn mean_deviation(&self, py: Python<'_>) -> PyResult<(f64, f64)> {
+        py.detach(|| self.inner.mean_deviation()).map_err(error)
     }
     fn inverse_survival(&self, py: Python<'_>, probability: f64) -> PyResult<f64> {
         py.detach(|| self.inner.inverse_survival(probability))
-            .map_err(error)
-    }
-    fn tail_integral(
-        &self,
-        py: Python<'_>,
-        lo: f64,
-        hi: f64,
-        center: f64,
-        square: bool,
-    ) -> PyResult<f64> {
-        py.detach(|| self.inner.tail_integral(lo, hi, center, square))
             .map_err(error)
     }
 }

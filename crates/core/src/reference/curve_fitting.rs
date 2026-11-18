@@ -1188,7 +1188,7 @@ fn stirf(x: f64) -> f64 {
     } else {
         y = x.powf(x - 0.5) / y;
     }
-    SQRTPI * y * w
+    (SQRT_2 * SQRTPI) * y * w
 }
 
 fn polevl(x: f64, coef: &[f64]) -> f64 {

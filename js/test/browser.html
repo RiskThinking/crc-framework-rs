@@ -8,7 +8,10 @@ try {
  const start=performance.now();
  await Promise.all([init(),init()]);
  const initMs=performance.now()-start;
- const cases=await (await fetch('../../python/crc_framework/contracts/numerical/fixtures-1.0.json')).json();
+ const fixtureText=await (await fetch('../../python/crc_framework/contracts/numerical/fixtures-1.0.json')).text();
+ const cases=JSON.parse(fixtureText,(key,value,context)=>
+  typeof value==='number' && Number.isInteger(value) && !Number.isSafeInteger(value)
+   ? JSON.rawJSON(context.source) : value);
  let assertions=0;
  for(const fixture of cases.accepted) {
   const text=JSON.stringify(fixture.document),prepared=prepareNumerical(text);
@@ -19,7 +22,7 @@ try {
      if(!rejected) throw new Error('outside evidence was accepted');
      assertions++;continue;
     }
-    const expected=query.outcome==='positive_infinity'?Infinity:query.outcome==='negative_infinity'?-Infinity:query.value;
+    const expected=query.outcome==='positive_infinity'?Infinity:query.outcome==='negative_infinity'?-Infinity:Number(query.value?.rawJSON??query.value);
     for(const actual of [quantile(text,query.probability),prepared.quantile(query.probability)]) {
      const matches = Number.isFinite(expected)
        ? Math.abs(actual - expected) <= 2e-10 * Math.max(1, Math.abs(expected))

@@ -5,6 +5,7 @@
 
 use serde::Deserialize;
 
+use crate::distribution::log_gamma_one_plus;
 use crate::error::{CrcError, Result};
 use crate::impact::quadrature::{GaussKronrod, integrate};
 use crate::{Distribution, DistributionFamily, FittedDistribution};
@@ -112,24 +113,39 @@ fn cumulative(probabilities: &[f64]) -> Result<Vec<f64>> {
     Ok(result)
 }
 
-pub(crate) fn compensated(values: impl Iterator<Item = f64>) -> f64 {
-    let mut sum: f64 = 0.0;
-    let mut correction: f64 = 0.0;
-    for value in values {
-        let next = sum + value;
+#[derive(Default)]
+pub(crate) struct CompensatedSum {
+    sum: f64,
+    correction: f64,
+}
+
+impl CompensatedSum {
+    pub(crate) fn add(&mut self, value: f64) {
+        let next = self.sum + value;
         if !next.is_finite() {
-            sum = next;
-            correction = 0.0;
-            continue;
+            self.sum = next;
+            self.correction = 0.0;
+            return;
         }
-        correction += if sum.abs() >= value.abs() {
-            (sum - next) + value
+        self.correction += if self.sum.abs() >= value.abs() {
+            (self.sum - next) + value
         } else {
-            (value - next) + sum
+            (value - next) + self.sum
         };
-        sum = next;
+        self.sum = next;
     }
-    sum + correction
+
+    pub(crate) fn total(&self) -> f64 {
+        self.sum + self.correction
+    }
+}
+
+pub(crate) fn compensated(values: impl Iterator<Item = f64>) -> f64 {
+    let mut sum = CompensatedSum::default();
+    for value in values {
+        sum.add(value);
+    }
+    sum.total()
 }
 
 fn scaled_difference(value: f64, center: f64, scale: f64) -> f64 {
@@ -141,37 +157,90 @@ fn scaled_difference(value: f64, center: f64, scale: f64) -> f64 {
     }
 }
 
-pub(crate) fn segment_moment(weight: f64, a: f64, b: f64, center: f64, square: bool) -> f64 {
-    if weight == 0.0 {
-        return 0.0;
-    }
-    if !square {
-        return scaled_difference(a.midpoint(b), center, weight);
-    }
-    // Incorporate the mass before squaring so a large value with a small
-    // probability can still have a representable contribution to the moment.
-    let scale = weight.sqrt();
-    let mean = scaled_difference(a.midpoint(b), center, scale);
-    let deviation = scaled_difference(b, a, scale / 12.0_f64.sqrt());
-    mean.powi(2) + deviation.powi(2)
+#[derive(Clone, Copy)]
+pub(crate) struct IntegralMoment {
+    pub(crate) center: f64,
+    pub(crate) square: bool,
+    pub(crate) scale: f64,
 }
 
-pub(crate) fn affine_segment_moments(
+impl IntegralMoment {
+    pub(crate) fn new(center: f64, square: bool, scale: f64) -> Self {
+        Self {
+            center,
+            square,
+            scale,
+        }
+    }
+
+    pub(crate) fn value(self, x: f64) -> f64 {
+        scaled_difference(x, self.center, self.scale)
+    }
+
+    pub(crate) fn segment(self, weight: f64, a: f64, b: f64) -> f64 {
+        if weight == 0.0 {
+            return 0.0;
+        }
+        if !self.square {
+            return self.weighted_difference(a.midpoint(b), self.center, weight);
+        }
+        let (mean, deviation) = self.segment_deviation(weight, a, b);
+        mean.powi(2) + deviation.powi(2)
+    }
+
+    pub(crate) fn linear_quartiles(self, weight: f64, first: f64, third: f64) -> f64 {
+        if !self.square {
+            return self.weighted_difference(first.midpoint(third), self.center, weight);
+        }
+        let root_mass = weight.sqrt();
+        let mean = self.weighted_difference(first.midpoint(third), self.center, root_mass);
+        let deviation = self.weighted_difference(third, first, root_mass / 3.0_f64.sqrt());
+        mean.powi(2) + deviation.powi(2)
+    }
+
+    fn segment_deviation(self, weight: f64, a: f64, b: f64) -> (f64, f64) {
+        let root_mass = weight.sqrt();
+        (
+            self.weighted_difference(a.midpoint(b), self.center, root_mass),
+            self.weighted_difference(b, a, root_mass / 12.0_f64.sqrt()),
+        )
+    }
+
+    fn weighted_difference(self, value: f64, center: f64, weight: f64) -> f64 {
+        // Apply mass and affine scale before squaring. If the factors alone
+        // round into the subnormal range, apply the scale to the value first.
+        let combined = self.scale * weight;
+        if combined < f64::MIN_POSITIVE && self.scale != 1.0 {
+            scaled_difference(value, center, self.scale) * weight
+        } else {
+            scaled_difference(value, center, combined)
+        }
+    }
+}
+
+pub(crate) fn affine_segment_mean_deviation(
     segments: &[ProbabilitySegment],
     slope: f64,
     intercept: f64,
 ) -> (f64, f64) {
+    let first = IntegralMoment::new(0.0, false, slope.abs());
     let mean = compensated(
         segments
             .iter()
-            .map(|&(a, b, mass)| segment_moment(mass, slope * a, slope * b, 0.0, false)),
+            .map(|&(a, b, mass)| first.segment(mass, a, b)),
     );
-    let variance = compensated(
+    let deviation =
         segments
             .iter()
-            .map(|&(a, b, mass)| segment_moment(mass, slope * a, slope * b, mean, true)),
-    );
-    (mean + intercept, variance)
+            .filter(|&&(_, _, mass)| mass > 0.0)
+            .fold(0.0_f64, |norm, &(a, b, mass)| {
+                let a = a * slope.abs();
+                let b = b * slope.abs();
+                let moment = IntegralMoment::new(mean, true, 1.0);
+                let (offset, spread) = moment.segment_deviation(mass, a, b);
+                norm.hypot(offset.hypot(spread))
+            });
+    (mean * slope.signum() + intercept, deviation)
 }
 
 // Local probability coordinates avoid subtracting two cumulative values near
@@ -296,18 +365,14 @@ fn lower_gamma(shape: f64, x: f64) -> f64 {
 /// Integral over the uppermost `mass` ranks of a finite-moment heavy GEV.
 /// With z=-ln(q), the nonconstant term is an incomplete-gamma integral:
 /// integral(q0..1,(-ln(q))^c dq)=gamma_lower(1+c,-ln(q0)).
-fn gev_upper_integral(
-    distribution: &FittedDistribution,
-    mass: f64,
-    center: f64,
-    square: bool,
-) -> f64 {
+fn gev_upper_integral(distribution: &FittedDistribution, mass: f64, moment: IntegralMoment) -> f64 {
     let c = distribution.shape.expect("GEV has a shape");
     let x = -(-mass).ln_1p();
-    let a = distribution.location + distribution.scale / c - center;
-    let b = -distribution.scale / c;
+    let scaled_shape = distribution.scale * moment.scale / c;
+    let a = moment.value(distribution.location) + scaled_shape;
+    let b = -scaled_shape;
     let first = lower_gamma(1.0 + c, x);
-    if square {
+    if moment.square {
         a * a * mass + 2.0 * a * b * first + b * b * lower_gamma(1.0 + 2.0 * c, x)
     } else {
         a * mass + b * first
@@ -408,8 +473,7 @@ pub(crate) fn segment_integral(
     segments: &[ProbabilitySegment],
     lo: f64,
     hi: f64,
-    center: f64,
-    square: bool,
+    moment: IntegralMoment,
     survival: bool,
 ) -> f64 {
     let masses: Vec<f64> = segments.iter().map(|&(_, _, p)| p).collect();
@@ -423,7 +487,7 @@ pub(crate) fn segment_integral(
             let (width, a, b) = local_interval(lo, hi, start, end, mass);
             let x = linear_interpolate(xa, xb, a);
             let y = linear_interpolate(xa, xb, b);
-            segment_moment(width, x, y, center, square)
+            moment.segment(width, x, y)
         },
     ))
 }
@@ -873,6 +937,50 @@ impl NumericalLaw {
     /// Integral in survival coordinates, preserving conditional tail mass
     /// even when both corresponding CDF coordinates round to one.
     pub fn tail_integral(&self, lo: f64, hi: f64, center: f64, square: bool) -> Result<f64> {
+        self.scaled_integral(lo, hi, center, square, true, 1.0)
+    }
+
+    /// Integrate after applying a scale to each centered quantile.
+    pub fn scaled_integral(
+        &self,
+        lo: f64,
+        hi: f64,
+        center: f64,
+        square: bool,
+        survival: bool,
+        scale: f64,
+    ) -> Result<f64> {
+        if let Some(base) = self.unconditioned_hurdle_base() {
+            return base.scaled_integral(lo, hi, center, square, survival, scale);
+        }
+        // Center and scale fitted laws before querying their ranks, which can
+        // be outside binary64 even when the scaled integral is representable.
+        let scaled = match self {
+            Self::Parametric(d) if scale > 0.0 && scale != 1.0 => {
+                FittedDistribution::from_parameters(
+                    d.family,
+                    d.shape,
+                    scaled_difference(d.location, center, scale),
+                    d.scale * scale,
+                )
+                .ok()
+                .map(Self::Parametric)
+            }
+            _ => None,
+        };
+        let (law, moment) = if let Some(scaled) = &scaled {
+            (scaled, IntegralMoment::new(0.0, square, 1.0))
+        } else {
+            (self, IntegralMoment::new(center, square, scale))
+        };
+        if survival {
+            law.tail_integral_moment(lo, hi, moment)
+        } else {
+            law.integral_moment(lo, hi, moment)
+        }
+    }
+
+    fn tail_integral_moment(&self, lo: f64, hi: f64, moment: IntegralMoment) -> Result<f64> {
         if !lo.is_finite() || !hi.is_finite() || lo < 0.0 || hi > 1.0 || lo > hi {
             return Err(invalid("invalid survival integration interval"));
         }
@@ -880,7 +988,7 @@ impl NumericalLaw {
             return Ok(0.0);
         }
         if let Some(segments) = self.finite_segments() {
-            return Ok(segment_integral(&segments, lo, hi, center, square, true));
+            return Ok(segment_integral(&segments, lo, hi, moment, true));
         }
         if let Self::Hurdle {
             base,
@@ -890,7 +998,7 @@ impl NumericalLaw {
         {
             let w = 1.0 - p;
             let atom_width = (hi - lo.max(w)).max(0.0);
-            let atom = segment_moment(atom_width, *x, *x, center, square);
+            let atom = moment.segment(atom_width, *x, *x);
             if lo >= w {
                 return Ok(atom);
             }
@@ -900,15 +1008,15 @@ impl NumericalLaw {
             let upper_base = upper / w * surviving;
             let tail =
                 if upper_base < f64::MIN_POSITIVE || (lo > 0.0 && lower_base < f64::MIN_POSITIVE) {
-                    self.integrate_deep_tail(lo, upper, center, square)?
+                    self.integrate_deep_tail(lo, upper, moment)?
                 } else {
-                    w / surviving * base.tail_integral(lower_base, upper_base, center, square)?
+                    w / surviving * base.tail_integral_moment(lower_base, upper_base, moment)?
                 };
             return Ok(atom + tail);
         }
         if let Self::Parametric(d) = self {
             let c = d.shape.unwrap_or(0.0);
-            let order = if square { 2.0 } else { 1.0 };
+            let order = if moment.square { 2.0 } else { 1.0 };
             if lo == 0.0
                 && (matches!(d.family, DistributionFamily::GenPareto) && c * order >= 1.0
                     || matches!(d.family, DistributionFamily::GenExtreme) && c * order <= -1.0)
@@ -916,7 +1024,7 @@ impl NumericalLaw {
                 return Ok(f64::INFINITY);
             }
             if lo == 0.0 && matches!(d.family, DistributionFamily::GenExtreme) && c < -0.01 {
-                return Ok(gev_upper_integral(d, hi, center, square));
+                return Ok(gev_upper_integral(d, hi, moment));
             }
             if matches!(d.family, DistributionFamily::GenPareto) && c.abs() >= 0.01 {
                 let power_integral = |power: f64| {
@@ -927,9 +1035,9 @@ impl NumericalLaw {
                         (hi.powf(exponent) - lo.powf(exponent)) / exponent
                     }
                 };
-                let a = d.location - d.scale / c - center;
-                let b = d.scale / c;
-                return Ok(if square {
+                let b = d.scale * moment.scale / c;
+                let a = moment.value(d.location) - b;
+                return Ok(if moment.square {
                     a * a * (hi - lo)
                         + 2.0 * a * b * power_integral(c)
                         + b * b * power_integral(2.0 * c)
@@ -937,13 +1045,13 @@ impl NumericalLaw {
                     a * (hi - lo) + b * power_integral(c)
                 });
             }
-            return self.integrate_deep_tail(lo, hi, center, square);
+            return self.integrate_deep_tail(lo, hi, moment);
         }
         unreachable!("all numerical representations covered")
     }
 
-    fn integrate_deep_tail(&self, lo: f64, hi: f64, center: f64, square: bool) -> Result<f64> {
-        if lo == 0.0 && self.upper_tail_moment_diverges(square) {
+    fn integrate_deep_tail(&self, lo: f64, hi: f64, moment: IntegralMoment) -> Result<f64> {
+        if lo == 0.0 && self.upper_tail_moment_diverges(moment.square) {
             return Ok(f64::INFINITY);
         }
         let width = hi - lo;
@@ -962,7 +1070,7 @@ impl NumericalLaw {
             let value = self.inverse_log_survival(log_survival).map_err(|e| {
                 crate::impact::ImpactContractError::new("numerical_failure", "", e.to_string())
             })?;
-            Ok(jacobian * segment_moment(width, value, value, center, square))
+            Ok(jacobian * moment.segment(width, value, value))
         })
         .map_err(|e| invalid(&e.to_string()))?;
         Ok(result.value)
@@ -1179,6 +1287,10 @@ impl NumericalLaw {
     /// Integral of the quantile over a probability interval. Linear and atomic
     /// representations are analytic; parametric tails use adaptive quadrature.
     pub fn integral(&self, lo: f64, hi: f64, center: f64, square: bool) -> Result<f64> {
+        self.scaled_integral(lo, hi, center, square, false, 1.0)
+    }
+
+    fn integral_moment(&self, lo: f64, hi: f64, moment: IntegralMoment) -> Result<f64> {
         if !lo.is_finite() || !hi.is_finite() || lo < 0.0 || hi > 1.0 || lo > hi {
             return Err(invalid("invalid integration probability interval"));
         }
@@ -1187,7 +1299,7 @@ impl NumericalLaw {
         }
         if let Self::Hurdle { .. } = self {
             if let Some(segments) = self.finite_segments() {
-                return Ok(segment_integral(&segments, lo, hi, center, square, false));
+                return Ok(segment_integral(&segments, lo, hi, moment, false));
             }
         }
         let segment = |qa: f64, qb: f64, xa: f64, xb: f64| {
@@ -1198,10 +1310,10 @@ impl NumericalLaw {
             }
             let x = linear_interpolate(xa, xb, (a - qa) / (qb - qa));
             let y = linear_interpolate(xa, xb, (b - qa) / (qb - qa));
-            segment_moment(b - a, x, y, center, square)
+            moment.segment(b - a, x, y)
         };
         match self {
-            Self::PointMass(x) => Ok(segment_moment(hi - lo, *x, *x, center, square)),
+            Self::PointMass(x) => Ok(moment.segment(hi - lo, *x, *x)),
             Self::Discrete {
                 values,
                 probabilities,
@@ -1212,7 +1324,7 @@ impl NumericalLaw {
                     .zip(mass_intervals(probabilities))
                     .map(|(x, (left, right, mass))| {
                         let (width, _, _) = local_interval(lo, hi, left, right, mass);
-                        segment_moment(width, *x, *x, center, square)
+                        moment.segment(width, *x, *x)
                     }),
             )),
             Self::Histogram {
@@ -1228,7 +1340,7 @@ impl NumericalLaw {
                         let (width, a, b) = local_interval(lo, hi, left, right, mass);
                         let xa = linear_interpolate(x[0], x[1], a);
                         let xb = linear_interpolate(x[0], x[1], b);
-                        segment_moment(width, xa, xb, center, square)
+                        moment.segment(width, xa, xb)
                     }),
             )),
             Self::Quantile {
@@ -1243,17 +1355,17 @@ impl NumericalLaw {
                 ..
             } => {
                 if *p == 1.0 {
-                    return Ok(segment_moment(hi - lo, *x, *x, center, square));
+                    return Ok(moment.segment(hi - lo, *x, *x));
                 }
                 let mut terms = vec![segment(0.0, *p, *x, *x)];
                 if hi > *p {
-                    terms.push(self.tail_integral(1.0 - hi, 1.0 - lo.max(*p), center, square)?);
+                    terms.push(self.tail_integral_moment(1.0 - hi, 1.0 - lo.max(*p), moment)?);
                 }
                 Ok(compensated(terms.into_iter()))
             }
             Self::Parametric(d) => {
                 let c = d.shape.unwrap_or(0.0);
-                let order = if square { 2.0 } else { 1.0 };
+                let order = if moment.square { 2.0 } else { 1.0 };
                 let divergent_upper = matches!(d.family, DistributionFamily::GenPareto)
                     && c * order >= 1.0
                     || matches!(d.family, DistributionFamily::GenExtreme) && c * order <= -1.0;
@@ -1261,7 +1373,7 @@ impl NumericalLaw {
                     return Ok(f64::INFINITY);
                 }
                 if hi == 1.0 && matches!(d.family, DistributionFamily::GenExtreme) && c < -0.01 {
-                    return Ok(gev_upper_integral(d, 1.0 - lo, center, square));
+                    return Ok(gev_upper_integral(d, 1.0 - lo, moment));
                 }
                 if matches!(d.family, DistributionFamily::GenPareto) && c.abs() >= 0.01 {
                     // Integrate the actual power tail analytically. An
@@ -1275,9 +1387,9 @@ impl NumericalLaw {
                             ((1.0 - lo).powf(exponent) - (1.0 - hi).powf(exponent)) / exponent
                         }
                     };
-                    let a = d.location - d.scale / c - center;
-                    let b = d.scale / c;
-                    return Ok(if square {
+                    let b = d.scale * moment.scale / c;
+                    let a = moment.value(d.location) - b;
+                    return Ok(if moment.square {
                         a * a * (hi - lo)
                             + 2.0 * a * b * power_integral(c)
                             + b * b * power_integral(2.0 * c)
@@ -1304,12 +1416,8 @@ impl NumericalLaw {
                         code: "numerical_failure",
                         path: "".into(),
                         message: e.to_string(),
-                    })? - center;
-                    Ok(if square {
-                        value * value * jac
-                    } else {
-                        value * jac
-                    })
+                    })?;
+                    Ok(moment.segment(jac, value, value))
                 })
                 .map_err(|e| invalid(&e.to_string()))?;
                 Ok(result.value)
@@ -1318,20 +1426,74 @@ impl NumericalLaw {
     }
 
     pub fn moments(&self) -> Result<(f64, f64)> {
+        let (mean, deviation) = self.mean_deviation()?;
+        Ok((mean, deviation.powi(2)))
+    }
+
+    /// Compute the standard deviation before squaring so that it can remain
+    /// representable even if the variance exceeds the floating-point range.
+    pub fn mean_deviation(&self) -> Result<(f64, f64)> {
+        if let Some(base) = self.unconditioned_hurdle_base() {
+            return base.mean_deviation();
+        }
         if let Self::Parametric(d) = self {
-            return Ok(affine_fitted_moments(d, 1.0, 0.0));
+            return Ok(affine_fitted_mean_deviation(d, 1.0, 0.0));
+        }
+        if let Some(segments) = self.finite_segments() {
+            return Ok(affine_segment_mean_deviation(&segments, 1.0, 0.0));
         }
         let mean = self.integral(0.0, 1.0, 0.0, false)?;
-        let variance = if mean.is_finite() {
-            self.integral(0.0, 1.0, mean, true)?
-        } else {
-            f64::NAN
+        if !mean.is_finite() {
+            return Ok((mean, f64::NAN));
+        }
+        // A hurdle can hide most of a large parametric tail in a small
+        // probability interval. Use the base scale even when its quartiles
+        // coincide with the hurdle.
+        let scale = deviation_scale(self.moment_magnitude(mean));
+        let variance = self.scaled_integral(0.0, 1.0, mean, true, false, scale)?;
+        Ok((mean, variance.sqrt() / scale))
+    }
+
+    fn unconditioned_hurdle_base(&self) -> Option<&Self> {
+        let Self::Hurdle {
+            base,
+            atom_probability: 0.0,
+            atom_location,
+        } = self
+        else {
+            return None;
         };
-        Ok((mean, variance))
+        let lower = base.support().0;
+        (*atom_location < lower || *atom_location == lower && base.cdf(*atom_location, true) == 0.0)
+            .then_some(base)
+    }
+
+    fn moment_magnitude(&self, center: f64) -> f64 {
+        match self {
+            Self::Parametric(d) => d.scale,
+            Self::Hurdle {
+                base,
+                atom_location,
+                ..
+            } => base
+                .moment_magnitude(center)
+                .max((center - atom_location).abs()),
+            _ => 0.0,
+        }
     }
 }
 
-pub(crate) fn affine_fitted_moments(
+pub(crate) fn deviation_scale(magnitude: f64) -> f64 {
+    if magnitude > 1e150 {
+        2.0_f64.powi(-600)
+    } else if magnitude > 0.0 && magnitude < 1e-150 {
+        2.0_f64.powi(600)
+    } else {
+        1.0
+    }
+}
+
+pub(crate) fn affine_fitted_mean_deviation(
     d: &FittedDistribution,
     slope: f64,
     intercept: f64,
@@ -1346,20 +1508,20 @@ pub(crate) fn affine_fitted_moments(
     let gumbel_deviation = pi / 6.0_f64.sqrt();
     let divergence = f64::INFINITY.copysign(slope);
     match d.family {
-        DistributionFamily::GumbelRight => (l + s * euler, (s * gumbel_deviation).powi(2)),
-        DistributionFamily::GumbelLeft => (l - s * euler, (s * gumbel_deviation).powi(2)),
+        DistributionFamily::GumbelRight => (l + s * euler, s.abs() * gumbel_deviation),
+        DistributionFamily::GumbelLeft => (l - s * euler, s.abs() * gumbel_deviation),
         DistributionFamily::GenExtreme => {
             let mean = if c > -1.0 {
                 l - s * gamma_moments(c).1
             } else {
                 divergence
             };
-            let variance = if c > -0.5 {
-                (s * gamma_moments(c).2.sqrt()).powi(2)
+            let deviation = if c > -0.5 {
+                s.abs() * gamma_moments(c).2.sqrt()
             } else {
                 f64::INFINITY
             };
-            (mean, variance)
+            (mean, deviation)
         }
         DistributionFamily::GenPareto => (
             if c < 1.0 {
@@ -1368,27 +1530,46 @@ pub(crate) fn affine_fitted_moments(
                 divergence
             },
             if c < 0.5 {
-                (s / (1.0 - c) / (0.5 - c).sqrt() / 2.0_f64.sqrt()).powi(2)
+                s.abs() / (1.0 - c) / (0.5 - c).sqrt() / 2.0_f64.sqrt()
             } else {
                 f64::INFINITY
             },
         ),
         DistributionFamily::WeibullMin | DistributionFamily::WeibullMax => {
-            let (g, _, scaled_variance) = gamma_moments(1.0 / c);
-            (
-                l + if d.family == DistributionFamily::WeibullMin {
-                    s * g
+            let reciprocal = 1.0 / c;
+            let (log_mean, log_deviation) = if reciprocal < 0.01 {
+                // The series retains the variance of a law whose raw
+                // moments are almost equal even in log space.
+                let (g, _, scaled_variance) = gamma_moments(reciprocal);
+                (g.ln(), reciprocal.ln() + 0.5 * scaled_variance.ln())
+            } else {
+                let first = log_gamma_one_plus(reciprocal);
+                let second = log_gamma_one_plus(2.0 * reciprocal);
+                let log_variance = if second.is_infinite() {
+                    second
                 } else {
-                    -s * g
-                },
-                (s / c * scaled_variance.sqrt()).powi(2),
+                    second + (-(2.0 * first - second).exp_m1()).ln()
+                };
+                (first, 0.5 * log_variance)
+            };
+            // Scale in log space before exponentiating. The raw moments
+            // can overflow even when the dimensional moments are finite.
+            let log_scale = d.scale.ln() + slope.abs().ln();
+            let sign = if d.family == DistributionFamily::WeibullMin {
+                slope
+            } else {
+                -slope
+            };
+            (
+                l + (log_scale + log_mean).exp().copysign(sign),
+                (log_scale + log_deviation).exp(),
             )
         }
         DistributionFamily::SkewNormal => {
             let delta = c / c.hypot(1.0);
             (
                 l + s * delta * (2.0 / pi).sqrt(),
-                (s * (1.0 - 2.0 * delta * delta / pi).sqrt()).powi(2),
+                s.abs() * (1.0 - 2.0 * delta * delta / pi).sqrt(),
             )
         }
     }

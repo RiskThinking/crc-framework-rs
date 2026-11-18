@@ -13,6 +13,7 @@ import json
 import math
 import re
 from decimal import Decimal
+from fractions import Fraction
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
 
 DEFINITION_SCHEMA_VERSION = "1.0"
@@ -1440,7 +1441,11 @@ def _table(model: Mapping[str, Any], value: float) -> float:
 def raw_response(model: Mapping[str, Any], value: float) -> float:
     kind = model["kind"]
     if kind == "linear":
-        return model["slope"] * value + model["intercept"]
+        exact = Fraction(model["slope"]) * Fraction(value) + Fraction(model["intercept"])
+        try:
+            return float(exact)
+        except OverflowError:
+            return -math.inf if exact < 0 else math.inf
     if kind == "sigmoid":
         threshold = model["zero_below"]
         if threshold is not None and value < threshold:
@@ -1486,10 +1491,13 @@ def evaluate(definition: Mapping[str, Any], value: float) -> float:
     """Evaluate a normalized definition at one exposure value."""
     if not math.isfinite(value):
         _fail("non_finite_exposure", "", "exposure values must be finite")
-    result = raw_response(definition["model"], value)
+    model = definition["model"]
+    result = raw_response(model, value)
+    if math.isfinite(result) or math.isinf(result) and model["kind"] == "linear":
+        result = apply_clamp(definition["clamp"], result)
     if not math.isfinite(result):
         _fail("non_finite_result", "", "impact evaluation produced a non-finite response")
-    return apply_clamp(definition["clamp"], result)
+    return result
 
 
 # Monotonicity -------------------------------------------------------------
