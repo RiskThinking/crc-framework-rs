@@ -95,6 +95,40 @@ def test_var_keeps_the_lower_cutoff_when_prefix_mass_equals_level() -> None:
         assert result.at(above).value_at_risk == 1
 
 
+def test_var_compares_exact_joint_mass_at_rounding_boundary() -> None:
+    slow = outcome("large", 0.75, 10)
+    small = BinaryOutcome(
+        "small",
+        lower_rank_mass=0.2,
+        lower_impact=0,
+        upper_rank_mass=0.8,
+        upper_impact=1,
+    )
+    above = math.nextafter(0.25, 1.0)
+    result = compute_risk([slow, small], levels=[0.25, above])
+    assert result.at(0.25).value_at_risk == 1
+    assert result.at(above).value_at_risk == 10
+
+
+@pytest.mark.parametrize("q", [1e-20, math.ulp(0.0)])
+def test_cvar_retains_small_excluded_prefix_at_large_impact_scale(q: float) -> None:
+    symmetric = BinaryOutcome(
+        "symmetric",
+        lower_rank_mass=0.5,
+        lower_impact=-1e308,
+        upper_rank_mass=0.5,
+        upper_impact=1e308,
+    )
+    level = compute_risk([symmetric], levels=[q]).at(q)
+    expected = 1e308 * q
+    assert level.value_at_risk == -1e308
+    assert level.conditional_value_at_risk == pytest.approx(expected, rel=1e-15, abs=0)
+    assert (
+        level.attribution[0].conditional_value_at_risk
+        == level.conditional_value_at_risk
+    )
+
+
 def test_contributions_sum_without_implicit_averaging() -> None:
     result = compute_risk(
         [outcome("a", 0.1, 1), outcome("b", 0.2, 2)], levels=[0.5, 0.95]

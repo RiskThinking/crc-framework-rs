@@ -536,7 +536,22 @@ impl FittedDistribution {
     }
 
     fn z(&self, x: f64) -> f64 {
-        (x - self.location) / self.scale
+        let centered = x - self.location;
+        if centered.is_infinite() && x.is_finite() {
+            // The unscaled difference can overflow for opposite signs.
+            x / self.scale - self.location / self.scale
+        } else {
+            centered / self.scale
+        }
+    }
+
+    fn unstandardize(&self, standardized: f64) -> f64 {
+        let value = self.location + self.scale * standardized;
+        if value.is_infinite() && standardized.is_finite() {
+            self.scale.mul_add(standardized, self.location)
+        } else {
+            value
+        }
     }
 
     /// Upper-tail probability `P(X > x)`.
@@ -680,7 +695,7 @@ impl FittedDistribution {
                 inverse_by_bisection(|z| skew_normal_log_cdf(z, shape), logarithm)
             }
         };
-        Ok(self.location + self.scale * standardized)
+        Ok(self.unstandardize(standardized))
     }
 
     /// Invert a positive tail even when its linear probability underflows.
@@ -704,7 +719,7 @@ impl FittedDistribution {
                 -inverse_by_bisection(|z| skew_normal_log_cdf(z, -shape), logarithm)
             }
         };
-        Ok(self.location + self.scale * standardized)
+        Ok(self.unstandardize(standardized))
     }
 
     fn log_pdf(&self, x: f64) -> f64 {
@@ -747,10 +762,8 @@ impl FittedDistribution {
             ));
         }
         let value = match self.family {
-            DistributionFamily::GumbelRight => {
-                self.location - self.scale * (-(-survival).ln_1p()).ln()
-            }
-            DistributionFamily::GumbelLeft => self.location + self.scale * (-survival.ln()).ln(),
+            DistributionFamily::GumbelRight => self.unstandardize(-(-(-survival).ln_1p()).ln()),
+            DistributionFamily::GumbelLeft => self.unstandardize((-survival.ln()).ln()),
             DistributionFamily::WeibullMin => {
                 self.location
                     + self.scale * (-survival.ln()).powf(1.0 / self.shape.expect("validated"))
@@ -954,8 +967,8 @@ impl Distribution for FittedDistribution {
             });
         }
         let value = match self.family {
-            DistributionFamily::GumbelRight => self.location - self.scale * (-q.ln()).ln(),
-            DistributionFamily::GumbelLeft => self.location + self.scale * (-(-q).ln_1p()).ln(),
+            DistributionFamily::GumbelRight => self.unstandardize(-(-q.ln()).ln()),
+            DistributionFamily::GumbelLeft => self.unstandardize((-(-q).ln_1p()).ln()),
             DistributionFamily::WeibullMin => {
                 self.location
                     + self.scale * (-(-q).ln_1p()).powf(1.0 / self.shape.expect("validated"))

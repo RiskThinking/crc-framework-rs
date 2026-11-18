@@ -2654,6 +2654,43 @@
       ]
     },
     {
+      "name": "parametric-location-cancellation",
+      "document": {
+        "family": "gumbel_r",
+        "kind": "parametric",
+        "location": -1e+308,
+        "object": "distribution",
+        "scale": 1e+308,
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.1,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.5,
+          "value": -6.334870794183356e+307
+        },
+        {
+          "probability": 0.9,
+          "value": 1.2503673273124453e+308
+        },
+        {
+          "probability": 0.99,
+          "outcome": "positive_infinity"
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
       "name": "composed-piecewise-affine",
       "document": {
         "impact": {

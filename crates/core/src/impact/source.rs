@@ -6,8 +6,8 @@
 use std::borrow::Cow;
 
 use crate::numerical::{
-    ProbabilitySegment, interval_fraction, linear_interpolate, segment_inverse_survival,
-    segment_probability, segment_quantile,
+    ProbabilitySegment, affine_fitted_mean_deviation, interval_fraction, linear_interpolate,
+    segment_inverse_survival, segment_probability, segment_quantile,
 };
 use crate::{
     Distribution, EmpiricalDistribution, FittedDistribution, HurdleDistribution,
@@ -19,7 +19,6 @@ use super::kernel_curve::KernelCurve;
 use super::quadrature::neumaier;
 
 const MASS_TOLERANCE: f64 = 1e-12;
-const EULER: f64 = 0.577_215_664_901_532_9;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum Tail {
@@ -801,13 +800,20 @@ impl ImpactSource {
         }
     }
 
-    pub(crate) fn mean(&self) -> Option<f64> {
-        match self {
-            Self::Fitted(distribution) => fitted_mean(distribution),
-            // The atom is exact. A closed conditional mean is not required
-            // for the families whose unconditional mean is the fixture path.
-            Self::Hurdle(_) => None,
-            _ => None,
+    pub(crate) fn affine_mean(&self, slope: f64, intercept: f64) -> Option<f64> {
+        use crate::DistributionFamily::{GenExtreme, GenPareto, GumbelLeft, GumbelRight};
+        let Self::Fitted(distribution) = self else {
+            return None;
+        };
+        if matches!(
+            distribution.family,
+            GenExtreme | GenPareto | GumbelLeft | GumbelRight
+        ) && fitted_mean_is_finite(distribution)
+        {
+            let mean = affine_fitted_mean_deviation(distribution, slope, intercept).0;
+            mean.is_finite().then_some(mean)
+        } else {
+            None
         }
     }
 
@@ -916,69 +922,6 @@ fn fitted_support(distribution: &FittedDistribution) -> (Tail, Tail) {
             }
         }
     }
-}
-
-fn fitted_mean(distribution: &FittedDistribution) -> Option<f64> {
-    use crate::DistributionFamily::{GenExtreme, GenPareto, GumbelLeft, GumbelRight};
-    if !fitted_mean_is_finite(distribution) {
-        return None;
-    }
-    let location = distribution.location;
-    let scale = distribution.scale;
-    let mean = match distribution.family {
-        GumbelRight => location + scale * EULER,
-        GumbelLeft => location - scale * EULER,
-        // SciPy `genextreme`: E[X] = loc + scale * (1 - Gamma(1 + c)) / c.
-        GenExtreme => location + scale * gev_mean_factor(distribution.shape?),
-        // SciPy `genpareto`: E[X] = loc + scale / (1 - c).
-        GenPareto => location + scale / (1.0 - distribution.shape?),
-        _ => return None,
-    };
-    mean.is_finite().then_some(mean)
-}
-
-/// `(1 - Gamma(1 + c)) / c` for `c > -1`, with the limit Euler's constant at zero.
-///
-/// Near zero the direct form cancels, so `ln Gamma(1 + c)` is summed from its
-/// Taylor series `-EULER c + sum_k (-1)^k zeta(k) c^k / k` instead.
-pub(crate) fn gev_mean_factor(shape: f64) -> f64 {
-    if shape.abs() >= 0.1 {
-        return (1.0 - crate::reference::curve_fitting::gamma(1.0 + shape)) / shape;
-    }
-    // zeta(2) through zeta(17); later terms are below 1e-17 for |c| < 0.1.
-    const ZETA: [f64; 16] = [
-        1.644_934_066_848_226_4,
-        1.202_056_903_159_594_3,
-        1.082_323_233_711_138_2,
-        1.036_927_755_143_37,
-        1.017_343_061_984_449,
-        1.008_349_277_381_922_8,
-        1.004_077_356_197_944_4,
-        1.002_008_392_826_082_2,
-        1.000_994_575_127_818_1,
-        1.000_494_188_604_119_5,
-        1.000_246_086_553_308,
-        1.000_122_713_347_578_5,
-        1.000_061_248_135_058_7,
-        1.000_030_588_236_307_1,
-        1.000_015_282_259_408_7,
-        1.000_007_637_197_637_9,
-    ];
-    // `log_ratio` is ln Gamma(1 + c) / c.
-    let mut log_ratio = -EULER;
-    let mut power = 1.0;
-    for (offset, zeta) in ZETA.iter().enumerate() {
-        let order = (offset + 2) as f64;
-        power *= -shape;
-        log_ratio -= power * zeta / order;
-    }
-    let log_gamma = log_ratio * shape;
-    let expm1_ratio = if log_gamma == 0.0 {
-        1.0
-    } else {
-        log_gamma.exp_m1() / log_gamma
-    };
-    -log_ratio * expm1_ratio
 }
 
 fn fitted_mean_is_finite(distribution: &FittedDistribution) -> bool {

@@ -724,3 +724,33 @@ def test_affine_fitted_law_is_rescaled_before_querying_overflowing_ranks(
             assert actual[metric].value == pytest.approx(
                 expected[metric].value, rel=1e-8
             )
+
+
+def test_affine_gumbel_mean_can_be_finite_when_its_scale_overflows() -> None:
+    source = Distribution.parametric(
+        DistributionFamily.GUMBEL_RIGHT, location=0, scale=1e308
+    )
+    response = linear(2)
+    expected = (2 * 0.577_215_664_901_532_9) * 1e308
+    assert response.expectation(source) == pytest.approx(expected, rel=1e-14)
+    value = (
+        response.pushforward(source)
+        .statistics(metrics=[Statistic.MEAN])
+        .values[Statistic.MEAN]
+    )
+    assert value.value == pytest.approx(expected, rel=1e-14)
+
+
+def test_downscaled_affine_expectation_matches_the_pushforward_mean() -> None:
+    source = Distribution.parametric(
+        DistributionFamily.GUMBEL_RIGHT, location=1.5e308, scale=1.5e308
+    )
+    response = linear(1e-308)
+    expected = 1.5 * (1 + 0.577_215_664_901_532_9)
+    assert response.expectation(source) == pytest.approx(expected, rel=1e-14)
+    value = (
+        response.pushforward(source)
+        .statistics(metrics=[Statistic.MEAN])
+        .values[Statistic.MEAN]
+    )
+    assert value.value == pytest.approx(expected, rel=1e-14)
