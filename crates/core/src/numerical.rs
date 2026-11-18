@@ -1498,26 +1498,61 @@ pub(crate) fn affine_fitted_mean_deviation(
     slope: f64,
     intercept: f64,
 ) -> (f64, f64) {
-    let (l, s, c) = (
-        slope.mul_add(d.location, intercept),
-        d.scale * slope,
-        d.shape.unwrap_or(0.0),
-    );
+    let l = slope.mul_add(d.location, intercept);
+    let s = d.scale * slope;
+    let c = d.shape.unwrap_or(0.0);
     let euler = 0.577_215_664_901_532_9;
     let pi = std::f64::consts::PI;
     let gumbel_deviation = pi / 6.0_f64.sqrt();
     let divergence = f64::INFINITY.copysign(slope);
+    let scaled = |factor: f64| {
+        let value = s * factor;
+        if s.is_normal() && value.is_finite() {
+            value
+        } else {
+            let regrouped = d.scale * factor * slope;
+            if regrouped.is_normal() {
+                regrouped
+            } else if factor == 0.0 {
+                factor
+            } else {
+                (d.scale.ln() + slope.abs().ln() + factor.abs().ln())
+                    .exp()
+                    .copysign(factor * slope.signum())
+            }
+        }
+    };
+    let mean = |factor: f64| {
+        let value = l + scaled(factor);
+        if value.is_finite() {
+            value
+        } else if s.is_finite() && l.is_finite() {
+            s.mul_add(factor, l)
+        } else {
+            slope.mul_add(d.scale.mul_add(factor, d.location), intercept)
+        }
+    };
     match d.family {
-        DistributionFamily::GumbelRight => (l + s * euler, s.abs() * gumbel_deviation),
-        DistributionFamily::GumbelLeft => (l - s * euler, s.abs() * gumbel_deviation),
+        DistributionFamily::GumbelRight => (mean(euler), scaled(gumbel_deviation).abs()),
+        DistributionFamily::GumbelLeft => (mean(-euler), scaled(gumbel_deviation).abs()),
         DistributionFamily::GenExtreme => {
+            if c >= 32.0 {
+                // The Gamma terms can exceed binary64 before dimensional scaling.
+                let log_scale_over_shape = d.scale.ln() + slope.abs().ln() - c.ln();
+                let first = log_gamma_one_plus(c);
+                let log_mean = first + (-(-first).exp()).ln_1p();
+                return (
+                    l + (log_scale_over_shape + log_mean).exp().copysign(-slope),
+                    (log_scale_over_shape + 0.5 * log_gamma_variance(c, first)).exp(),
+                );
+            }
             let mean = if c > -1.0 {
-                l - s * gamma_moments(c).1
+                mean(-gamma_moments(c).1)
             } else {
                 divergence
             };
             let deviation = if c > -0.5 {
-                s.abs() * gamma_moments(c).2.sqrt()
+                scaled(gamma_moments(c).2.sqrt()).abs()
             } else {
                 f64::INFINITY
             };
@@ -1525,12 +1560,22 @@ pub(crate) fn affine_fitted_mean_deviation(
         }
         DistributionFamily::GenPareto => (
             if c < 1.0 {
-                l + s / (1.0 - c)
+                mean(1.0 / (1.0 - c))
             } else {
                 divergence
             },
             if c < 0.5 {
-                s.abs() / (1.0 - c) / (0.5 - c).sqrt() / 2.0_f64.sqrt()
+                let root = if c >= -f64::MAX / 2.0 {
+                    (1.0 - 2.0 * c).sqrt()
+                } else {
+                    (0.5 - c).sqrt() * 2.0_f64.sqrt()
+                };
+                let factor = 1.0 / (1.0 - c) / root;
+                if factor.is_normal() {
+                    scaled(factor).abs()
+                } else {
+                    (d.scale.ln() + slope.abs().ln() - (1.0 - c).ln() - root.ln()).exp()
+                }
             } else {
                 f64::INFINITY
             },
@@ -1544,13 +1589,7 @@ pub(crate) fn affine_fitted_mean_deviation(
                 (g.ln(), reciprocal.ln() + 0.5 * scaled_variance.ln())
             } else {
                 let first = log_gamma_one_plus(reciprocal);
-                let second = log_gamma_one_plus(2.0 * reciprocal);
-                let log_variance = if second.is_infinite() {
-                    second
-                } else {
-                    second + (-(2.0 * first - second).exp_m1()).ln()
-                };
-                (first, 0.5 * log_variance)
+                (first, 0.5 * log_gamma_variance(reciprocal, first))
             };
             // Scale in log space before exponentiating. The raw moments
             // can overflow even when the dimensional moments are finite.
@@ -1568,10 +1607,19 @@ pub(crate) fn affine_fitted_mean_deviation(
         DistributionFamily::SkewNormal => {
             let delta = c / c.hypot(1.0);
             (
-                l + s * delta * (2.0 / pi).sqrt(),
-                s.abs() * (1.0 - 2.0 * delta * delta / pi).sqrt(),
+                mean(delta * (2.0 / pi).sqrt()),
+                scaled((1.0 - 2.0 * delta * delta / pi).sqrt()).abs(),
             )
         }
+    }
+}
+
+fn log_gamma_variance(shape: f64, first: f64) -> f64 {
+    let second = log_gamma_one_plus(2.0 * shape);
+    if second.is_infinite() {
+        second
+    } else {
+        second + (-(2.0 * first - second).exp_m1()).ln()
     }
 }
 

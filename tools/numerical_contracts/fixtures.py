@@ -276,6 +276,12 @@ def build():
                 ),
             ),
             (
+                "parametric-location-cancellation",
+                Distribution.parametric(
+                    DistributionFamily.GUMBEL_RIGHT, location=-1e308, scale=1e308
+                ),
+            ),
+            (
                 "composed-piecewise-affine",
                 sigmoid.pushforward(clamped_affine.pushforward(complete)),
             ),

@@ -616,6 +616,57 @@ def test_standard_deviation_survives_variance_underflow() -> None:
 
 
 @pytest.mark.parametrize(
+    "family,orientation",
+    [(DistributionFamily.GUMBEL_RIGHT, 1), (DistributionFamily.GUMBEL_LEFT, -1)],
+)
+def test_gumbel_location_scale_cancellation_preserves_ranks(
+    family: DistributionFamily, orientation: int
+) -> None:
+    scale = 1e308
+    law = Distribution.parametric(family, location=-orientation * scale, scale=scale)
+    probability = 0.9 if orientation > 0 else 0.1
+    expected = orientation * (-math.log(-math.log(0.9)) - 1) * scale
+    assert law.quantile(probability) == pytest.approx(expected, rel=1e-14)
+    assert law.cdf(expected) == pytest.approx(probability, rel=1e-14)
+    assert law.exceedance(expected) == pytest.approx(1 - probability, rel=1e-14)
+
+
+def test_gev_applies_scale_before_exponentiating_large_moments() -> None:
+    scale, shape = 1e-300, 250
+    law = Distribution.parametric(
+        DistributionFamily.GENERALIZED_EXTREME_VALUE,
+        location=0,
+        scale=scale,
+        shape=shape,
+    )
+    first = math.lgamma(1 + shape)
+    second = math.lgamma(1 + 2 * shape)
+    factor = math.log(scale) - math.log(shape)
+    mean = math.exp(factor + first) * math.expm1(-first)
+    deviation = math.exp(
+        factor + (second + math.log(-math.expm1(2 * first - second))) / 2
+    )
+    values = law.statistics(
+        metrics=[Statistic.MEAN, Statistic.STANDARD_DEVIATION]
+    ).values
+    assert values[Statistic.MEAN].value == pytest.approx(mean, rel=1e-12)
+    assert values[Statistic.STANDARD_DEVIATION].value == pytest.approx(
+        deviation, rel=1e-12
+    )
+
+
+def test_exponential_pareto_preserves_representable_standard_deviation() -> None:
+    scale = 1.5e308
+    law = Distribution.parametric(
+        DistributionFamily.GENERALIZED_PARETO, location=0, scale=scale, shape=0
+    )
+    value = law.statistics(metrics=[Statistic.STANDARD_DEVIATION]).values[
+        Statistic.STANDARD_DEVIATION
+    ]
+    assert value.value == pytest.approx(scale, rel=1e-14)
+
+
+@pytest.mark.parametrize(
     "shape,scale", [(0.05, 1e-20), (0.01, 1e-100), (0.004, 1e-300)]
 )
 @pytest.mark.parametrize(

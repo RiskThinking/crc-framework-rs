@@ -375,7 +375,7 @@ fn moment_expectation(model: &Model, clamp: &Clamp, source: &ImpactSource) -> Op
     if *slope == 0.0 {
         return Some(*intercept);
     }
-    source.mean().map(|mean| slope * mean + intercept)
+    source.affine_mean(*slope, *intercept)
 }
 
 fn split_at_breakpoints(
