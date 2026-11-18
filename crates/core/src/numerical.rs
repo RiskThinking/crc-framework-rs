@@ -3,6 +3,8 @@
 //! Finite laws integrate their actual probability intervals, including tiny
 //! atoms. No quantile grid is substituted for the caller's law.
 
+use num_rational::BigRational;
+use num_traits::{ToPrimitive, Zero};
 use serde::Deserialize;
 
 use crate::distribution::log_gamma_one_plus;
@@ -490,6 +492,45 @@ pub(crate) fn segment_integral(
             moment.segment(width, x, y)
         },
     ))
+}
+
+pub(crate) fn segment_cvar(
+    segments: &[ProbabilitySegment],
+    level: f64,
+    upper: bool,
+) -> Option<f64> {
+    if !(0.0 < level && level < 1.0) || segments.windows(2).any(|w| w[0].1 > w[1].0) {
+        return None;
+    }
+    // Keep the original masses in exact binary arithmetic: even a partial
+    // atom with an almost unchanged width can alter the conditional mean.
+    let exact = |value: f64| BigRational::from_float(value).expect("finite segment data");
+    let total: BigRational = segments.iter().map(|&(_, _, mass)| exact(mass)).sum();
+    let mut excluded = &total * exact(level);
+    let included = total - &excluded;
+    if included.is_zero() {
+        return None;
+    }
+    let mut moment = BigRational::default();
+    for i in 0..segments.len() {
+        let (a, b, p) = if upper {
+            segments[i]
+        } else {
+            let (a, b, p) = segments[segments.len() - 1 - i];
+            (b, a, p)
+        };
+        let width = exact(p);
+        if excluded >= width {
+            excluded -= width;
+            continue;
+        }
+        let a = exact(a);
+        let b = exact(b);
+        let offset = &excluded / &width;
+        moment += (&width - &excluded) * (&a + &b + (&b - &a) * offset);
+        excluded = BigRational::default();
+    }
+    (moment / included / BigRational::from_integer(2.into())).to_f64()
 }
 
 impl NumericalLaw {
@@ -1288,6 +1329,11 @@ impl NumericalLaw {
     /// representations are analytic; parametric tails use adaptive quadrature.
     pub fn integral(&self, lo: f64, hi: f64, center: f64, square: bool) -> Result<f64> {
         self.scaled_integral(lo, hi, center, square, false, 1.0)
+    }
+
+    /// Compute a trimmed mean for a law with finite probability-linear segments.
+    pub fn finite_cvar(&self, level: f64, upper: bool) -> Option<f64> {
+        segment_cvar(&self.finite_segments()?, level, upper)
     }
 
     fn integral_moment(&self, lo: f64, hi: f64, moment: IntegralMoment) -> Result<f64> {

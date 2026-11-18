@@ -157,6 +157,10 @@ impl PyNumericalDocument {
         })
         .map_err(error)
     }
+    fn finite_cvar(&self, py: Python<'_>, level: f64, upper: bool) -> PyResult<Option<f64>> {
+        py.detach(|| self.inner.finite_cvar(level, upper))
+            .map_err(error)
+    }
 }
 
 #[pyclass(name = "NativeNumericalLaw", frozen, from_py_object)]
@@ -228,6 +232,9 @@ impl PyNumericalLaw {
     }
     fn mean_deviation(&self, py: Python<'_>) -> PyResult<(f64, f64)> {
         py.detach(|| self.inner.mean_deviation()).map_err(error)
+    }
+    fn finite_cvar(&self, py: Python<'_>, level: f64, upper: bool) -> Option<f64> {
+        py.detach(|| self.inner.finite_cvar(level, upper))
     }
     fn inverse_survival(&self, py: Python<'_>, probability: f64) -> PyResult<f64> {
         py.detach(|| self.inner.inverse_survival(probability))

@@ -1,7 +1,7 @@
 //! Independent binary rank outcomes and exact tail-risk attribution.
 
 use crate::error::{CrcError, Result};
-use crate::numerical::{CompensatedSum, compensated};
+use crate::numerical::{CompensatedSum, compensated, linear_interpolate};
 use num_bigint::{BigInt, BigUint};
 use num_rational::BigRational;
 use num_traits::ToPrimitive;
@@ -49,8 +49,12 @@ const HARD_MAX_BRANCHES: usize = 1 << 26;
 
 type Factors<'a> = [(usize, &'a BinaryOutcome)];
 
+fn upper_state(mask: usize, index: usize) -> usize {
+    (mask >> index) & 1
+}
+
 fn contribution(outcome: &BinaryOutcome, mask: usize, index: usize) -> f64 {
-    if mask & (1 << index) == 0 {
+    if upper_state(mask, index) == 0 {
         outcome.lower_impact
     } else {
         outcome.upper_impact
@@ -191,9 +195,84 @@ fn quantile_index(
     branches.len() - 1
 }
 
-// For tiny q, subtracting the excluded mass from the tail width would round
-// it away. Integrate just the excluded prefix in exact binary arithmetic, then
-// subtract it from the analytical unconditional per-factor means.
+fn add_state_masses(states: &mut [[CompensatedSum; 2]], mask: usize, mass: f64) {
+    for (i, pair) in states.iter_mut().enumerate() {
+        pair[upper_state(mask, i)].add(mass);
+    }
+}
+
+fn exact_factor_mean(factor: &BinaryOutcome, upper_probability: BigRational) -> BigRational {
+    let lower = BigRational::from_float(factor.lower_impact).expect("finite impact");
+    let upper = BigRational::from_float(factor.upper_impact).expect("finite impact");
+    &lower + (upper - &lower) * upper_probability
+}
+
+fn conditioned_attribution(
+    states: &[[CompensatedSum; 2]],
+    factors: &Factors<'_>,
+) -> Option<Vec<f64>> {
+    let mut parts = vec![0.0; factors.len()];
+    for (&(index, factor), pair) in factors.iter().zip(states) {
+        let [lower, upper] = pair.each_ref().map(CompensatedSum::total);
+        let (a, b) = (factor.lower_impact, factor.upper_impact);
+        // Use the smaller state mass as the interpolation weight so a rare
+        // state survives even when the other state's weight rounds to one.
+        let (start, end) = if upper <= lower { (a, b) } else { (b, a) };
+        let weight = lower.min(upper) / (lower + upper);
+        let value = linear_interpolate(start, end, weight);
+        if value.abs() <= 64.0 * f64::EPSILON * (start * (1.0 - weight)).abs()
+            && start.is_sign_negative() != end.is_sign_negative()
+            && weight > 0.0
+        {
+            // Rounding the state fractions separately can erase or invent
+            // contributions when two large terms nearly cancel.
+            return None;
+        }
+        parts[index] = value;
+    }
+    Some(parts)
+}
+
+fn var_attribution(
+    tied: &[Branch],
+    factors: &Factors<'_>,
+    exact: &mut Option<ExactMasses>,
+) -> Vec<f64> {
+    let mut states = Vec::from_iter((0..factors.len()).map(|_| Default::default()));
+    if tied.iter().all(|branch| branch.mass >= f64::MIN_POSITIVE) {
+        for branch in tied {
+            add_state_masses(&mut states, branch.mask, branch.mass);
+        }
+        if let Some(parts) = conditioned_attribution(&states, factors) {
+            return parts;
+        }
+    }
+    let masses = exact.get_or_insert_with(|| ExactMasses::new(factors));
+    let mut total = BigUint::ZERO;
+    let mut upper = vec![BigUint::ZERO; factors.len()];
+    for branch in tied {
+        let weight = masses.at(branch.mask);
+        for (i, state) in upper.iter_mut().enumerate() {
+            if upper_state(branch.mask, i) != 0 {
+                *state += &weight;
+            }
+        }
+        total += weight;
+    }
+    let total = BigInt::from(total);
+    let mut parts = vec![0.0; factors.len()];
+    for (&(index, factor), upper) in factors.iter().zip(upper) {
+        let probability = BigRational::new_raw(BigInt::from(upper), total.clone());
+        parts[index] = exact_factor_mean(factor, probability)
+            .to_f64()
+            .expect("finite VaR attribution");
+    }
+    parts
+}
+
+// Integrate just the excluded prefix in exact binary arithmetic and subtract
+// it from the unconditional per-factor means. This preserves tiny excluded
+// mass and avoids cancellation from rounding large impact contributions.
 fn exact_tail(
     branches: &[Branch],
     quantile: f64,
@@ -235,9 +314,7 @@ fn exact_tail(
         let excluded_upper =
             BigRational::new_raw(BigInt::from(excluded_upper_numerator), denominator.clone());
         let upper_in_tail = (upper_probability - excluded_upper) / &tail;
-        let lower_impact = BigRational::from_float(factor.lower_impact).expect("finite impact");
-        let upper_impact = BigRational::from_float(factor.upper_impact).expect("finite impact");
-        let part = &lower_impact + (upper_impact - &lower_impact) * upper_in_tail;
+        let part = exact_factor_mean(factor, upper_in_tail);
         parts[index] = part.to_f64().expect("finite tail mean");
         cvar += part;
     }
@@ -349,34 +426,18 @@ pub fn compute_risk(
         let index = quantile_index(&branches, total, q, &factors, &mut exact);
         let quantile = branches[index].value;
         // Tied VaR states have probability-weighted attribution, independent of order.
-        let tied = branches.iter().filter(|b| b.value == quantile);
-        let tied_mass = compensated(tied.clone().map(|b| b.mass));
-        let exact_tied = if tied_mass < f64::MIN_POSITIVE {
-            let masses = exact.get_or_insert_with(|| ExactMasses::new(&factors));
-            let mass: BigUint = tied.clone().map(|b| masses.at(b.mask)).sum();
-            Some((masses, BigInt::from(mass)))
-        } else {
+        let lo = branches.partition_point(|branch| branch.value < quantile);
+        let hi = branches.partition_point(|branch| branch.value <= quantile);
+        let var_parts = var_attribution(&branches[lo..hi], &factors, &mut exact);
+        let approximate = if q < 64.0 * f64::EPSILON || rounded_mass {
             None
-        };
-        let mut var_parts = vec![0.0; outcomes.len()];
-        for branch in tied {
-            let weight = if let Some((masses, mass)) = &exact_tied {
-                BigRational::new_raw(BigInt::from(masses.at(branch.mask)), mass.clone())
-                    .to_f64()
-                    .expect("finite branch fraction")
-            } else {
-                branch.mass / tied_mass
-            };
-            for (i, &(index, outcome)) in factors.iter().enumerate() {
-                var_parts[index] += contribution(outcome, branch.mask, i) * weight;
-            }
-        }
-        let (cvar, cvar_parts) = if q < 64.0 * f64::EPSILON || rounded_mass {
-            let exact = exact.get_or_insert_with(|| ExactMasses::new(&factors));
-            exact_tail(&branches, quantile, q, &factors, exact)
         } else {
             upper_tail(&branches, (1.0 - q) * total, &factors)
         };
+        let (cvar, cvar_parts) = approximate.unwrap_or_else(|| {
+            let exact = exact.get_or_insert_with(|| ExactMasses::new(&factors));
+            exact_tail(&branches, quantile, q, &factors, exact)
+        });
         result.push(RiskLevel {
             probability: q,
             value_at_risk: quantile,
@@ -398,28 +459,46 @@ pub fn compute_risk(
     })
 }
 
-fn upper_tail(branches: &[Branch], tail_mass: f64, factors: &Factors<'_>) -> (f64, Vec<f64>) {
+fn upper_tail(
+    branches: &[Branch],
+    tail_mass: f64,
+    factors: &Factors<'_>,
+) -> Option<(f64, Vec<f64>)> {
     let mut remaining = tail_mass;
     let mut cvar = CompensatedSum::default();
-    let mut parts = vec![0.0; factors.len()];
+    let mut largest_positive = 0.0_f64;
+    let mut largest_negative = 0.0_f64;
+    let mut states = Vec::from_iter((0..factors.len()).map(|_| Default::default()));
     for tied in branches.chunk_by(|a, b| a.value == b.value).rev() {
         let group_mass = compensated(tied.iter().map(|branch| branch.mass));
         let used = group_mass.min(remaining);
         let weight = used / tail_mass;
-        cvar.add(tied[0].value * weight);
+        let contribution = tied[0].value * weight;
+        largest_positive = largest_positive.max(contribution);
+        largest_negative = largest_negative.min(contribution);
+        cvar.add(contribution);
         // A partial cutoff includes the same fraction of each tied state.
         for branch in tied {
-            let weight = weight * (branch.mass / group_mass);
-            for (i, &(index, outcome)) in factors.iter().enumerate() {
-                parts[index] += contribution(outcome, branch.mask, i) * weight;
-            }
+            add_state_masses(
+                &mut states,
+                branch.mask,
+                weight * (branch.mass / group_mass),
+            );
         }
         remaining -= used;
         if remaining <= 0.0 {
             break;
         }
     }
-    (cvar.total(), parts)
+    let value = cvar.total();
+    if !value.is_finite()
+        || largest_negative < 0.0
+            && largest_positive > 0.0
+            && value.abs() <= 64.0 * f64::EPSILON * largest_positive.max(-largest_negative)
+    {
+        return None;
+    }
+    Some((value, conditioned_attribution(&states, factors)?))
 }
 
 #[cfg(test)]
