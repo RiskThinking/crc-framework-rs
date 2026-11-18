@@ -9,6 +9,7 @@ use sha2::{Digest, Sha256};
 
 use crate::canonical::{Numerical, scientific_equal, validate_structure};
 use crate::error::{CrcError, Result};
+use crate::numerical::compensated;
 
 pub const DATASET_URI: &str = "https://climateriskcommons.org/schemas/dataset/2.0";
 
@@ -388,6 +389,51 @@ pub fn validate_fit_record(record: &Value) -> Result<()> {
     validate_record(record).map(|_| ())
 }
 
+fn validate_selected_weights(weights: &[f64], specification: &Value) -> Result<()> {
+    let requested = specification["weights"]
+        .as_array()
+        .map(|values| {
+            values
+                .iter()
+                .map(|value| {
+                    value
+                        .as_f64()
+                        .filter(|w| w.is_finite() && *w >= 0.0)
+                        .ok_or_else(|| invalid("invalid requested weight"))
+                })
+                .collect::<Result<Vec<_>>>()
+        })
+        .transpose()?;
+    let uniform = 1.0 / weights.len() as f64;
+    let scale = if let Some(requested) = &requested {
+        if requested.len() != weights.len() {
+            return Err(invalid(
+                "selected specification needs one weight per supplied knot",
+            ));
+        }
+        let maximum = requested.iter().copied().fold(0.0, f64::max);
+        (
+            maximum,
+            compensated(requested.iter().map(|weight| weight / maximum)),
+        )
+    } else {
+        (1.0, 1.0)
+    };
+    for (index, &weight) in weights.iter().enumerate() {
+        let expected = requested
+            .as_ref()
+            .map_or(uniform, |values| (values[index] / scale.0) / scale.1);
+        let positive = requested.as_ref().is_none_or(|values| values[index] > 0.0);
+        let tolerance = (1e-12 * weight.max(expected)).max(f64::from_bits(1));
+        if (weight > 0.0) != positive || (weight - expected).abs() > tolerance {
+            return Err(invalid(
+                "effective weights contradict the selected specification",
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn validate_record(record: &Value) -> Result<Option<&Value>> {
     validate_structure("https://climateriskcommons.org/schemas/fitting/1.0", record)?;
     let count = natural(&record["evidence_count"])?;
@@ -415,14 +461,28 @@ fn validate_record(record: &Value) -> Result<Option<&Value>> {
         } else if reason.is_none_or(str::is_empty) {
             return Err(invalid("failed or rejected attempts require reasons"));
         }
+        let actual = fit_specification(&attempt["specification"])?;
+        let converged = attempt["status"] == "converged";
+        let code = if converged {
+            format!("fit.{}", text(&actual["kind"])?)
+        } else {
+            "fit.failed".to_owned()
+        };
+        let severity = if converged { "info" } else { "error" };
+        let mut has_outcome = false;
         for diagnostic in array(&attempt["diagnostics"])? {
             text(&diagnostic["code"])?;
             if diagnostic["message"].as_str().is_none_or(str::is_empty) {
                 return Err(invalid("diagnostic message must be nonempty literal text"));
             }
+            has_outcome |= diagnostic["code"] == code && diagnostic["severity"] == severity;
+        }
+        if !has_outcome {
+            return Err(invalid(
+                "a fit attempt requires diagnostics for its outcome",
+            ));
         }
 
-        let actual = fit_specification(&attempt["specification"])?;
         if !allowed.contains(&canonical(&actual).to_string()) {
             return Err(invalid(
                 "fit attempt was not requested or explicitly configured",
@@ -466,21 +526,25 @@ fn validate_record(record: &Value) -> Result<Option<&Value>> {
         return Err(invalid("actual estimator contradicts selected attempt"));
     }
     if let Some(weights) = record["weights"].as_array() {
-        let mut sum = 0.0;
-        let mut positive = 0;
-        for weight in weights {
-            let weight = weight
-                .as_f64()
-                .filter(|w| w.is_finite() && *w >= 0.0)
-                .ok_or_else(|| invalid("invalid effective weight"))?;
-            sum += weight;
-            positive += u64::from(weight > 0.0);
-        }
+        let weights = weights
+            .iter()
+            .map(|weight| {
+                weight
+                    .as_f64()
+                    .filter(|w| (0.0..=1.0).contains(w))
+                    .ok_or_else(|| invalid("invalid effective weight"))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let sum = compensated(weights.iter().copied());
+        let positive = weights.iter().filter(|&&w| w > 0.0).count();
         if weights.len().to_string() != count
             || (sum - 1.0).abs() > 1e-12
             || positive.to_string() != used
         {
             return Err(invalid("effective weights contradict evidence counts"));
+        }
+        if let Some(actual) = selected.filter(|s| s["kind"] != "samples") {
+            validate_selected_weights(&weights, actual)?;
         }
     }
     if let Some(support) = record["evidence_support"].as_array() {

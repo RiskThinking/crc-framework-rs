@@ -63,6 +63,10 @@ impl ImpactDistribution {
         &self.atoms
     }
 
+    pub(crate) fn is_discrete(&self) -> bool {
+        matches!(self.law, Law::Discrete)
+    }
+
     pub fn quantile(&self, probability: f64) -> ContractResult<f64> {
         if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
             return Err(fail(
@@ -84,7 +88,7 @@ impl ImpactDistribution {
                 // with the upper source quantile, so a zero-mass gap in the
                 // source resolves to the lower response value.
                 let exposure = if *decreasing {
-                    self.source.upper_quantile(1.0 - probability)?
+                    self.source.upper_quantile_from_survival(probability)?
                 } else {
                     self.source.quantile(probability)?
                 };
@@ -630,6 +634,9 @@ fn discrete_quantile(atoms: &[ImpactAtom], probability: f64) -> f64 {
     if probability <= 0.0 {
         return atoms[0].value;
     }
+    if probability >= 1.0 {
+        return atoms.last().expect("atoms are non-empty").value;
+    }
     let mut cumulative = 0.0;
     for atom in atoms {
         cumulative += atom.probability;
@@ -683,21 +690,7 @@ impl Region {
     }
 
     fn probability(self, source: &ImpactSource) -> f64 {
-        let right = if self.end.is_infinite() && self.end.is_sign_positive() {
-            1.0
-        } else if self.end_closed {
-            source.cdf(self.end)
-        } else {
-            source.cdf_below(self.end)
-        };
-        let left = if self.start.is_infinite() && self.start.is_sign_negative() {
-            0.0
-        } else if self.start_closed {
-            source.cdf_below(self.start)
-        } else {
-            source.cdf(self.start)
-        };
-        (right - left).max(0.0)
+        source.interval_probability(self.start, self.end, self.start_closed, self.end_closed)
     }
 }
 

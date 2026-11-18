@@ -18,6 +18,7 @@ pub use registry::{
 
 pub use error::ImpactContractError;
 
+use crate::numerical::ProbabilitySegment;
 use definition::{ModelKind, compile, known_registry_factor, override_rule};
 use json::{canonical_json, content_hash, parse_json};
 
@@ -79,6 +80,49 @@ impl ImpactDefinition {
         source: &ImpactSource,
     ) -> Result<ImpactDistribution, ImpactContractError> {
         pushforward::transform(&self.model, &self.clamp, &self.hash, source)
+    }
+
+    /// Exact image of finite uniform intervals and atoms through a piecewise
+    /// affine impact. Boundaries include all response knots and clamp crossings.
+    pub(crate) fn image_segments(
+        &self,
+        source: &[ProbabilitySegment],
+    ) -> Result<Option<Vec<ProbabilitySegment>>, ImpactContractError> {
+        if !matches!(
+            self.model,
+            definition::Model::Linear { .. }
+                | definition::Model::Tabulated {
+                    interpolation: definition::Interpolation::Linear,
+                    ..
+                }
+        ) {
+            return Ok(None);
+        }
+        let cuts = expectation::response_breakpoints(&self.model, &self.clamp);
+        let mut segments = Vec::new();
+        for &(lower, upper, mass) in source {
+            if lower == upper {
+                let value = self.evaluate(lower)?;
+                segments.push((value, value, mass));
+                continue;
+            }
+            let mut left = lower;
+            for right in cuts
+                .iter()
+                .copied()
+                .filter(|cut| lower < *cut && *cut < upper)
+                .chain(std::iter::once(upper))
+            {
+                let portion = mass * ((right - left) / (upper - lower));
+                if portion > 0.0 {
+                    let (a, b) = (self.evaluate(left)?, self.evaluate(right)?);
+                    segments.push((a.min(b), a.max(b), portion));
+                }
+                left = right;
+            }
+        }
+        segments.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.total_cmp(&b.1)));
+        Ok(Some(segments))
     }
 }
 

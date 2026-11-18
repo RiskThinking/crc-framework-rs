@@ -453,6 +453,24 @@ class Distribution:
             result = [atoms.get(float(x), 0.0) for x in query.reshape(-1)]
         return _output(result, query.shape, scalar)
 
+    def _point_atoms(self) -> list[tuple[float, float]]:
+        if self._native is not None:
+            return self._native.atoms()
+        if self._transformed is not None:
+            return self._transformed.atoms()
+        assert self._base is not None
+        p = cast(float, self._data["atom_probability"])
+        atom = cast(float, self._data["atom_location"])
+        result = [(atom, p)] if p else []
+        if p < 1:
+            survival = float(self._base.exceedance(atom))
+            result.extend(
+                (x, mass / survival * (1 - p))
+                for x, mass in self._base._point_atoms()
+                if x > atom
+            )
+        return result
+
     def sample(
         self, size: int | tuple[int, ...], *, seed: int | None = None
     ) -> FloatArray:
@@ -650,8 +668,13 @@ class Distribution:
 
         impact = Impact.from_json(_dump(self._data["impact"]))
         source = Distribution.from_json(_dump(self._data["source"]))
+        assert self._transformed is not None
         return impact._threshold_probability(
-            source, x, inclusive, exceedance=exceedance
+            source,
+            x,
+            inclusive,
+            exceedance=exceedance,
+            at_atom=any(value == x for value, _ in self._transformed.atoms()),
         )
 
     def _transformed_exceedance(self, x: float, inclusive: bool) -> float:
@@ -744,19 +767,7 @@ class Distribution:
         raise TypeError("this law requires its exact compound representation")
 
     def _segment_source(self) -> _core.NativeImpactSource:
-        segments = self._segments()
-        probabilities = [0.0]
-        values = [segments[0][0]]
-        mass = 0.0
-        for lower, upper, probability in segments:
-            if values[-1] != lower:
-                probabilities.append(mass)
-                values.append(lower)
-            mass += probability
-            probabilities.append(mass)
-            values.append(upper)
-        probabilities[-1] = 1.0
-        return _core.NativeImpactSource.segments(probabilities, values)
+        return _core.NativeImpactSource.segments(self._segments())
 
     def _segments(self) -> list[tuple[float, float, float]]:
         """Ordered exact uniform intervals and atoms for a finite law."""
@@ -835,6 +846,7 @@ class Distribution:
             or data.pop("object", None) != "distribution"
         ):
             raise ValueError("expected numerical distribution schema 1.0")
+        has_evidence = "evidence" in data
         record = data.pop("evidence", None)
         if data.get("kind") == "transformed":
             _fields(data, {"kind", "source", "impact"})
@@ -854,7 +866,7 @@ class Distribution:
                 if not shapeless and data.get("shape") is None:
                     raise ValueError("this parametric family requires a shape")
             result = cls._create(data)
-        if record is not None:
+        if has_evidence:
             if result.kind is not DistributionKind.QUANTILE or not isinstance(
                 record, dict
             ):

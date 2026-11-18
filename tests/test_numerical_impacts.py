@@ -300,6 +300,62 @@ def test_finite_hurdle_impact_uses_the_conditioned_tail() -> None:
     assert reflected.cdf(-1.0) == 1.0
 
 
+def test_exact_hurdle_impact_preserves_a_sub_ulp_atom() -> None:
+    source = Distribution.hurdle(
+        Distribution.discrete([1, 1e20], [1, 1e-20]), atom_probability=0.2
+    )
+    identity = linear(1)
+    assert identity.expectation(source) == pytest.approx(1.6)
+    image = identity.pushforward(source)
+    assert image.mass(1e20) == pytest.approx(8e-21, abs=0)
+    assert image.exceedance(1.0) == pytest.approx(8e-21, abs=0)
+    assert image.quantile(1.0) == 1e20
+
+
+@pytest.mark.parametrize("hurdle", [False, True])
+def test_exact_impact_preserves_a_sub_ulp_continuous_interval(hurdle: bool) -> None:
+    base = Distribution.histogram([1, 2, 2e20], [1, 1e-20])
+    source = Distribution.hurdle(base, atom_probability=0.2) if hurdle else base
+    weight = 0.8 if hurdle else 1
+    identity = linear(1)
+    assert identity.expectation(source) == pytest.approx(2.5 * weight)
+    assert identity.pushforward(source).exceedance(2.0) == pytest.approx(
+        1e-20 * weight, abs=0
+    )
+    assert linear(-1).pushforward(source).quantile(5e-21 * weight) == pytest.approx(
+        -1e20
+    )
+
+
+@pytest.mark.parametrize("steepness", [0.22, -0.22])
+def test_sigmoid_pushforward_probability_respects_rounded_atom(
+    steepness: float,
+) -> None:
+    source = Distribution.hurdle(
+        Distribution.parametric(DistributionFamily.GUMBEL_RIGHT, location=0, scale=1),
+        atom_probability=0.2,
+    )
+    impact = Impact.sigmoid(
+        midpoint=-2.33, steepness=steepness, input=Ratio(), output=Ratio()
+    )
+    atom = cast(float, impact.evaluate(0))
+    image = impact.pushforward(source)
+    assert image.mass(atom) == pytest.approx(0.2)
+    below = 0.0 if steepness > 0 else 0.8
+    assert image.cdf(atom, inclusive=False) == pytest.approx(below)
+    assert image.cdf(atom) == pytest.approx(below + 0.2)
+    assert image.exceedance(atom) == pytest.approx(0.8 - below)
+    assert image.exceedance(atom, inclusive=True) == pytest.approx(1 - below)
+
+
+def test_hurdle_generalized_inverse_excludes_discarded_atoms() -> None:
+    base = Distribution.discrete([-1, 2, 3], [0.5, 0.1, 0.4])
+    hurdle = Distribution.hurdle(base, atom_probability=0.2)
+    assert hurdle.quantile(0.2) == 0.0
+    assert hurdle.quantile(math.nextafter(0.2, 1.0)) == 2.0
+    assert Distribution.hurdle(base, atom_probability=0).quantile(0.0) == 2.0
+
+
 @pytest.mark.parametrize("field", ["fields", "schema"])
 def test_measurement_extensions_require_mappings(field: str) -> None:
     with pytest.raises(TypeError, match="mapping"):

@@ -85,7 +85,7 @@ fn cumulative(probabilities: &[f64]) -> Result<Vec<f64>> {
     Ok(result)
 }
 
-fn compensated(values: impl Iterator<Item = f64>) -> f64 {
+pub(crate) fn compensated(values: impl Iterator<Item = f64>) -> f64 {
     let mut sum: f64 = 0.0;
     let mut correction: f64 = 0.0;
     for value in values {
@@ -240,6 +240,77 @@ fn gev_upper_integral(
     }
 }
 
+pub(crate) type ProbabilitySegment = (f64, f64, f64);
+
+/// Retain the part of each interval strictly above the hurdle. Endpoint
+/// exclusion only affects atoms, since a uniform interval has no endpoint mass.
+pub(crate) fn condition_segments(
+    segments: Vec<ProbabilitySegment>,
+    atom_probability: f64,
+    atom_location: f64,
+    surviving_mass: f64,
+) -> Vec<ProbabilitySegment> {
+    let mut result = Vec::with_capacity(segments.len() + 1);
+    if atom_probability > 0.0 {
+        result.push((atom_location, atom_location, atom_probability));
+    }
+    if atom_probability < 1.0 {
+        result.extend(segments.into_iter().filter_map(|(lo, hi, mass)| {
+            if hi <= atom_location {
+                return None;
+            }
+            let retained = if lo >= atom_location {
+                1.0
+            } else {
+                (hi - atom_location) / (hi - lo)
+            };
+            let mass = (mass * retained / surviving_mass) * (1.0 - atom_probability);
+            (mass > 0.0).then_some((lo.max(atom_location), hi, mass))
+        }));
+    }
+    result
+}
+
+pub(crate) fn segment_quantile(segments: &[ProbabilitySegment], q: f64, upper: bool) -> f64 {
+    if q == 0.0 {
+        return segments[0].0;
+    }
+    if q == 1.0 {
+        return segments.last().unwrap().1;
+    }
+    let mut left = 0.0;
+    for &(a, b, mass) in segments {
+        let right = left + mass;
+        if q < right || !upper && q == right {
+            return a + (b - a) * ((q - left) / mass).clamp(0.0, 1.0);
+        }
+        left = right;
+    }
+    segments.last().unwrap().1
+}
+
+pub(crate) fn segment_inverse_survival(
+    segments: &[ProbabilitySegment],
+    survival: f64,
+    upper: bool,
+) -> f64 {
+    if survival == 0.0 {
+        return segments.last().unwrap().1;
+    }
+    if survival == 1.0 {
+        return segments[0].0;
+    }
+    let mut right = 0.0;
+    for &(a, b, mass) in segments.iter().rev() {
+        let left = right + mass;
+        if survival < left || upper && survival == left {
+            return b + (a - b) * ((survival - right) / mass).clamp(0.0, 1.0);
+        }
+        right = left;
+    }
+    segments[0].0
+}
+
 impl NumericalLaw {
     pub fn from_json(text: &str) -> Result<Self> {
         // Externally tagged decoding dispatches typed fields directly. Serde's
@@ -388,7 +459,7 @@ impl NumericalLaw {
         })
     }
 
-    fn finite_segments(&self) -> Option<Vec<(f64, f64, f64)>> {
+    pub(crate) fn finite_segments(&self) -> Option<Vec<ProbabilitySegment>> {
         match self {
             Self::PointMass(x) => Some(vec![(*x, *x, 1.0)]),
             Self::Discrete {
@@ -432,16 +503,12 @@ impl NumericalLaw {
                 if *p == 1.0 {
                     return Some(vec![(*x, *x, 1.0)]);
                 }
-                let original = base.finite_segments()?;
-                let surviving = base.exceedance(*x, false);
-                let mut result = if *p > 0.0 { vec![(*x, *x, *p)] } else { vec![] };
-                result.extend(original.into_iter().filter(|(_, b, _)| *b > *x).map(
-                    |(a, b, mass)| {
-                        let fraction = if a >= *x { 1.0 } else { (b - x) / (b - a) };
-                        (a.max(*x), b, mass * fraction * (1.0 - p) / surviving)
-                    },
-                ));
-                Some(result)
+                Some(condition_segments(
+                    base.finite_segments()?,
+                    *p,
+                    *x,
+                    base.exceedance(*x, false),
+                ))
             }
             Self::Parametric(_) => None,
         }
@@ -538,22 +605,48 @@ impl NumericalLaw {
                 atom_probability: p,
                 atom_location: x,
             } => {
-                if *p == 1.0 {
-                    return Ok(*x);
-                }
                 if q <= *p {
                     *x
+                } else if let Some(segments) = self.finite_segments() {
+                    segment_quantile(&segments, q, false)
                 } else {
                     let surviving = base.exceedance(*x, false);
                     let survival = (1.0 - q) / (1.0 - p) * surviving;
-                    return if let Self::Parametric(d) = base.as_ref() {
-                        d.isf(survival)
-                    } else {
-                        base.quantile(1.0 - survival)
-                    };
+                    return base
+                        .inverse_survival(survival)
+                        .map(|quantile| quantile.max(*x));
                 }
             }
         })
+    }
+
+    pub fn atoms(&self) -> Vec<(f64, f64)> {
+        if let Self::Hurdle {
+            base,
+            atom_probability: p,
+            atom_location: x,
+        } = self
+        {
+            let mut atoms = Vec::new();
+            if *p > 0.0 {
+                atoms.push((*x, *p));
+            }
+            if *p < 1.0 {
+                let surviving = base.exceedance(*x, false);
+                atoms.extend(
+                    base.atoms()
+                        .into_iter()
+                        .filter(|&(value, _)| value > *x)
+                        .map(|(value, mass)| (value, (mass / surviving) * (1.0 - p))),
+                );
+            }
+            return atoms;
+        }
+        self.finite_segments()
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|(lo, hi, mass)| (lo == hi).then_some((lo, mass)))
+            .collect()
     }
 
     /// Private engine primitive for conditioning deep upper tails without
@@ -572,16 +665,7 @@ impl NumericalLaw {
             return d.isf(s);
         }
         if let Some(segments) = self.finite_segments() {
-            let total = compensated(segments.iter().map(|(_, _, p)| *p));
-            let mut right = 0.0;
-            for (a, b, mass) in segments.into_iter().rev() {
-                let mass = mass / total;
-                if s < right + mass {
-                    return Ok(b + (a - b) * ((s - right) / mass));
-                }
-                right += mass;
-            }
-            return Ok(self.support().0);
+            return Ok(segment_inverse_survival(&segments, s, false));
         }
         if let Self::Hurdle {
             base,
@@ -592,7 +676,9 @@ impl NumericalLaw {
             if s >= 1.0 - p {
                 return Ok(*x);
             }
-            return base.inverse_survival(s / (1.0 - p) * base.exceedance(*x, false));
+            return base
+                .inverse_survival(s / (1.0 - p) * base.exceedance(*x, false))
+                .map(|quantile| quantile.max(*x));
         }
         unreachable!("all numerical representations covered")
     }

@@ -921,7 +921,8 @@
                   "minLength": 1
                 },
                 "message": {
-                  "type": "string"
+                  "type": "string",
+                  "minLength": 1
                 },
                 "severity": {
                   "enum": [
@@ -945,7 +946,8 @@
                 "details"
               ],
               "additionalProperties": false
-            }
+            },
+            "minItems": 1
           }
         },
         "required": [
@@ -1004,7 +1006,7 @@
           "items": {
             "type": "number",
             "minimum": 0,
-            "maximum": 1.7976931348623157e+308
+            "maximum": 1
           }
         },
         {

@@ -115,7 +115,7 @@ def fitting_schema():
     diagnostic = obj(
         {
             "code": {"type": "string", "minLength": 1},
-            "message": {"type": "string"},
+            "message": {"type": "string", "minLength": 1},
             "severity": {"enum": ["error", "warning", "info"]},
             "path": {"type": "string"},
             "details": {"type": "object"},
@@ -126,7 +126,7 @@ def fitting_schema():
             "specification": {"$ref": "#/$defs/specification"},
             "status": {"enum": ["converged", "rejected", "failed"]},
             "reason": nullable({"type": "string"}),
-            "diagnostics": array(diagnostic),
+            "diagnostics": array(diagnostic, minItems=1),
         }
     )
     record = obj(
@@ -139,7 +139,7 @@ def fitting_schema():
             "evidence_count": {"type": "integer", "minimum": 0},
             "used_count": {"type": "integer", "minimum": 0},
             "excluded_count": {"type": "integer", "minimum": 0},
-            "weights": nullable(array({**NUMBER, "minimum": 0})),
+            "weights": nullable(array(PROBABILITY)),
             "evidence_support": nullable(array(NUMBER, minItems=2, maxItems=2)),
             "engine_version": {"type": "string", "minLength": 1},
         }
