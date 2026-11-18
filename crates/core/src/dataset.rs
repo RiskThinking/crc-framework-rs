@@ -211,6 +211,17 @@ fn fit_specification(value: &Value) -> Result<Value> {
         {
             return Err(invalid("selection cannot mix sample and quantile evidence"));
         }
+        if let Some(censor) = candidates
+            .iter()
+            .find_map(|candidate| candidate["censor_location"].as_f64())
+            && candidates
+                .iter()
+                .any(|candidate| candidate["censor_location"].as_f64() != Some(censor))
+        {
+            return Err(invalid(
+                "censored model selection requires every candidate to use the same censor_location",
+            ));
+        }
         let criterion = value
             .get("criterion")
             .and_then(Value::as_str)
@@ -484,76 +495,55 @@ fn requested_weights(specification: &Value, count: usize) -> Option<Vec<f64>> {
     Some(normalized)
 }
 
-fn failed_attempt_weights(record: &Value, attempts: &[Value], count: usize) -> Option<Vec<f64>> {
-    let support = &record["evidence_support"];
-    let first = support[0].as_f64()?;
-    let last = support[1].as_f64()?;
-    // The record retains the last attempt that passed input checks and
-    // reached optimization. Effective weights are available from that point.
-    attempts.iter().rev().find_map(|attempt| {
-        let specification = &attempt["specification"];
-        if specification["kind"] == "samples" {
-            return None;
+fn eligible_quantile_count(
+    spec: &Value,
+    evidence_count: &Value,
+    (first, last): (f64, f64),
+) -> Result<Option<Value>> {
+    let effective_count = if let Some(requested) = spec["weights"].as_array() {
+        if json!(requested.len()) != *evidence_count {
+            return Ok(None);
         }
-        let minimum = specification
-            .get("minimum_knots")
-            .map_or(Some(4), |value| unsigned(value).ok())?;
-        let weights = requested_weights(specification, count)?;
-        if (first == 0.0 && weights.first().is_some_and(|w| *w > 0.0))
-            || (last == 1.0 && weights.last().is_some_and(|w| *w > 0.0))
-            || (weights.iter().filter(|&&w| w > 0.0).count() as u64) < minimum
+        let Some(weights) = requested_weights(spec, requested.len()) else {
+            return Ok(None);
+        };
+        if (first == 0.0 && weights.first().is_some_and(|&w| w > 0.0))
+            || (last == 1.0 && weights.last().is_some_and(|&w| w > 0.0))
         {
-            return None;
+            return Ok(None);
         }
-        Some(weights)
-    })
+        json!(weights.iter().filter(|&&w| w > 0.0).count())
+    } else {
+        if first == 0.0 || last == 1.0 {
+            return Ok(None);
+        }
+        evidence_count.clone()
+    };
+    let minimum = integer(spec.get("minimum_knots").unwrap_or(&json!(4)))?;
+    Ok((!greater(&minimum, &effective_count)).then_some(effective_count))
 }
 
-fn converged_score(attempt: &Value, evidence_count: &Value, used_count: &Value) -> Result<f64> {
-    let spec = fit_specification(&attempt["specification"])?;
+fn converged_score(attempt: &Value, effective_count: &Value) -> Result<f64> {
+    let spec = &attempt["specification"];
     let details = &attempt["diagnostic"];
-    let samples = spec["kind"] == "samples";
-    let effective_count = match spec["weights"].as_array() {
-        Some(weights) => {
-            if json!(weights.len()) != *evidence_count {
-                return Err(invalid(
-                    "converged specification needs one weight per supplied knot",
-                ));
-            }
-            json!(
-                weights
-                    .iter()
-                    .filter(|w| w.as_f64().unwrap_or(0.0) > 0.0)
-                    .count()
-            )
-        }
-        None if samples => used_count.clone(),
-        None => evidence_count.clone(),
-    };
-    let minimum = &spec[if samples {
-        "minimum_samples"
-    } else {
-        "minimum_knots"
-    }];
-    if greater(minimum, &effective_count) {
-        return Err(invalid(
-            "converged attempt has less than its required evidence",
-        ));
-    }
     let partition = match spec["kind"].as_str() {
         Some("censored_quantiles") => Some(("censored_count", "uncensored_count")),
         Some("hurdle_quantiles") => Some(("atom_count", "tail_count")),
         _ => None,
     };
     if let Some((a, b)) = partition {
-        let partition_count = natural_sum(&natural(&details[a])?, &natural(&details[b])?);
-        if partition_count != natural(&effective_count)? {
+        let first = natural(&details[a])?;
+        let second = natural(&details[b])?;
+        if natural_sum(&first, &second) != natural(effective_count)?
+            || (spec["kind"] == "censored_quantiles" && (first == "0" || second == "0"))
+            || (spec["kind"] == "hurdle_quantiles" && greater(&json!(4), &integer(&details[b])?))
+        {
             return Err(invalid(
                 "fit diagnostic counts contradict effective evidence",
             ));
         }
     }
-    details[if samples {
+    details[if spec["kind"] == "samples" {
         "ks_statistic"
     } else {
         "normalized_rmse"
@@ -575,13 +565,73 @@ fn validate_record(record: &Value) -> Result<Option<&Value>> {
         ));
     }
     let requested = fit_specification(&record["specification"])?;
+    let sample_evidence = requested["kind"] == "samples"
+        || (requested["kind"] == "model_selection"
+            && requested["candidates"][0]["kind"] == "samples");
+    let support = if let Some(support) = record["evidence_support"].as_array() {
+        let [first, last] = support.as_slice() else {
+            return Err(invalid("invalid evidence support"));
+        };
+        Some(
+            first
+                .as_f64()
+                .zip(last.as_f64())
+                .filter(|(a, b)| a.is_finite() && b.is_finite() && a <= b)
+                .ok_or_else(|| invalid("invalid evidence support"))?,
+        )
+    } else {
+        None
+    };
+    if sample_evidence {
+        if support.is_some() != (count != "0")
+            || (count == "1" && support.is_some_and(|(first, last)| first != last))
+        {
+            return Err(invalid(
+                "sample evidence requires its actual observed support",
+            ));
+        }
+        if !record["weights"].is_null() {
+            return Err(invalid("sample fits do not have quantile weights"));
+        }
+    } else if greater(&json!(2), &evidence_count)
+        || support.is_none_or(|(a, b)| a < 0.0 || a >= b || b > 1.0)
+    {
+        return Err(invalid(
+            "quantile fits require at least two knots and their actual probability interval",
+        ));
+    }
     let attempts = array(&record["attempts"])?;
     text(&record["engine_version"])?;
+    let mut cursor = 0;
+    if requested["kind"] == "model_selection" {
+        for candidate in array(&requested["candidates"])? {
+            replay_attempts(candidate, attempts, &mut cursor)?;
+        }
+    } else {
+        replay_attempts(&requested, attempts, &mut cursor)?;
+    }
+    if cursor != attempts.len() {
+        return Err(invalid("attempt trace contains unexecuted alternatives"));
+    }
     let mut winner = None;
     let mut comparison_span = None;
+    let mut last_eligible_spec = None;
     for (index, attempt) in attempts.iter().enumerate() {
+        let spec = &attempt["specification"];
+        let effective_count = if sample_evidence {
+            let minimum = integer(spec.get("minimum_samples").unwrap_or(&json!(3)))?;
+            (!greater(&minimum, &evidence_count)).then_some(evidence_count.clone())
+        } else {
+            eligible_quantile_count(spec, &evidence_count, support.expect("validated"))?
+        };
+        if effective_count.is_some() {
+            last_eligible_spec = Some(spec);
+        }
         if attempt["status"] == "converged" {
-            let score = converged_score(attempt, &evidence_count, &used_count)?;
+            let effective_count = effective_count.ok_or_else(|| {
+                invalid("converged attempt contradicts the recorded evidence support or count")
+            })?;
+            let score = converged_score(attempt, &effective_count)?;
             if let Some(span) = attempt["diagnostic"]["normalization_scale"].as_f64() {
                 if comparison_span
                     .replace(span)
@@ -596,17 +646,6 @@ fn validate_record(record: &Value) -> Result<Option<&Value>> {
                 winner = Some((index, score));
             }
         }
-    }
-    let mut cursor = 0;
-    if requested["kind"] == "model_selection" {
-        for candidate in array(&requested["candidates"])? {
-            replay_attempts(candidate, attempts, &mut cursor)?;
-        }
-    } else {
-        replay_attempts(&requested, attempts, &mut cursor)?;
-    }
-    if cursor != attempts.len() {
-        return Err(invalid("attempt trace contains unexecuted alternatives"));
     }
     let selected_index = if record["selected_attempt"].is_null() {
         None
@@ -630,7 +669,24 @@ fn validate_record(record: &Value) -> Result<Option<&Value>> {
     if record["estimator"] != estimator {
         return Err(invalid("actual estimator contradicts selected attempt"));
     }
-    if let Some(weights) = record["weights"].as_array() {
+    if sample_evidence {
+        let expected = if last_eligible_spec.is_some() {
+            count.as_str()
+        } else {
+            "0"
+        };
+        if used != expected {
+            return Err(invalid("sample counts contradict the executed attempts"));
+        }
+        return Ok(selected);
+    }
+    // If no fit converged, Python records the last attempt whose evidence
+    // passed the preflight checks. Attempts rejected at preflight use no knots.
+    let expected_spec = selected.or(last_eligible_spec);
+    if let Some(specification) = expected_spec {
+        let weights = record["weights"]
+            .as_array()
+            .ok_or_else(|| invalid("quantile fits using knots require effective weights"))?;
         let weights = weights
             .iter()
             .map(|weight| {
@@ -648,12 +704,7 @@ fn validate_record(record: &Value) -> Result<Option<&Value>> {
         {
             return Err(invalid("effective weights contradict evidence counts"));
         }
-        let expected = match selected {
-            Some(actual) if actual["kind"] != "samples" => requested_weights(actual, weights.len()),
-            Some(_) => None,
-            None => failed_attempt_weights(record, attempts, weights.len()),
-        };
-        if expected.is_none_or(|expected| {
+        if requested_weights(specification, weights.len()).is_none_or(|expected| {
             weights.iter().zip(expected).any(|(&weight, expected)| {
                 let tolerance = (1e-12 * weight.max(expected)).max(f64::from_bits(1));
                 (weight > 0.0) != (expected > 0.0) || (weight - expected).abs() > tolerance
@@ -663,38 +714,10 @@ fn validate_record(record: &Value) -> Result<Option<&Value>> {
                 "effective weights contradict the executed specification",
             ));
         }
-    }
-    if let Some(support) = record["evidence_support"].as_array() {
-        if support.len() != 2
-            || support[0]
-                .as_f64()
-                .zip(support[1].as_f64())
-                .is_none_or(|(a, b)| !a.is_finite() || !b.is_finite() || a > b)
-        {
-            return Err(invalid("invalid evidence support"));
-        }
-    }
-    let sample_evidence = requested["kind"] == "samples"
-        || (requested["kind"] == "model_selection"
-            && requested["candidates"][0]["kind"] == "samples");
-    if sample_evidence && !record["weights"].is_null() {
-        return Err(invalid("sample fits do not have quantile weights"));
-    }
-    if !sample_evidence {
-        let interval = record["evidence_support"]
-            .as_array()
-            .filter(|v| v.len() == 2)
-            .and_then(|v| v[0].as_f64().zip(v[1].as_f64()));
-        if interval.is_none_or(|(a, b)| a < 0.0 || a >= b || b > 1.0) {
-            return Err(invalid(
-                "quantile fits require their actual probability interval",
-            ));
-        }
-        if (selected.is_some() || used != "0") && record["weights"].is_null() {
-            return Err(invalid(
-                "quantile fits using knots require effective weights",
-            ));
-        }
+    } else if used != "0" || !record["weights"].is_null() {
+        return Err(invalid(
+            "no executed quantile attempt used the recorded evidence",
+        ));
     }
     Ok(selected)
 }

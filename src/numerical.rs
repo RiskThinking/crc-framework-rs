@@ -43,11 +43,6 @@ impl PyNumericalDocument {
             .map(|inner| Self { inner })
             .map_err(error)
     }
-    #[staticmethod]
-    fn prepared_hurdle(py: Python<'_>, text: &str) -> PyResult<Option<Self>> {
-        let document = Self::new(py, text)?;
-        Ok(document.inner.has_prepared_hurdle().then_some(document))
-    }
     fn quantile(&self, py: Python<'_>, probability: f64) -> PyResult<f64> {
         py.detach(|| self.inner.quantile(probability))
             .map_err(error)

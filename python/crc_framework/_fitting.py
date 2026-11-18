@@ -306,6 +306,18 @@ class ModelSelection(FitSpec):
             raise ValueError(
                 "quantile model selection requires criterion=SelectionCriterion.NORMALIZED_ROOT_MEAN_SQUARE_ERROR"
             )
+        censor_locations = tuple(
+            item.censor_location
+            for item in self.candidates
+            if isinstance(item, CensoredQuantileFit)
+        )
+        if censor_locations and (
+            len(censor_locations) != len(self.candidates)
+            or len(set(censor_locations)) != 1
+        ):
+            raise ValueError(
+                "censored model selection requires every candidate to use the same censor_location"
+            )
         identities = [item.to_json() for item in self.candidates]
         if len(set(identities)) != len(identities):
             raise ValueError("candidate specifications must be distinct")
@@ -733,8 +745,14 @@ def fit_quantiles(
     interior = (probabilities > 0) & (probabilities < 1)
     comparison_probabilities = probabilities[interior]
     comparison_values = values[interior]
-    # Model selection needs one observable target and one scale. Candidate
-    # weights and censor levels affect estimation, not the comparison evidence.
+    first = candidates[0]
+    censor_location = (
+        first.censor_location if isinstance(first, CensoredQuantileFit) else None
+    )
+    if censor_location is not None:
+        comparison_values = np.maximum(comparison_values, censor_location)
+    # Rank candidates against one observable target and scale regardless of
+    # their estimation weights.
     comparison_span = (
         float(np.ptp(comparison_values)) if comparison_values.size else 0.0
     )
@@ -823,6 +841,8 @@ def fit_quantiles(
             predicted = np.asarray(
                 distribution.quantile(comparison_probabilities), dtype=np.float64
             )
+            if censor_location is not None:
+                predicted = np.maximum(predicted, censor_location)
             normalized_residuals = (predicted - comparison_values) / comparison_span
             score = float(np.sqrt(np.mean(normalized_residuals**2)))
             diagnostic = _quantile_diagnostic(native, score, comparison_span)

@@ -599,6 +599,28 @@ impl ImpactSource {
         }
     }
 
+    pub(crate) fn inverse_log_tail(&self, logarithm: f64, lower: bool) -> ContractResult<f64> {
+        match (self, lower) {
+            (Self::Fitted(distribution), true) => distribution.inverse_log_cdf(logarithm),
+            (Self::Fitted(distribution), false) => distribution.inverse_log_survival(logarithm),
+            (Self::Hurdle(distribution), false) => distribution.inverse_log_survival(logarithm),
+            (_, true) => return self.upper_quantile(logarithm.exp()),
+            (_, false) => return self.inverse_survival(logarithm.exp()),
+        }
+        .map_err(distribution_error)
+    }
+
+    pub(crate) fn log_tail_at(&self, x: f64, inclusive: bool, lower: bool) -> f64 {
+        match (self, lower) {
+            (Self::Fitted(distribution), true) => distribution.log_cdf(x),
+            (Self::Fitted(distribution), false) => distribution.log_survival(x),
+            (Self::Hurdle(distribution), false) => distribution.log_survival_at(x, inclusive),
+            (_, false) => self.survival_at(x, inclusive).ln(),
+            (_, true) if inclusive => self.cdf(x).ln(),
+            (_, true) => self.cdf_below(x).ln(),
+        }
+    }
+
     /// `P(X > x)`, or `P(X >= x)` when inclusive, without CDF subtraction.
     pub(crate) fn survival_at(&self, x: f64, inclusive: bool) -> f64 {
         match self {
