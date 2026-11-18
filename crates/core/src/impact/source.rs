@@ -5,7 +5,9 @@
 
 use std::borrow::Cow;
 
-use crate::numerical::{ProbabilitySegment, segment_inverse_survival, segment_quantile};
+use crate::numerical::{
+    ProbabilitySegment, segment_inverse_survival, segment_probability, segment_quantile,
+};
 use crate::{
     Distribution, EmpiricalDistribution, FittedDistribution, HurdleDistribution,
     PointMassDistribution, TabulatedDistribution,
@@ -328,16 +330,7 @@ pub struct WeightedSegments(Vec<ProbabilitySegment>);
 
 impl WeightedSegments {
     fn probability(&self, start: f64, end: f64, start_closed: bool, end_closed: bool) -> f64 {
-        neumaier(self.0.iter().map(|&(lo, hi, mass)| {
-            if lo == hi {
-                let after = lo > start || (start_closed && lo == start);
-                let before = hi < end || (end_closed && hi == end);
-                if after && before { mass } else { 0.0 }
-            } else {
-                mass * ((hi.min(end) - lo.max(start)).max(0.0) / (hi - lo))
-            }
-        }))
-        .clamp(0.0, 1.0)
+        segment_probability(&self.0, start, end, start_closed, end_closed)
     }
 }
 

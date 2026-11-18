@@ -866,6 +866,227 @@
       ]
     },
     {
+      "name": "conditioned-transformed-histogram",
+      "document": {
+        "atom_location": 4.0,
+        "atom_probability": 0.0,
+        "base": {
+          "impact": {
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 3
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "edges": [
+              0.0,
+              1.0,
+              2.0,
+              3.0
+            ],
+            "kind": "histogram",
+            "object": "distribution",
+            "probabilities": [
+              0.5,
+              0.0,
+              0.5
+            ],
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 6.0
+        },
+        {
+          "probability": 0.1,
+          "value": 6.3
+        },
+        {
+          "probability": 0.5,
+          "value": 7.5
+        },
+        {
+          "probability": 0.9,
+          "value": 8.7
+        },
+        {
+          "probability": 0.99,
+          "value": 8.969999999999999
+        },
+        {
+          "probability": 1,
+          "value": 9.0
+        }
+      ]
+    },
+    {
+      "name": "transformed-histogram-hurdle",
+      "document": {
+        "atom_location": 4.0,
+        "atom_probability": 0.2,
+        "base": {
+          "impact": {
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 3
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "edges": [
+              0.0,
+              1.0,
+              2.0,
+              3.0
+            ],
+            "kind": "histogram",
+            "object": "distribution",
+            "probabilities": [
+              0.5,
+              0.0,
+              0.5
+            ],
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 4.0
+        },
+        {
+          "probability": 0.1,
+          "value": 4.0
+        },
+        {
+          "probability": 0.2,
+          "value": 4.0
+        },
+        {
+          "probability": 0.20000000000000004,
+          "value": 6.0
+        },
+        {
+          "probability": 0.5,
+          "value": 7.125
+        },
+        {
+          "probability": 0.9,
+          "value": 8.625
+        },
+        {
+          "probability": 0.99,
+          "value": 8.9625
+        },
+        {
+          "probability": 1,
+          "value": 9.0
+        }
+      ]
+    },
+    {
+      "name": "subnormal-transformed-histogram-hurdle",
+      "document": {
+        "atom_location": 4.0,
+        "atom_probability": 0.25,
+        "base": {
+          "impact": {
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 3
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "edges": [
+              0.0,
+              1.0,
+              2.0,
+              3.0
+            ],
+            "kind": "histogram",
+            "object": "distribution",
+            "probabilities": [
+              1.0,
+              0.0,
+              5e-324
+            ],
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 4.0
+        },
+        {
+          "probability": 0.1,
+          "value": 4.0
+        },
+        {
+          "probability": 0.5,
+          "value": 7.0
+        },
+        {
+          "probability": 0.9,
+          "value": 8.6
+        },
+        {
+          "probability": 0.99,
+          "value": 8.96
+        },
+        {
+          "probability": 1,
+          "value": 9.0
+        }
+      ]
+    },
+    {
       "name": "hurdle-completed",
       "document": {
         "atom_location": 0.0,

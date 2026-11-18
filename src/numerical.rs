@@ -20,9 +20,88 @@ impl PyNumericalDocument {
             .map(|inner| Self { inner })
             .map_err(error)
     }
+    #[staticmethod]
+    fn finite_hurdle(py: Python<'_>, text: &str) -> PyResult<Option<Self>> {
+        let document = Self::new(py, text)?;
+        Ok(document
+            .inner
+            .finite_hurdle_segments()
+            .is_some()
+            .then_some(document))
+    }
     fn quantile(&self, py: Python<'_>, probability: f64) -> PyResult<f64> {
         py.detach(|| self.inner.quantile(probability))
             .map_err(error)
+    }
+    fn quantiles(&self, py: Python<'_>, probabilities: Vec<f64>) -> PyResult<Vec<f64>> {
+        py.detach(|| {
+            probabilities
+                .into_iter()
+                .map(|q| self.inner.quantile(q))
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .map_err(error)
+    }
+    fn inverse_survival(&self, py: Python<'_>, probability: f64) -> PyResult<f64> {
+        py.detach(|| self.inner.inverse_survival(probability))
+            .map_err(error)
+    }
+    fn hurdle_segments(&self, py: Python<'_>) -> PyResult<Vec<(f64, f64, f64)>> {
+        py.detach(|| self.inner.finite_hurdle_segments().map(<[_]>::to_vec))
+            .ok_or_else(|| PyValueError::new_err("requires a finite compound hurdle"))
+    }
+    fn hurdle_cdf(&self, py: Python<'_>, values: Vec<f64>, inclusive: bool) -> PyResult<Vec<f64>> {
+        py.detach(|| {
+            values
+                .into_iter()
+                .map(|x| {
+                    self.inner
+                        .finite_hurdle_probability(f64::NEG_INFINITY, x, false, inclusive)
+                })
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .map_err(error)
+    }
+    fn hurdle_exceedance(
+        &self,
+        py: Python<'_>,
+        values: Vec<f64>,
+        inclusive: bool,
+    ) -> PyResult<Vec<f64>> {
+        py.detach(|| {
+            values
+                .into_iter()
+                .map(|x| {
+                    self.inner
+                        .finite_hurdle_probability(x, f64::INFINITY, inclusive, false)
+                })
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .map_err(error)
+    }
+    fn hurdle_mass(&self, py: Python<'_>, values: Vec<f64>) -> PyResult<Vec<f64>> {
+        py.detach(|| {
+            values
+                .into_iter()
+                .map(|x| self.inner.finite_hurdle_probability(x, x, true, true))
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .map_err(error)
+    }
+    fn hurdle_integral(
+        &self,
+        py: Python<'_>,
+        lo: f64,
+        hi: f64,
+        center: f64,
+        square: bool,
+        survival: bool,
+    ) -> PyResult<f64> {
+        py.detach(|| {
+            self.inner
+                .finite_hurdle_integral(lo, hi, center, square, survival)
+        })
+        .map_err(error)
     }
 }
 

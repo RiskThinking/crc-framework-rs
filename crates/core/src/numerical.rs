@@ -311,6 +311,54 @@ pub(crate) fn segment_inverse_survival(
     segments[0].0
 }
 
+pub(crate) fn segment_probability(
+    segments: &[ProbabilitySegment],
+    lower: f64,
+    upper: f64,
+    include_lower: bool,
+    include_upper: bool,
+) -> f64 {
+    compensated(segments.iter().map(|&(lo, hi, mass)| {
+        if lo == hi {
+            let after = lo > lower || (include_lower && lo == lower);
+            let before = hi < upper || (include_upper && hi == upper);
+            if after && before { mass } else { 0.0 }
+        } else {
+            mass * ((hi.min(upper) - lo.max(lower)).max(0.0) / (hi - lo))
+        }
+    }))
+    .clamp(0.0, 1.0)
+}
+
+pub(crate) fn segment_integral(
+    segments: &[ProbabilitySegment],
+    lo: f64,
+    hi: f64,
+    center: f64,
+    square: bool,
+    survival: bool,
+) -> f64 {
+    let masses: Vec<f64> = segments.iter().map(|&(_, _, p)| p).collect();
+    compensated(segments.iter().zip(mass_intervals(&masses)).map(
+        |(&(xa, xb, _), (left, right, mass))| {
+            let (start, end, xa, xb) = if survival {
+                (right, left, xb, xa)
+            } else {
+                (left, right, xa, xb)
+            };
+            let (width, a, b) = local_interval(lo, hi, start, end, mass);
+            let x = xa + (xb - xa) * a - center;
+            let y = xa + (xb - xa) * b - center;
+            width
+                * if square {
+                    (x * x + x * y + y * y) / 3.0
+                } else {
+                    (x + y) / 2.0
+                }
+        },
+    ))
+}
+
 impl NumericalLaw {
     pub fn from_json(text: &str) -> Result<Self> {
         // Externally tagged decoding dispatches typed fields directly. Serde's
@@ -693,22 +741,7 @@ impl NumericalLaw {
             return Ok(0.0);
         }
         if let Some(segments) = self.finite_segments() {
-            let masses: Vec<f64> = segments.iter().map(|(_, _, p)| *p).collect();
-            return Ok(compensated(
-                segments.iter().zip(mass_intervals(&masses)).map(
-                    |((xa, xb, _), (left, right, mass))| {
-                        let (width, a, b) = local_interval(lo, hi, right, left, mass);
-                        let x = xb + (xa - xb) * a - center;
-                        let y = xb + (xa - xb) * b - center;
-                        width
-                            * if square {
-                                (x * x + x * y + y * y) / 3.0
-                            } else {
-                                (x + y) / 2.0
-                            }
-                    },
-                ),
-            ));
+            return Ok(segment_integral(&segments, lo, hi, center, square, true));
         }
         if let Self::Hurdle {
             base,
@@ -862,6 +895,9 @@ impl NumericalLaw {
                 atom_probability: p,
                 atom_location: v,
             } => {
+                if let Some(segments) = self.finite_segments() {
+                    return segment_probability(&segments, f64::NEG_INFINITY, x, false, inclusive);
+                }
                 if x < *v || (!inclusive && x == *v) {
                     0.0
                 } else if *p == 1.0 {
@@ -898,7 +934,7 @@ impl NumericalLaw {
                 if x == *v {
                     *p
                 } else if x > *v && *p < 1.0 {
-                    (1.0 - p) * base.mass(x) / base.exceedance(*v, false)
+                    (base.mass(x) / base.exceedance(*v, false)) * (1.0 - p)
                 } else {
                     0.0
                 }
@@ -954,6 +990,9 @@ impl NumericalLaw {
                 atom_probability: p,
                 atom_location: v,
             } => {
+                if let Some(segments) = self.finite_segments() {
+                    return segment_probability(&segments, x, f64::INFINITY, inclusive, false);
+                }
                 if x < *v || (inclusive && x == *v) {
                     1.0
                 } else if *p == 1.0 {
@@ -977,22 +1016,7 @@ impl NumericalLaw {
         }
         if let Self::Hurdle { .. } = self {
             if let Some(segments) = self.finite_segments() {
-                let masses: Vec<f64> = segments.iter().map(|(_, _, p)| *p).collect();
-                return Ok(compensated(
-                    segments.iter().zip(mass_intervals(&masses)).map(
-                        |((xa, xb, _), (left, right, mass))| {
-                            let (width, a, b) = local_interval(lo, hi, left, right, mass);
-                            let x = xa + (xb - xa) * a - center;
-                            let y = xa + (xb - xa) * b - center;
-                            width
-                                * if square {
-                                    (x * x + x * y + y * y) / 3.0
-                                } else {
-                                    (x + y) / 2.0
-                                }
-                        },
-                    ),
-                ));
+                return Ok(segment_integral(&segments, lo, hi, center, square, false));
             }
         }
         let segment = |qa: f64, qb: f64, xa: f64, xb: f64| {
