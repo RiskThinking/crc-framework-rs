@@ -55,6 +55,9 @@ the same wheel:
 The Python release workflow tests each wheel and also builds and tests a wheel
 from the source distribution. The JavaScript workflow tests the packed tarball
 with Node, TypeScript, Vite server-side rendering, and Chromium.
+Both publishers require the shared `conformance.yaml` checks to pass on their
+release tag. These checks exercise the installed Python package, native Rust
+contracts, and WebAssembly package.
 
 ## Publishing
 
