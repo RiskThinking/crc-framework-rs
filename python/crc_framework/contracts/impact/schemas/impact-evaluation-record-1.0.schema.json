@@ -32,10 +32,10 @@
           "$ref": "#/$defs/operation_point"
         },
         {
-          "$ref": "#/$defs/operation_expected_value"
+          "$ref": "#/$defs/operation_expectation"
         },
         {
-          "$ref": "#/$defs/operation_transform_distribution"
+          "$ref": "#/$defs/operation_pushforward"
         },
         {
           "$ref": "#/$defs/operation_tabulate"
@@ -574,7 +574,7 @@
         "max_evaluations"
       ]
     },
-    "settings_expected_value": {
+    "settings_expectation": {
       "type": "object",
       "description": "Expectation settings: E[f(X)], never f(E[X]).",
       "additionalProperties": false,
@@ -612,7 +612,7 @@
         "A non-auto request equals the resolved method kind."
       ]
     },
-    "settings_transform_distribution": {
+    "settings_pushforward": {
       "type": "object",
       "description": "Distribution pushforward settings.",
       "additionalProperties": false,
@@ -693,23 +693,23 @@
         "settings"
       ]
     },
-    "operation_expected_value": {
+    "operation_expectation": {
       "type": "object",
-      "description": "expected_value operation.",
+      "description": "expectation operation.",
       "additionalProperties": false,
       "properties": {
         "kind": {
           "type": "string",
-          "const": "expected_value",
-          "description": "Variant tag 'expected_value'.",
+          "const": "expectation",
+          "description": "Variant tag 'expectation'.",
           "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
-          "x-crc-native": "Operation::expected_value"
+          "x-crc-native": "Operation::expectation"
         },
         "settings": {
-          "$ref": "#/$defs/settings_expected_value",
+          "$ref": "#/$defs/settings_expectation",
           "description": "Typed operation settings.",
           "x-crc-canonical": "object with sorted keys",
-          "x-crc-native": "Operation::expected_value::settings"
+          "x-crc-native": "Operation::expectation::settings"
         }
       },
       "required": [
@@ -717,23 +717,23 @@
         "settings"
       ]
     },
-    "operation_transform_distribution": {
+    "operation_pushforward": {
       "type": "object",
-      "description": "transform_distribution operation.",
+      "description": "pushforward operation.",
       "additionalProperties": false,
       "properties": {
         "kind": {
           "type": "string",
-          "const": "transform_distribution",
-          "description": "Variant tag 'transform_distribution'.",
+          "const": "pushforward",
+          "description": "Variant tag 'pushforward'.",
           "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
-          "x-crc-native": "Operation::transform_distribution"
+          "x-crc-native": "Operation::pushforward"
         },
         "settings": {
-          "$ref": "#/$defs/settings_transform_distribution",
+          "$ref": "#/$defs/settings_pushforward",
           "description": "Typed operation settings.",
           "x-crc-canonical": "object with sorted keys",
-          "x-crc-native": "Operation::transform_distribution::settings"
+          "x-crc-native": "Operation::pushforward::settings"
         }
       },
       "required": [

@@ -11,7 +11,6 @@ pub mod rank;
 mod reference;
 pub mod risk;
 pub mod spatial;
-pub mod transform;
 
 pub use distribution::{
     CensoredQuantileFitDiagnostics, CensoredQuantileFitResult, DiagnosticMetrics, Distribution,
@@ -32,6 +31,3 @@ pub use metrics::{
     generate_microscores,
 };
 pub use risk::{RiskAttribution, RiskResult, SpanningBranch, compute_risk, compute_spanning_set};
-pub use transform::{
-    ImpactContext, ImpactRegistry, LinearImpact, PiecewiseLinearImpact, SigmoidImpact, Transform,
-};

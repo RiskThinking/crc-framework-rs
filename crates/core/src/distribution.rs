@@ -1165,21 +1165,6 @@ pub struct HurdleQuantileFitResult {
     pub diagnostics: HurdleQuantileFitDiagnostics,
 }
 
-pub fn fit_distribution(samples: &[f64], family: Option<DistributionFamily>) -> Result<FitResult> {
-    validate_samples(samples)?;
-    if let Some(family) = family {
-        return fit_family(samples, family);
-    }
-    fit_all(samples)?
-        .into_iter()
-        .max_by(|left, right| {
-            left.diagnostics
-                .ks_pvalue
-                .total_cmp(&right.diagnostics.ks_pvalue)
-        })
-        .ok_or_else(|| CrcError::Unsupported("no candidate distribution could be fitted".into()))
-}
-
 /// Fit GEV or Gumbel observations by unbiased sample L-moments.
 ///
 /// This is a standalone estimator: no likelihood optimization or family selection.
@@ -1527,49 +1512,12 @@ fn fit_quantile_points_internal(
     })
 }
 
-pub fn fit_all(samples: &[f64]) -> Result<Vec<FitResult>> {
-    validate_samples(samples)?;
-    reference_curve_fitting::fit_all_candidates_diagnostic(samples)
-        .into_iter()
-        .map(reference_diagnostic)
-        .collect()
-}
-
 pub fn calculate_diagnostics(
     samples: &[f64],
     distribution: &dyn Distribution,
 ) -> Result<DiagnosticMetrics> {
     validate_samples(samples)?;
     Ok(diagnostics(samples, distribution))
-}
-
-fn fit_family(samples: &[f64], family: DistributionFamily) -> Result<FitResult> {
-    fit_samples_mle(samples, family, FitBounds::default())
-}
-
-fn reference_diagnostic(diagnostic: reference_curve_fitting::DiagnosticFit) -> Result<FitResult> {
-    let family = DistributionFamily::from_name(diagnostic.name).ok_or_else(|| {
-        CrcError::Unsupported(format!(
-            "reference fitter returned unknown family {}",
-            diagnostic.name
-        ))
-    })?;
-    Ok(FitResult {
-        distribution: FittedDistribution::from_parameters(
-            family,
-            diagnostic.shape,
-            diagnostic.loc,
-            diagnostic.scale,
-        )?,
-        diagnostics: DiagnosticMetrics {
-            ks_statistic: diagnostic.ks_stat,
-            ks_pvalue: diagnostic.p_value,
-            rmse: diagnostic.rmse,
-            r_squared: diagnostic.r_squared,
-        },
-        iterations: 0,
-        evaluations: 0,
-    })
 }
 
 fn diagnostics(samples: &[f64], distribution: &dyn Distribution) -> DiagnosticMetrics {

@@ -3,7 +3,7 @@
   "$id": "https://schemas.riskthinking.ai/crc/impact/1.0.0/registry-impact-reference-1.0.schema.json",
   "title": "CRC registry impact reference 1.0",
   "type": "object",
-  "description": "Pinned recipe that resolves to a self-contained impact definition. reference_hash uses the definition canonicalization and hashing rules and is never embedded in the payload.",
+  "description": "Pinned recipe that resolves to a self-contained impact definition with explicit context. reference_hash uses the definition canonicalization and hashing rules and is never embedded in the payload.",
   "additionalProperties": false,
   "properties": {
     "schema_version": {
@@ -34,7 +34,7 @@
     "resolver_semantics_version": {
       "type": "string",
       "const": "crc-impact-registry/1",
-      "description": "Resolver semantics: override catalog, context precedence, fallbacks and key normalization.",
+      "description": "Resolver semantics: override catalog, explicit context and key normalization.",
       "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
       "x-crc-native": "RegistryImpactReference::resolver_semantics_version: ResolverSemantics"
     },
@@ -65,24 +65,6 @@
       "x-crc-canonical": "object with sorted keys; absent keys omitted; always present in canonical form",
       "x-crc-native": "RegistryImpactReference::overrides: RegistryOverrides",
       "default": {}
-    },
-    "context_defaults": {
-      "$ref": "#/$defs/context",
-      "description": "Lowest-precedence context values.",
-      "x-crc-canonical": "object with all members present; always present in canonical form",
-      "x-crc-native": "RegistryImpactReference::context_defaults: ImpactContext",
-      "default": {}
-    },
-    "fallback_policy": {
-      "type": "string",
-      "enum": [
-        "error",
-        "legacy_defaults"
-      ],
-      "description": "error rejects missing table keys; legacy_defaults permits and records documented fallbacks.",
-      "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
-      "x-crc-native": "RegistryImpactReference::fallback_policy: FallbackPolicy",
-      "default": "error"
     }
   },
   "required": [
@@ -146,84 +128,6 @@
       "type": "string",
       "pattern": "^[0-9a-f]{15}$",
       "description": "H3 cell index as 15 lowercase hexadecimal characters."
-    },
-    "context": {
-      "type": "object",
-      "description": "Registry resolution context. Every member is nullable and defaults to null; only context used by the resolved branch carries values in a frozen origin.",
-      "additionalProperties": false,
-      "properties": {
-        "cell": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/h3_cell"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "H3 cell of the matched hazard row.",
-          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
-          "x-crc-native": "ImpactContext::cell: Option<u64> (validated H3 index)",
-          "default": null
-        },
-        "country": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/identifier"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Country key, normalized only by the pinned registry manifest.",
-          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
-          "x-crc-native": "ImpactContext::country: Option<String>",
-          "default": null
-        },
-        "continent": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/identifier"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Continent key used by flood tables.",
-          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
-          "x-crc-native": "ImpactContext::continent: Option<String>",
-          "default": null
-        },
-        "building_type": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/identifier"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Building type key used by flood, SPEI and baseline-relative tables.",
-          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile; always present in canonical form",
-          "x-crc-native": "ImpactContext::building_type: Option<String>",
-          "default": null
-        },
-        "historic_mean": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Historical baseline exposure for baseline-relative factors.",
-          "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; always present in canonical form",
-          "x-crc-native": "ImpactContext::historic_mean: Option<f64>",
-          "default": null
-        }
-      },
-      "required": []
     },
     "overrides": {
       "type": "object",

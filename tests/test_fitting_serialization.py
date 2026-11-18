@@ -246,7 +246,7 @@ def test_record_rejects_contradictory_counts_selection_and_estimator(field, valu
     [
         (),
         ("attempts", 0),
-        ("attempts", 0, "diagnostics", 0),
+        ("attempts", 0, "diagnostic"),
         ("attempts", 0, "specification"),
         ("specification",),
     ],
@@ -312,21 +312,12 @@ def test_effective_weights_match_the_selected_quantile_specification():
 
 
 @pytest.mark.parametrize(
-    "diagnostics",
-    [
-        [],
-        [{"code": "fit.failed", "severity": "error"}],
-        [{"details": {}}],
-        [{"details": {"ks_statistic": 0.25}}],
-        [{}, {}],
-    ],
+    "diagnostic",
+    [None, {}, {"message": "fit failed"}, {"ks_statistic": 0.25}],
 )
-def test_attempts_require_their_outcome_diagnostic(diagnostics):
+def test_attempts_require_their_outcome_diagnostic(diagnostic):
     document = json.loads(sample_record().to_json())
-    original = document["attempts"][0]["diagnostics"][0]
-    document["attempts"][0]["diagnostics"] = [
-        original | change for change in diagnostics
-    ]
+    document["attempts"][0]["diagnostic"] = diagnostic
     assert not RECORD_VALIDATOR.is_valid(document)
     with pytest.raises(ValueError):
         FitRecord.from_json(json.dumps(document))
@@ -392,11 +383,13 @@ def test_integral_json_number_counts_are_hydrated_without_truncation():
         document[field] = float(document[field])
     document["specification"]["minimum_samples"] = 3.0
     document["attempts"][0]["specification"]["minimum_samples"] = 3.0
+    document["attempts"][0]["diagnostic"]["iterations"] = 0.0
     assert RECORD_VALIDATOR.is_valid(document)
     restored = FitRecord.from_json(json.dumps(document))
     assert type(restored.evidence_count) is int
     assert type(restored.selected_attempt) is int
     assert restored.specification.minimum_samples == 3
+    assert type(restored.attempts[0].diagnostic.iterations) is int
     document["used_count"] = 7.5
     with pytest.raises(ValueError):
         FitRecord.from_json(json.dumps(document))

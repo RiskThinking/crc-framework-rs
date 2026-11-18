@@ -450,88 +450,53 @@
               "status": {
                 "const": "converged"
               },
-              "reason": {
-                "type": "null"
-              },
-              "diagnostics": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "const": "fit.samples"
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "severity": {
-                      "const": "info"
-                    },
-                    "path": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "object",
-                      "properties": {
-                        "ks_statistic": {
-                          "type": "number",
-                          "minimum": 0,
-                          "maximum": 1
-                        },
-                        "ks_pvalue": {
-                          "type": "number",
-                          "minimum": 0,
-                          "maximum": 1
-                        },
-                        "rmse": {
-                          "type": "number",
-                          "minimum": 0,
-                          "maximum": 1.7976931348623157e+308
-                        },
-                        "r_squared": {
-                          "type": "number",
-                          "minimum": -1.7976931348623157e+308,
-                          "maximum": 1.7976931348623157e+308
-                        },
-                        "iterations": {
-                          "type": "integer",
-                          "minimum": 0
-                        },
-                        "evaluations": {
-                          "type": "integer",
-                          "minimum": 0
-                        }
-                      },
-                      "required": [
-                        "ks_statistic",
-                        "ks_pvalue",
-                        "rmse",
-                        "r_squared",
-                        "iterations",
-                        "evaluations"
-                      ],
-                      "additionalProperties": false
-                    }
+              "diagnostic": {
+                "type": "object",
+                "properties": {
+                  "ks_statistic": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
                   },
-                  "required": [
-                    "code",
-                    "message",
-                    "severity",
-                    "path",
-                    "details"
-                  ],
-                  "additionalProperties": false
+                  "ks_pvalue": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "rmse": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "r_squared": {
+                    "type": "number",
+                    "minimum": -1.7976931348623157e+308,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "iterations": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "evaluations": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
                 },
-                "minItems": 1,
-                "maxItems": 1
+                "required": [
+                  "ks_statistic",
+                  "ks_pvalue",
+                  "rmse",
+                  "r_squared",
+                  "iterations",
+                  "evaluations"
+                ],
+                "additionalProperties": false
               }
             },
             "required": [
               "specification",
               "status",
-              "reason",
-              "diagnostics"
+              "diagnostic"
             ],
             "additionalProperties": false
           },
@@ -544,95 +509,60 @@
               "status": {
                 "const": "converged"
               },
-              "reason": {
-                "type": "null"
-              },
-              "diagnostics": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "const": "fit.quantiles"
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "severity": {
-                      "const": "info"
-                    },
-                    "path": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "object",
-                      "properties": {
-                        "rmse": {
-                          "type": "number",
-                          "minimum": 0,
-                          "maximum": 1.7976931348623157e+308
-                        },
-                        "weighted_r_squared": {
-                          "type": "number",
-                          "minimum": -1.7976931348623157e+308,
-                          "maximum": 1.7976931348623157e+308
-                        },
-                        "maximum_absolute_residual": {
-                          "type": "number",
-                          "minimum": 0,
-                          "maximum": 1.7976931348623157e+308
-                        },
-                        "normalized_rmse": {
-                          "type": "number",
-                          "minimum": 0,
-                          "maximum": 1.7976931348623157e+308
-                        },
-                        "normalization_scale": {
-                          "type": "number",
-                          "minimum": 0,
-                          "maximum": 1.7976931348623157e+308,
-                          "exclusiveMinimum": 0
-                        },
-                        "iterations": {
-                          "type": "integer",
-                          "minimum": 0
-                        },
-                        "evaluations": {
-                          "type": "integer",
-                          "minimum": 0
-                        }
-                      },
-                      "required": [
-                        "rmse",
-                        "weighted_r_squared",
-                        "maximum_absolute_residual",
-                        "normalized_rmse",
-                        "normalization_scale",
-                        "iterations",
-                        "evaluations"
-                      ],
-                      "additionalProperties": false
-                    }
+              "diagnostic": {
+                "type": "object",
+                "properties": {
+                  "rmse": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308
                   },
-                  "required": [
-                    "code",
-                    "message",
-                    "severity",
-                    "path",
-                    "details"
-                  ],
-                  "additionalProperties": false
+                  "weighted_r_squared": {
+                    "type": "number",
+                    "minimum": -1.7976931348623157e+308,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "maximum_absolute_residual": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "normalized_rmse": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "normalization_scale": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308,
+                    "exclusiveMinimum": 0
+                  },
+                  "iterations": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "evaluations": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
                 },
-                "minItems": 1,
-                "maxItems": 1
+                "required": [
+                  "rmse",
+                  "weighted_r_squared",
+                  "maximum_absolute_residual",
+                  "normalized_rmse",
+                  "normalization_scale",
+                  "iterations",
+                  "evaluations"
+                ],
+                "additionalProperties": false
               }
             },
             "required": [
               "specification",
               "status",
-              "reason",
-              "diagnostics"
+              "diagnostic"
             ],
             "additionalProperties": false
           },
@@ -645,125 +575,90 @@
               "status": {
                 "const": "converged"
               },
-              "reason": {
-                "type": "null"
-              },
-              "diagnostics": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "const": "fit.censored_quantiles"
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "severity": {
-                      "const": "info"
-                    },
-                    "path": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "object",
-                      "properties": {
-                        "rmse": {
-                          "type": "number",
-                          "minimum": 0,
-                          "maximum": 1.7976931348623157e+308
-                        },
-                        "weighted_r_squared": {
-                          "type": "number",
-                          "minimum": -1.7976931348623157e+308,
-                          "maximum": 1.7976931348623157e+308
-                        },
-                        "maximum_absolute_residual": {
-                          "type": "number",
-                          "minimum": 0,
-                          "maximum": 1.7976931348623157e+308
-                        },
-                        "normalized_rmse": {
-                          "type": "number",
-                          "minimum": 0,
-                          "maximum": 1.7976931348623157e+308
-                        },
-                        "normalization_scale": {
-                          "type": "number",
-                          "minimum": 0,
-                          "maximum": 1.7976931348623157e+308,
-                          "exclusiveMinimum": 0
-                        },
-                        "negative_log_likelihood": {
-                          "type": "number",
-                          "minimum": -1.7976931348623157e+308,
-                          "maximum": 1.7976931348623157e+308
-                        },
-                        "residual_scale": {
-                          "type": "number",
-                          "minimum": 0,
-                          "maximum": 1.7976931348623157e+308,
-                          "exclusiveMinimum": 0
-                        },
-                        "residual_scale_floor": {
-                          "type": "number",
-                          "minimum": 0,
-                          "maximum": 1.7976931348623157e+308,
-                          "exclusiveMinimum": 0
-                        },
-                        "censored_count": {
-                          "type": "integer",
-                          "minimum": 0
-                        },
-                        "uncensored_count": {
-                          "type": "integer",
-                          "minimum": 0
-                        },
-                        "iterations": {
-                          "type": "integer",
-                          "minimum": 0
-                        },
-                        "evaluations": {
-                          "type": "integer",
-                          "minimum": 0
-                        }
-                      },
-                      "required": [
-                        "rmse",
-                        "weighted_r_squared",
-                        "maximum_absolute_residual",
-                        "normalized_rmse",
-                        "normalization_scale",
-                        "negative_log_likelihood",
-                        "residual_scale",
-                        "residual_scale_floor",
-                        "censored_count",
-                        "uncensored_count",
-                        "iterations",
-                        "evaluations"
-                      ],
-                      "additionalProperties": false
-                    }
+              "diagnostic": {
+                "type": "object",
+                "properties": {
+                  "rmse": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308
                   },
-                  "required": [
-                    "code",
-                    "message",
-                    "severity",
-                    "path",
-                    "details"
-                  ],
-                  "additionalProperties": false
+                  "weighted_r_squared": {
+                    "type": "number",
+                    "minimum": -1.7976931348623157e+308,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "maximum_absolute_residual": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "normalized_rmse": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "normalization_scale": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308,
+                    "exclusiveMinimum": 0
+                  },
+                  "negative_log_likelihood": {
+                    "type": "number",
+                    "minimum": -1.7976931348623157e+308,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "residual_scale": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308,
+                    "exclusiveMinimum": 0
+                  },
+                  "residual_scale_floor": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308,
+                    "exclusiveMinimum": 0
+                  },
+                  "censored_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "uncensored_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "iterations": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "evaluations": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
                 },
-                "minItems": 1,
-                "maxItems": 1
+                "required": [
+                  "rmse",
+                  "weighted_r_squared",
+                  "maximum_absolute_residual",
+                  "normalized_rmse",
+                  "normalization_scale",
+                  "negative_log_likelihood",
+                  "residual_scale",
+                  "residual_scale_floor",
+                  "censored_count",
+                  "uncensored_count",
+                  "iterations",
+                  "evaluations"
+                ],
+                "additionalProperties": false
               }
             },
             "required": [
               "specification",
               "status",
-              "reason",
-              "diagnostics"
+              "diagnostic"
             ],
             "additionalProperties": false
           },
@@ -776,105 +671,70 @@
               "status": {
                 "const": "converged"
               },
-              "reason": {
-                "type": "null"
-              },
-              "diagnostics": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "const": "fit.hurdle_quantiles"
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "severity": {
-                      "const": "info"
-                    },
-                    "path": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "object",
-                      "properties": {
-                        "normalized_rmse": {
-                          "type": "number",
-                          "minimum": 0,
-                          "maximum": 1.7976931348623157e+308
-                        },
-                        "normalization_scale": {
-                          "type": "number",
-                          "minimum": 0,
-                          "maximum": 1.7976931348623157e+308,
-                          "exclusiveMinimum": 0
-                        },
-                        "tail_rmse": {
-                          "type": "number",
-                          "minimum": 0,
-                          "maximum": 1.7976931348623157e+308
-                        },
-                        "tail_weighted_r_squared": {
-                          "type": "number",
-                          "minimum": -1.7976931348623157e+308,
-                          "maximum": 1.7976931348623157e+308
-                        },
-                        "tail_maximum_absolute_residual": {
-                          "type": "number",
-                          "minimum": 0,
-                          "maximum": 1.7976931348623157e+308
-                        },
-                        "atom_count": {
-                          "type": "integer",
-                          "minimum": 0
-                        },
-                        "tail_count": {
-                          "type": "integer",
-                          "minimum": 0
-                        },
-                        "iterations": {
-                          "type": "integer",
-                          "minimum": 0
-                        },
-                        "evaluations": {
-                          "type": "integer",
-                          "minimum": 0
-                        }
-                      },
-                      "required": [
-                        "normalized_rmse",
-                        "normalization_scale",
-                        "tail_rmse",
-                        "tail_weighted_r_squared",
-                        "tail_maximum_absolute_residual",
-                        "atom_count",
-                        "tail_count",
-                        "iterations",
-                        "evaluations"
-                      ],
-                      "additionalProperties": false
-                    }
+              "diagnostic": {
+                "type": "object",
+                "properties": {
+                  "normalized_rmse": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308
                   },
-                  "required": [
-                    "code",
-                    "message",
-                    "severity",
-                    "path",
-                    "details"
-                  ],
-                  "additionalProperties": false
+                  "normalization_scale": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308,
+                    "exclusiveMinimum": 0
+                  },
+                  "tail_rmse": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "tail_weighted_r_squared": {
+                    "type": "number",
+                    "minimum": -1.7976931348623157e+308,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "tail_maximum_absolute_residual": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "atom_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "tail_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "iterations": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "evaluations": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
                 },
-                "minItems": 1,
-                "maxItems": 1
+                "required": [
+                  "normalized_rmse",
+                  "normalization_scale",
+                  "tail_rmse",
+                  "tail_weighted_r_squared",
+                  "tail_maximum_absolute_residual",
+                  "atom_count",
+                  "tail_count",
+                  "iterations",
+                  "evaluations"
+                ],
+                "additionalProperties": false
               }
             },
             "required": [
               "specification",
               "status",
-              "reason",
-              "diagnostics"
+              "diagnostic"
             ],
             "additionalProperties": false
           },
@@ -890,53 +750,24 @@
                   "failed"
                 ]
               },
-              "reason": {
-                "type": "string",
-                "minLength": 1
-              },
-              "diagnostics": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "const": "fit.failed"
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "severity": {
-                      "const": "error"
-                    },
-                    "path": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "object",
-                      "properties": {},
-                      "required": [],
-                      "additionalProperties": false
-                    }
-                  },
-                  "required": [
-                    "code",
-                    "message",
-                    "severity",
-                    "path",
-                    "details"
-                  ],
-                  "additionalProperties": false
+              "diagnostic": {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "type": "string",
+                    "minLength": 1
+                  }
                 },
-                "minItems": 1,
-                "maxItems": 1
+                "required": [
+                  "message"
+                ],
+                "additionalProperties": false
               }
             },
             "required": [
               "specification",
               "status",
-              "reason",
-              "diagnostics"
+              "diagnostic"
             ],
             "additionalProperties": false
           }

@@ -52,7 +52,7 @@ fn discrete(support: &[f64], probabilities: &[f64]) -> ImpactSource {
 
 fn atom_total(impact: &ImpactDefinition, source: &ImpactSource) -> f64 {
     impact
-        .transform_distribution(source)
+        .pushforward(source)
         .unwrap()
         .atoms()
         .iter()
@@ -68,10 +68,10 @@ fn empirical_breakpoints_use_observed_probability_masses() {
         "",
     );
     let source = empirical(&[0.0, 1.0, 2.0]);
-    let result = binned.expected_value(&source, MethodRequest::Auto).unwrap();
+    let result = binned.expectation(&source, MethodRequest::Auto).unwrap();
     assert!(matches!(result.method, ResolvedMethod::Exact { .. }));
     assert!((result.value - 2.0 / 3.0).abs() < 1e-15);
-    let distribution = binned.transform_distribution(&source).unwrap();
+    let distribution = binned.pushforward(&source).unwrap();
     let atoms = distribution.atoms();
     assert_eq!(atoms.len(), 2);
     assert!((atoms[0].probability - 1.0 / 3.0).abs() < 1e-15);
@@ -81,9 +81,9 @@ fn empirical_breakpoints_use_observed_probability_masses() {
         r#"{"kind": "linear", "slope": 1.0, "intercept": 0.0}"#,
         r#""clamp": {"maximum": 0.5},"#,
     );
-    let result = capped.expected_value(&source, MethodRequest::Auto).unwrap();
+    let result = capped.expectation(&source, MethodRequest::Auto).unwrap();
     assert!((result.value - 1.0 / 3.0).abs() < 1e-15);
-    let image = capped.transform_distribution(&source).unwrap();
+    let image = capped.pushforward(&source).unwrap();
     assert_eq!(image.atoms().len(), 2);
     assert_eq!(image.atoms()[0].value, 0.0);
     assert_eq!(image.atoms()[1].value, 0.5);
@@ -94,22 +94,20 @@ fn empirical_breakpoints_use_observed_probability_masses() {
 fn empirical_ties_retain_their_observed_mass() {
     let identity = definition(r#"{"kind": "linear", "slope": 1.0, "intercept": 0.0}"#, "");
     let source = empirical(&[1.0, 1.0, 3.0, 5.0]);
-    let distribution = identity.transform_distribution(&source).unwrap();
+    let distribution = identity.pushforward(&source).unwrap();
     let atoms = distribution.atoms();
     assert_eq!(atoms.len(), 3);
     assert_eq!(atoms[0].value, 1.0);
     assert_eq!(atoms[0].probability, 0.5);
     assert_eq!(atoms[1].probability, 0.25);
     assert_eq!(atoms[2].probability, 0.25);
-    let result = identity
-        .expected_value(&source, MethodRequest::Exact)
-        .unwrap();
+    let result = identity.expectation(&source, MethodRequest::Exact).unwrap();
     assert_eq!(result.value, 2.5);
     let step = definition(
         r#"{"kind": "binned", "bin_edges": [0.0, 1.0, 2.0, 6.0], "values": [0.0, 1.0, 2.0]}"#,
         "",
     );
-    let result = step.expected_value(&source, MethodRequest::Auto).unwrap();
+    let result = step.expectation(&source, MethodRequest::Auto).unwrap();
     assert!((result.value - 1.5).abs() < 1e-15);
 }
 
@@ -121,7 +119,7 @@ fn adjacent_flat_segments_do_not_double_count_the_shared_knot() {
         "",
     );
     let source = discrete(&[1.0, 2.5], &[0.5, 0.5]);
-    let distribution = impact.transform_distribution(&source).unwrap();
+    let distribution = impact.pushforward(&source).unwrap();
     let atoms = distribution.atoms();
     assert_eq!(atoms.len(), 2);
     assert_eq!((atoms[0].value, atoms[0].probability), (0.0, 0.5));
@@ -154,9 +152,9 @@ fn transform_honours_outside_domain_error() {
             fitted("gumbel_r", None, 0.5, 0.05),
         ] {
             let expectation = impact
-                .expected_value(&source, MethodRequest::Auto)
+                .expectation(&source, MethodRequest::Auto)
                 .unwrap_err();
-            let transform = impact.transform_distribution(&source).unwrap_err();
+            let transform = impact.pushforward(&source).unwrap_err();
             assert_eq!(expectation.code, "out_of_domain", "{model}");
             assert_eq!(transform.code, "out_of_domain", "{model}");
         }
@@ -175,7 +173,7 @@ fn sigmoid_floor_is_exact_for_large_thresholds() {
     );
     assert_eq!(impact.monotonicity(), "non_decreasing");
     let source = fitted("gumbel_r", None, 1e17, 1e15);
-    let distribution = impact.transform_distribution(&source).unwrap();
+    let distribution = impact.pushforward(&source).unwrap();
     let atoms = distribution.atoms();
     assert_eq!(atoms.len(), 1);
     assert_eq!(atoms[0].value, 0.0);
@@ -189,7 +187,7 @@ fn heavy_tail_means_are_closed_form() {
     let identity = definition(r#"{"kind": "linear", "slope": 1.0, "intercept": 0.0}"#, "");
     for shape in [0.1, 0.45, 0.5, 0.9, 0.95] {
         let result = identity
-            .expected_value(
+            .expectation(
                 &fitted("genpareto", Some(shape), 0.0, 1.0),
                 MethodRequest::Auto,
             )
@@ -213,7 +211,7 @@ fn heavy_tail_means_are_closed_form() {
         (0.3, 0.341_764_345_645_742_7),
     ] {
         let result = identity
-            .expected_value(
+            .expectation(
                 &fitted("genextreme", Some(shape), 0.0, 1.0),
                 MethodRequest::Auto,
             )
@@ -229,7 +227,7 @@ fn heavy_tail_means_are_closed_form() {
         r#""clamp": {"minimum": 0.5},"#,
     );
     let error = floored
-        .expected_value(
+        .expectation(
             &fitted("genpareto", Some(0.6), 0.0, 1.0),
             MethodRequest::Auto,
         )
@@ -244,7 +242,7 @@ fn decreasing_map_over_a_gap_returns_the_lower_value() {
     let source = ImpactSource::Histogram(
         HistogramExposure::new(vec![0.0, 1.0, 2.0, 3.0], vec![0.5, 0.0, 0.5]).unwrap(),
     );
-    let distribution = negate.transform_distribution(&source).unwrap();
+    let distribution = negate.pushforward(&source).unwrap();
     // P(Y <= -2) = P(X >= 2) = 0.5, so Q_Y(0.5) = -2.
     assert_eq!(distribution.quantile(0.5).unwrap(), -2.0);
     assert_eq!(distribution.quantile(0.25).unwrap(), -2.5);
@@ -259,12 +257,10 @@ fn indexed_histogram_and_discrete_laws_match_direct_scans() {
     let weights = vec![0.1, 0.0, 0.3, 0.2, 0.0, 0.4];
     let histogram =
         ImpactSource::Histogram(HistogramExposure::new(edges.clone(), weights.clone()).unwrap());
-    let pushforward = identity.transform_distribution(&histogram).unwrap();
+    let pushforward = identity.pushforward(&histogram).unwrap();
     let support = vec![3.0, -1.0, 2.0, 2.0, 7.5];
     let masses = vec![0.2, 0.1, 0.3, 0.1, 0.3];
-    let atoms = identity
-        .transform_distribution(&discrete(&support, &masses))
-        .unwrap();
+    let atoms = identity.pushforward(&discrete(&support, &masses)).unwrap();
     for step in 0..=200 {
         let probability = step as f64 / 200.0;
         // Lower quantile of the uniform-within-bin histogram, scanning bins.
@@ -306,7 +302,7 @@ fn indexed_histogram_and_discrete_laws_match_direct_scans() {
         "",
     );
     let result = binned
-        .expected_value(&discrete(&support, &masses), MethodRequest::Auto)
+        .expectation(&discrete(&support, &masses), MethodRequest::Auto)
         .unwrap();
     assert!((result.value - (0.1 * 1.0 + 0.4 * 3.0 + 0.2 * 4.0 + 0.3 * 4.0)).abs() < 1e-15);
 }
@@ -321,7 +317,7 @@ fn large_quadrature_budget_fails_quickly() {
     let options = GaussKronrodOptions::new(1e-300, 1e-300, 400_000).unwrap();
     let started = std::time::Instant::now();
     let error = impact
-        .expected_value(
+        .expectation(
             &fitted("gumbel_r", None, 0.5, 0.1),
             MethodRequest::GaussKronrod(options),
         )

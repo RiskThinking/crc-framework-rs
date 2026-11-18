@@ -1088,14 +1088,11 @@
             "overrides": {
               "maximum_damage": 0.8
             },
-            "fallback_policy": "error",
             "lookups": [
               {
                 "table_id": "wind.cyclone_params",
                 "table_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-                "requested_key": "PHL",
-                "resolved_key": "PHL",
-                "status": "exact"
+                "key": "PHL"
               }
             ]
           },
@@ -1103,7 +1100,7 @@
           "derived_from": []
         }
       },
-      "definition_hash": "sha256:0e052a65e9260393ef4bc3f702ff6471966eb55b62433fc406694e19c5a9834b",
+      "definition_hash": "sha256:9e729bbc4ccc444cf3851eab651cbdd86de7741660dc4c4cd1a18689250de049",
       "tolerance": {
         "absolute": 1e-12,
         "relative": 1e-12

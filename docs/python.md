@@ -119,13 +119,14 @@ fit = fit_samples(
 median = fit.distribution.quantile(0.5)
 assert fit.record.converged
 assert fit.record.estimator is SampleEstimator.L_MOMENTS
+ks = fit.diagnostic.ks_statistic
 ```
 
 Maximum likelihood requires successful likelihood optimization. Moment
 initialization is not reported as successful maximum likelihood. Estimator
 alternatives execute only when supplied through `SampleFit.fallbacks`, and all
-attempts remain in the fit record. `FitError` exposes the failed record and
-structured diagnostics.
+attempts remain in the fit record. `FitError.record` contains those attempts
+and their failure messages.
 
 For probability-labelled evidence, use `fit_quantiles` and the appropriate
 specification. Supplied quantile knots are never treated as observations:
@@ -148,7 +149,8 @@ only its explicit candidate specifications. Sample selection uses
 not treated as an independent sample for a KS test. `FitConstraints` apply to the
 requested fit; they do not authorize fitting other families.
 
-A `FitResult` contains the law, diagnostics, and a `FitRecord` with the requested
+A `FitResult` contains the law, the selected attempt's typed `diagnostic`, and
+a `FitRecord` with the requested
 specification, actual estimator, convergence, attempts, the selected attempt
 index, effective weights, evidence counts and support, and engine version.
 Sample attempts report their KS statistic and p-value. Quantile attempts

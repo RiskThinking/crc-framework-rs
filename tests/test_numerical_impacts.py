@@ -244,11 +244,15 @@ def test_every_builtin_identity_resolves_with_its_discovered_context(
     requirements = reference.requirements
     data = {
         "cell": int("852b83b3fffffff", 16),
-        "country": "USA" if model is BuiltinImpact.CONSECUTIVE_DRY_DAYS else "CAN",
+        "country": "USA"
+        if model
+        in (
+            BuiltinImpact.CONSECUTIVE_DRY_DAYS,
+            BuiltinImpact.COOLING_DEGREE_DAYS_CROP_YIELD,
+        )
+        else "CAN",
         "region": FloodRegion.EUROPE,
-        "asset_type": AssetType.AGRICULTURAL_BUILDING
-        if model is BuiltinImpact.CONSECUTIVE_DRY_DAYS
-        else AssetType.RESIDENTIAL,
+        "asset_type": AssetType.RESIDENTIAL,
         "historic_mean": 20.0,
     }
     values = {field.name: data[field.name] for field in requirements.context_fields}

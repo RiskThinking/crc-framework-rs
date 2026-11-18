@@ -55,7 +55,7 @@ ERROR_CODES = {
     "missing_context": ("resolve", "Required resolution context is missing after merging."),
     "registry_unavailable": ("resolve", "The requested registry revision is not installed."),
     "registry_manifest_mismatch": ("resolve", "The installed manifest digest differs from the pinned digest."),
-    "fallback_required": ("resolve", "A table key is missing and the fallback policy is error."),
+    "missing_table_key": ("resolve", "The resolved context has no exact entry in a required table."),
     "non_finite_exposure": ("evaluate", "An exposure value is NaN or infinite."),
     "non_finite_result": ("evaluate", "The raw or final response is not finite."),
     "out_of_domain": ("evaluate", "Exposure outside a table domain with outside_domain error."),
@@ -229,7 +229,7 @@ def build() -> Dict[str, bytes]:
     fixture_ids |= {f"number:{case['name']}" for case in cases.number_cases()}
     fixture_ids |= {f"point:{case['name']}" for case in cases.point_cases()}
     operations = cases.operation_cases()
-    fixture_ids |= {f"operation:{case['name']}" for group in ("expected_value", "transform_distribution", "spatial_combination") for case in operations[group]}
+    fixture_ids |= {f"operation:{case['name']}" for group in ("expectation", "pushforward", "spatial_combination") for case in operations[group]}
     semantics = cases.semantics_constants()
     declared = [entry["id"] for entry in semantics]
     if len(declared) != len(set(declared)):

@@ -229,8 +229,7 @@
               "enum": [
                 "residential",
                 "commercial",
-                "industrial",
-                "agricultural_building"
+                "industrial"
               ]
             },
             {

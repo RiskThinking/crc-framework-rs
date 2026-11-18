@@ -120,7 +120,7 @@
       "value": 15,
       "owner": "ImpactContext.cell",
       "fixtures": [
-        "definition:origin-registry-legacy-fallback",
+        "definition:origin-registry-h3-key",
         "definition:registry-cell-padded",
         "spatial-record:h3-target-padded"
       ]
@@ -146,7 +146,7 @@
     {
       "id": "override-catalog",
       "rule": "factor override keys and nullability",
-      "owner": "ImpactRegistry",
+      "owner": "RegistryImpactReference",
       "fixtures": [
         "definition:registry-null-override",
         "registry-reference:no-override-factor"

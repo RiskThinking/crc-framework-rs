@@ -1,4 +1,4 @@
-from typing import reveal_type
+from typing import assert_type, reveal_type
 
 from crc_framework import (
     Distribution,
@@ -6,9 +6,11 @@ from crc_framework import (
     Impact,
     QuantileCurve,
     QuantileFit,
+    QuantileFitDiagnostic,
     Ratio,
     SampleEstimator,
     SampleFit,
+    SampleFitDiagnostic,
     Statistic,
     TailCompletion,
     fit_quantiles,
@@ -28,10 +30,12 @@ fit = fit_samples(
     ),
 )
 reveal_type(fit.record.converged)
+assert_type(fit.diagnostic, SampleFitDiagnostic)
 curve = QuantileCurve([0.1, 0.3, 0.6, 0.9, 0.99], [0.0, 0.2, 0.8, 1.6, 2.5])
 completed = curve.complete(TailCompletion(lower=-0.5, upper=4.0))
 quantile_fit = fit_quantiles(curve, QuantileFit(family=DistributionFamily.GUMBEL_RIGHT))
 reveal_type(quantile_fit.distribution)
+assert_type(quantile_fit.diagnostic, QuantileFitDiagnostic)
 impact = Impact.linear(slope=0.5, input=Ratio(), output=Ratio())
 reveal_type(impact.evaluate([0.5, 1.0]))
 reveal_type(impact.pushforward(completed))

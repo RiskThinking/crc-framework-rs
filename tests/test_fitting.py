@@ -13,6 +13,7 @@ from crc_framework import (
     DistributionFamily,
     FitConstraints,
     FitError,
+    FitFailureDiagnostic,
     FitStatus,
     HurdleQuantileFit,
     ModelSelection,
@@ -25,12 +26,6 @@ from crc_framework import (
     fit_quantiles,
     fit_samples,
 )
-from crc_framework._diagnostics import ScientificValue
-
-
-def _number(value: ScientificValue) -> float:
-    assert isinstance(value, (int, float)) and not isinstance(value, bool)
-    return float(value)
 
 
 @pytest.mark.parametrize(
@@ -66,8 +61,8 @@ def test_sample_mle_recovers_requested_family_and_reports_actual_optimizer(
     assert result.record.used_count == 400
     assert result.record.excluded_count == 0
     assert result.record.weights is None
-    assert _number(result.diagnostics[0].details["iterations"]) > 0
-    assert _number(result.diagnostics[0].details["evaluations"]) > 0
+    assert result.diagnostic.iterations > 0
+    assert result.diagnostic.evaluations > 0
     assert result.record.attempts[0].status is FitStatus.CONVERGED
 
 
@@ -124,7 +119,9 @@ def test_failed_mle_does_not_masquerade_as_moments(
     assert error.record.selected_attempt is None
     assert len(error.record.attempts) == 1
     assert error.record.attempts[0].status is FitStatus.FAILED
-    assert "did not converge" in error.diagnostics[0].message
+    diagnostic = error.record.attempts[0].diagnostic
+    assert isinstance(diagnostic, FitFailureDiagnostic)
+    assert "did not converge" in diagnostic.message
 
 
 def test_only_explicit_alternative_estimator_executes(
@@ -201,7 +198,7 @@ def test_quantile_fit_recovers_values_and_reports_effective_weights() -> None:
     )
     assert result.record.evidence_support == (0.1, 0.99)
     assert result.record.estimator is None
-    assert "ks_pvalue" not in result.diagnostics[0].details
+    assert result.diagnostic.normalized_rmse < 1e-6
 
 
 def test_quantile_constraint_refines_only_one_requested_law() -> None:
@@ -232,14 +229,12 @@ def test_censored_quantile_fit_has_operation_specific_diagnostics() -> None:
         family=DistributionFamily.GENERALIZED_EXTREME_VALUE, censor_location=0.0
     )
     result = fit_quantiles(curve, specification)
-    details = result.diagnostics[0].details
-    assert details["censored_count"] == 6
-    assert details["uncensored_count"] == 3
-    assert _number(details["residual_scale"]) >= _number(
-        details["residual_scale_floor"]
-    )
-    assert "negative_log_likelihood" in details
-    assert "atom_probability" not in details
+    diagnostic = result.diagnostic
+    assert diagnostic.censored_count == 6
+    assert diagnostic.uncensored_count == 3
+    assert diagnostic.residual_scale >= diagnostic.residual_scale_floor
+    assert np.isfinite(diagnostic.negative_log_likelihood)
+    assert not hasattr(diagnostic, "atom_probability")
 
 
 def test_hurdle_quantile_fit_reports_atom_and_true_tail() -> None:
@@ -261,8 +256,8 @@ def test_hurdle_quantile_fit_reports_atom_and_true_tail() -> None:
         result.distribution.quantile(probabilities), curve.values, atol=1e-6
     )
     assert result.distribution.mass(0.0) == pytest.approx(0.6)
-    assert result.diagnostics[0].details["atom_count"] == 4
-    assert result.diagnostics[0].details["tail_count"] == 5
+    assert result.diagnostic.atom_count == 4
+    assert result.diagnostic.tail_count == 5
 
 
 def test_scientific_inputs_and_choices_are_explicit() -> None:
@@ -298,10 +293,9 @@ def test_endpoint_evidence_is_never_silently_discarded() -> None:
     with pytest.raises(FitError) as caught:
         fit_quantiles(curve, QuantileFit(family=DistributionFamily.GUMBEL_RIGHT))
     assert caught.value.record.evidence_count == 6
-    assert (
-        "endpoint evidence cannot be silently excluded"
-        in caught.value.diagnostics[0].message
-    )
+    diagnostic = caught.value.record.attempts[0].diagnostic
+    assert isinstance(diagnostic, FitFailureDiagnostic)
+    assert "endpoint evidence cannot be silently excluded" in diagnostic.message
 
 
 def test_specification_json_has_one_discriminator_and_canonical_enum_values() -> None:
@@ -347,8 +341,7 @@ def test_quantile_model_selection_uses_its_explicit_evidence_criterion() -> None
     assert (
         tuple(attempt.specification for attempt in result.record.attempts) == candidates
     )
-    assert _number(result.diagnostics[0].details["normalized_rmse"]) < 1e-6
-    assert "ks_statistic" not in result.diagnostics[0].details
+    assert result.diagnostic.normalized_rmse < 1e-6
     with pytest.raises(ValueError, match="KOLMOGOROV_SMIRNOV"):
         ModelSelection(
             candidates=(SampleFit(family=DistributionFamily.GUMBEL_RIGHT),),

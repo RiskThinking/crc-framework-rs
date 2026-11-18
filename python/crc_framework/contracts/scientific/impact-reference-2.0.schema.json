@@ -17,6 +17,7 @@
         "crc:inundation",
         "crc:standardized_precipitation_evapotranspiration_index",
         "crc:cooling_degree_days",
+        "crc:cooling_degree_days_crop_yield",
         "crc:consecutive_dry_days"
       ]
     },

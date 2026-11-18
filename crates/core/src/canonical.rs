@@ -296,11 +296,10 @@ fn validate_custom_science(value: &Value) -> Result<()> {
         }
         if map.get("kind").and_then(Value::as_str) == Some("climate_index") {
             if let Some(period) = map.get("reference_period") {
-                if period["start"]
-                    .as_f64()
-                    .zip(period["end"].as_f64())
-                    .is_some_and(|(a, b)| a > b)
-                {
+                if crate::dataset::greater(
+                    &crate::dataset::integer(&period["start"])?,
+                    &crate::dataset::integer(&period["end"])?,
+                ) {
                     return Err(invalid("reference period boundaries must be ordered"));
                 }
             }
@@ -699,7 +698,7 @@ impl Numerical {
         document: &Value,
     ) -> Result<ImpactDistribution> {
         match self.impact_source() {
-            Ok(source) => function.transform_distribution(&source).map_err(invalid),
+            Ok(source) => function.pushforward(&source).map_err(invalid),
             Err(error @ CrcError::Unsupported(_)) => {
                 if let Compiled::Transformed { source, .. } = &self.compiled {
                     if let Some(composed) = compose_affine(document, &self.document["impact"]) {
@@ -1061,7 +1060,7 @@ fn compile_impact(document: &Value) -> Result<ImpactDefinition> {
             })
             .transpose()?;
         let (registry, version, resolver, digest) = crate::impact::registry_identity();
-        let reference=crate::RegistryImpactReference::from_json(&json!({"schema_version":"1.0","registry_id":registry,"registry_revision":version,"registry_manifest_sha256":digest,"resolver_semantics_version":resolver,"factor":bindings["models"][id],"fallback_policy":"error"}).to_string()).map_err(invalid)?;
+        let reference=crate::RegistryImpactReference::from_json(&json!({"schema_version":"1.0","registry_id":registry,"registry_revision":version,"registry_manifest_sha256":digest,"resolver_semantics_version":resolver,"factor":bindings["models"][id]}).to_string()).map_err(invalid)?;
         let expected = reference
             .resolve(&crate::ResolutionContext {
                 cell,

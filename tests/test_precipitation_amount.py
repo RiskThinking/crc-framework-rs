@@ -11,6 +11,7 @@ from crc_framework import (
     DistributionFamily,
     Duration,
     FitError,
+    FitFailureDiagnostic,
     FitRecord,
     Impact,
     ImpactError,
@@ -58,8 +59,9 @@ def test_no_usable_samples_produces_an_authoritative_failed_fit_record() -> None
     assert not record.converged and record.evidence_support is None
     assert record.evidence_count == record.used_count == record.excluded_count == 0
     assert record.attempts[0].specification == spec
-    assert record.attempts[0].reason is not None
-    assert "requires at least" in record.attempts[0].reason
+    diagnostic = record.attempts[0].diagnostic
+    assert isinstance(diagnostic, FitFailureDiagnostic)
+    assert "requires at least" in diagnostic.message
     assert FitRecord.from_json(record.to_json()) == record
 
 

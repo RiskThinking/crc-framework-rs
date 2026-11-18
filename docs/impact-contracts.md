@@ -11,6 +11,8 @@ Input and output `Measurement` declarations describe the function's quantities
 and units. A built-in `ImpactReference` additionally pins its model identity and
 reference tables; `requirements` describes the input science and typed context
 needed to resolve it. Resolution produces an ordinary context-free `Impact`.
+When a required reference table has no entry for the supplied context,
+resolution raises `ImpactError` with code `missing_table_key`.
 
 ```python
 from crc_framework import Distribution, Impact, Ratio

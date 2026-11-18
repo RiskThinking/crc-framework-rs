@@ -1,55 +1,5 @@
 use phf::phf_map;
 
-pub const RESIDENTIAL_COMMERCIAL_COOLING_ENERGY: phf::Map<&'static str, f32> = phf_map! {
-    "ARG" =>0.03445358,
-    "BDI" =>0.016428364828341,
-    "BEN" =>0.038187323597126004,
-    "BFA" =>0.038187323597126004,
-    "BRA" =>0.16269911311415403,
-    "CAN" =>0.006056229992149001,
-    "CHN" =>1.1747199054981081,
-    "CIV" =>0.038187323597126004,
-    "COL" =>0.0429849,
-    "COM" =>0.016428364828341,
-    "CPV" =>0.038187323597126004,
-    "DJI" =>0.016428364828341,
-    "ERI" =>0.016428364828341,
-    "ETH" =>0.016428364828341,
-    "GBR" =>0.520358680677,
-    "GHA" =>0.038187323597126004,
-    "GIN" =>0.038187323597126004,
-    "GMB" =>0.038187323597126004,
-    "GNB" =>0.038187323597126004,
-    "IDN" =>0.10238862254289001,
-    "IND" =>0.56985135575432,
-    "JPN" =>0.10881023694045201,
-    "KEN" =>0.016428364828341,
-    "LBR" =>0.038187323597126004,
-    "MDG" =>0.016428364828341,
-    "MEX" =>0.009147761507439001,
-    "MLI" =>0.038187323597126004,
-    "MOZ" =>0.016428364828341,
-    "MRT" =>0.038187323597126004,
-    "MUS" =>0.016428364828341,
-    "MWI" =>0.016428364828341,
-    "NGA" =>0.038187323597126004,
-    "PAK" =>0.14459339999999998,
-    "REU" =>0.016428364828341,
-    "RUS" =>0.010917238553798001,
-    "RWA" =>0.016428364828341,
-    "SEN" =>0.038187323597126004,
-    "SLE" =>0.038187323597126004,
-    "SOM" =>0.016428364828341,
-    "SSD" =>0.016428364828341,
-    "SYC" =>0.016428364828341,
-    "TGO" =>0.038187323597126004,
-    "TUR" =>0.01530099252737,
-    "TZA" =>0.016428364828341,
-    "UGA" =>0.016428364828341,
-    "USA" =>0.878817040828552,
-    "ZAF" =>0.0061305764214010005,
-    "WLD" =>0.09870897213609194
-};
 pub const RESIDENTIAL_COOLING_ENERGY: phf::Map<&'static str, f32> = phf_map! {
         "ARG" =>0.013970699999999999,
         "BDI" =>0.01642836,
@@ -980,30 +930,3 @@ pub const RESIDENTIAL_COMMERCIAL_ENERGY: phf::Map<&'static str, f32> = phf_map! 
     "ZWE" =>0.30095000000000005,
     "WLD" =>1.8298821841201598
 };
-
-pub fn get_building_type_energy_consumption(building_type: &str, country: &str) -> &'static f32 {
-    match building_type {
-        "Residential buildings" => RESIDENTIAL_COOLING_ENERGY.get(country).unwrap_or(&0.0),
-        "Commercial buildings" => COMMERCIAL_COOLING_ENERGY.get(country).unwrap_or(&0.0),
-        "Industrial buildings" => INDUSTRIAL_COOLING_ENERGY.get(country).unwrap_or(&0.0),
-        _ => RESIDENTIAL_COMMERCIAL_COOLING_ENERGY
-            .get(country)
-            .unwrap_or(&0.0),
-    }
-}
-
-pub fn get_building_type_energy_price(building_type: &str, country: &str) -> &'static f32 {
-    match building_type {
-        "Residential buildings" => RESIDENTIAL_ENERGY_PRICE.get(country).unwrap_or(&0.0),
-        "Industrial buildings" => INDUSTRIAL_ENERGY_PRICE.get(country).unwrap_or(&0.0),
-        _ => RESIDENTIAL_ENERGY_PRICE.get(country).unwrap_or(&0.0),
-    }
-}
-
-pub fn get_building_type_energy(building_type: &str, country: &str) -> &'static f32 {
-    match building_type {
-        "Residential buildings" => RESIDENTIAL_COMMERCIAL_ENERGY.get(country).unwrap_or(&0.0),
-        "Industrial buildings" => INDUSTRIAL_ENERGY.get(country).unwrap_or(&0.0),
-        _ => RESIDENTIAL_COMMERCIAL_ENERGY.get(country).unwrap_or(&0.0),
-    }
-}

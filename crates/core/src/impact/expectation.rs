@@ -105,7 +105,7 @@ pub struct Expectation {
     pub normalization_factor: Option<f64>,
 }
 
-pub(crate) fn expected_value(
+pub(crate) fn expectation(
     model: &Model,
     clamp: &Clamp,
     source: &ImpactSource,

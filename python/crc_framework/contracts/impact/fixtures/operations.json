@@ -22,7 +22,7 @@
       "coverage": "require_full"
     }
   },
-  "expected_value": [
+  "expectation": [
     {
       "definition": {
         "schema_version": "1.0",
@@ -1007,7 +1007,7 @@
       "derivation": "tolerance unreachable within one 15-point rule"
     }
   ],
-  "transform_distribution": [
+  "pushforward": [
     {
       "definition": {
         "schema_version": "1.0",

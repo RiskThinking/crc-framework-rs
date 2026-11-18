@@ -112,9 +112,8 @@ CYCLONE_ORIGIN = {
     "factor": "cyclone",
     "context": {"country": "PHL"},
     "overrides": {"maximum_damage": 0.8},
-    "fallback_policy": "error",
     "lookups": [
-        {"table_id": "wind.cyclone_params", "table_sha256": DIGEST_B, "requested_key": "PHL", "resolved_key": "PHL", "status": "exact"}
+        {"table_id": "wind.cyclone_params", "table_sha256": DIGEST_B, "key": "PHL"}
     ],
 }
 
@@ -214,8 +213,8 @@ def definition_cases() -> Dict[str, List[Dict[str, Any]]]:
     ok("snapshot-crop", "Crop registry snapshot model; weights are not renormalized.", CROP_SNAPSHOT)
     ok("snapshot-cyclone-registry-origin", "Registry origin trace with exact f32-widened coefficients.", CYCLONE_SNAPSHOT)
     ok(
-        "origin-registry-legacy-fallback",
-        "Registry origin with composite lookup keys, a recorded fallback, a null override and full context.",
+        "origin-registry-h3-key",
+        "Registry origin with a normalized H3 key, a null override and explicit context.",
         definition(
             {"kind": "sigmoid", "midpoint": 682.5, "steepness": 0.007, "origin_adjustment": "subtract_at_zero"},
             calibration={"exposure_variable": "rx1day", "exposure_unit": "mm/day", "impact_metric": "damage_ratio", "impact_unit": "1"},
@@ -229,14 +228,11 @@ def definition_cases() -> Dict[str, List[Dict[str, Any]]]:
                     "factor": "rx1day",
                     "context": {"cell": H3_CELL, "country": None, "continent": None, "building_type": None, "historic_mean": None},
                     "overrides": {"zero_below": None, "steepness": 0.007},
-                    "fallback_policy": "legacy_defaults",
                     "lookups": [
                         {
                             "table_id": "precipitation.rx1day_threshold",
                             "table_sha256": DIGEST_A,
-                            "requested_key": {"h3_resolution": "4", "cell": "0842a107fffffff"},
-                            "resolved_key": "global_default",
-                            "status": "fallback",
+                            "key": {"h3_resolution": "4", "cell": "842a107ffffffff"},
                         }
                     ],
                 }
@@ -337,7 +333,7 @@ def definition_cases() -> Dict[str, List[Dict[str, Any]]]:
     bad("unknown-calibration-field", "Unknown calibration field.", mutate(lambda d: d["calibration"].update(currency="USD")), "unknown_field", "/calibration/currency")
     bad("unknown-model-field", "Legacy linear minimum is not a model field.", mutate(lambda d: d["model"].update(minimum=0.0)), "unknown_field", "/model/minimum")
     bad(
-        "unknown-sigmoid-legacy-boolean",
+        "unknown-sigmoid-property",
         "The ambiguous adjust_at_zero boolean is not accepted.",
         definition({"kind": "sigmoid", "midpoint": 1.0, "steepness": 1.0, "adjust_at_zero": True}),
         "unknown_field",
@@ -452,7 +448,7 @@ def definition_cases() -> Dict[str, List[Dict[str, Any]]]:
     bad("registry-cell-padded", "Persisted H3 cells never carry a leading zero.", registry(lambda o: o.update(context={"cell": "0" + H3_CELL})), "invalid_value", "/provenance/origin/context/cell")
     bad("registry-cell-short", "Persisted H3 cells have exactly 15 characters.", registry(lambda o: o.update(context={"cell": H3_CELL[1:]})), "invalid_value", "/provenance/origin/context/cell")
     bad("registry-cell-non-hex", "Persisted H3 cells are hexadecimal.", registry(lambda o: o.update(context={"cell": H3_CELL[:-1] + "g"})), "invalid_value", "/provenance/origin/context/cell")
-    bad("registry-fallback-under-error", "Fallback lookups require legacy_defaults.", registry(lambda o: o["lookups"][0].update(status="fallback")), "invalid_value", "/provenance/origin/lookups/0/status")
+    bad("registry-empty-lookup-key", "Composite lookup keys name their fields.", registry(lambda o: o["lookups"][0].update(key={})), "invalid_value", "/provenance/origin/lookups/0/key")
     bad("registry-missing-lookups", "The resolution trace is complete.", registry(lambda o: o.pop("lookups")), "missing_field", "/provenance/origin/lookups")
     bad("registry-unknown-context-field", "Unknown context field.", registry(lambda o: o.update(context={"region": "x"})), "unknown_field", "/provenance/origin/context/region")
     return {"accepted": accepted, "rejected": rejected}
@@ -479,20 +475,14 @@ def reference_cases() -> Dict[str, List[Dict[str, Any]]]:
         return dumps(value)
 
     accepted = [
-        accept(n, "minimal", "Required members only; overrides, context defaults and fallback policy materialize.", dumps(REFERENCE)),
+        accept(n, "minimal", "Required members only; omitted overrides normalize to an empty object.", dumps(REFERENCE)),
         accept(n, "override-omitted", "Omitted zero_below uses the pinned registry default.", with_(overrides={"maximum_damage": 0.8})),
         accept(n, "override-null", "Explicit null clears zero_below; distinct identity from override-omitted.", with_(overrides={"maximum_damage": 0.8, "zero_below": None})),
         accept(n, "sigmoid-overrides", "Every sigmoid override key.", with_(factor="fwi", overrides={"midpoint": 30, "steepness": 0.25, "minimum_damage": 0.05, "maximum_damage": 0.95, "zero_below": 5.0})),
-        accept(n, "spei-override", "SPEI water unit cost override.", with_(factor="spei", overrides={"water_unit_cost": 3.1}, context_defaults={"country": "CAN", "building_type": "Commercial buildings"})),
-        accept(
-            n,
-            "context-defaults-legacy",
-            "Context defaults and explicit legacy fallbacks.",
-            with_(factor="cflood", overrides={"maximum_damage": 2}, context_defaults={"continent": "Europe", "building_type": "Residential buildings"}, fallback_policy="legacy_defaults"),
-        ),
+        accept(n, "spei-override", "SPEI water unit cost override.", with_(factor="spei", overrides={"water_unit_cost": 3.1})),
         accept(n, "hot-days-null-clamp", "Hot-days clamps are nullable overrides.", with_(factor="hot_days", overrides={"minimum_damage": None, "maximum_damage": 0.25, "slope": 0.0002, "intercept": -0.01})),
         accept(n, "cooling-branch-override", "Factor-level acceptance; branch applicability is checked after context resolution.", with_(factor="cooling_degree_days", overrides={"cooling_cost": 1.5e7})),
-        accept(n, "no-override-factor", "maximum_consecutive_dry_days accepts no overrides.", with_(factor="maximum_consecutive_dry_days", context_defaults={"cell": H3_CELL, "historic_mean": 12.5})),
+        accept(n, "no-override-factor", "maximum_consecutive_dry_days accepts no overrides.", with_(factor="maximum_consecutive_dry_days")),
     ]
     rejected = [
         reject(n, "missing-manifest", "References pin the manifest digest.", dumps({k: v for k, v in REFERENCE.items() if k != "registry_manifest_sha256"}), "missing_field", "/registry_manifest_sha256"),
@@ -505,10 +495,9 @@ def reference_cases() -> Dict[str, List[Dict[str, Any]]]:
         reject(n, "string-override", "Override values are numbers.", with_(overrides={"midpoint": "70"}), "invalid_type", "/overrides/midpoint"),
         reject(n, "schema-version", "Unsupported reference schema.", with_(schema_version="2.0"), "unsupported_schema_version", "/schema_version"),
         reject(n, "resolver-version", "Unsupported resolver semantics.", with_(resolver_semantics_version="latest"), "unsupported_semantics_version", "/resolver_semantics_version"),
-        reject(n, "fallback-policy", "Unknown fallback policy.", with_(fallback_policy="nearest"), "unsupported_value", "/fallback_policy"),
+        reject(n, "unexpected-policy", "References have no lookup policy field.", with_(fallback_policy="error"), "unknown_field", "/fallback_policy"),
         reject(n, "unknown-factor", "Unknown factor.", with_(factor="heatwave"), "unsupported_value", "/factor"),
-        reject(n, "context-null-defaults", "Context defaults are an object, not null.", with_(context_defaults=None), "invalid_type", "/context_defaults"),
-        reject(n, "context-empty-country", "Textual context members are non-empty.", with_(context_defaults={"country": ""}), "invalid_value", "/context_defaults/country"),
+        reject(n, "unexpected-context", "Context is passed when a reference is resolved.", with_(context_defaults={}), "unknown_field", "/context_defaults"),
         reject(n, "manifest-digest-prefixed", "Manifest digests are bare hex.", with_(registry_manifest_sha256="sha256:" + MANIFEST), "invalid_value", "/registry_manifest_sha256"),
     ]
     return {"accepted": accepted, "rejected": rejected}
@@ -598,7 +587,7 @@ def record_cases() -> Dict[str, List[Dict[str, Any]]]:
             dumps(
                 record(
                     function={"kind": "definition", "definition_hash": _definition_hash(definition({"kind": "binned", "bin_edges": [0.0, 0.1, 0.5, 1.5, 4.0], "values": [0.0, 0.05, 0.35, 0.9]}, calibration=FLOOD))},
-                    operation={"kind": "expected_value", "settings": {"requested_method": "auto", "method": {"kind": "exact", "version": "crc-exact-piecewise/1"}}},
+                    operation={"kind": "expectation", "settings": {"requested_method": "auto", "method": {"kind": "exact", "version": "crc-exact-piecewise/1"}}},
                     source={"kind": "histogram", "interval_count": 4, "within_bin": "uniform", "original_mass_sum": 1.0000000000002, "normalization_factor": 1 / 1.0000000000002, "snapshot": SNAPSHOT},
                     diagnostics={"exactness": "exact", "estimated_error": 0.0, "evaluations": 0, "components": [{"kind": "exact", "value": 0.1275}]},
                 )
@@ -610,7 +599,7 @@ def record_cases() -> Dict[str, List[Dict[str, Any]]]:
             "Auto request resolved to Gauss-Kronrod with every effective default.",
             dumps(
                 record(
-                    operation={"kind": "expected_value", "settings": {"requested_method": "auto", "method": gk}},
+                    operation={"kind": "expectation", "settings": {"requested_method": "auto", "method": gk}},
                     source={"kind": "canonical_distribution", "parameters": {"curve_kind": "fitted", "curve_type": "gumbel_r", "curve_location": 1.0, "curve_scale": 0.8}, "snapshot": SNAPSHOT},
                     engine={**ENGINE, "numerical_methods": {"quadrature": "crc-gk15/1", "point": "crc-impact/1"}},
                     diagnostics={"exactness": "numerical", "estimated_error": 3.2e-12, "evaluations": 465, "components": [{"kind": "numerical", "value": 2.92354, "estimated_error": 3.2e-12, "evaluations": 465}]},
@@ -624,7 +613,7 @@ def record_cases() -> Dict[str, List[Dict[str, Any]]]:
             dumps(
                 record(
                     function={"kind": "definition", "definition_hash": _definition_hash(CYCLONE_SNAPSHOT)},
-                    operation={"kind": "transform_distribution", "settings": {"algorithm": "crc-pushforward/1"}},
+                    operation={"kind": "pushforward", "settings": {"algorithm": "crc-pushforward/1"}},
                     source={"kind": "canonical_distribution", "parameters": {"curve_kind": "tabulated", "curve_type": "linear_probability", "curve_probabilities": [0.0, 1.0], "curve_values": [0.0, 10.0]}, "snapshot": SNAPSHOT},
                     resolution={"reference_hash": reference_hash, "context": {"country": "PHL"}, "context_hash": ref.content_hash(REFERENCE_CONTEXT)},
                     diagnostics={"exactness": "exact"},
@@ -681,7 +670,7 @@ def record_cases() -> Dict[str, List[Dict[str, Any]]]:
             "Canonical distribution with shape, digest and selection but no retained snapshot.",
             dumps(
                 record(
-                    operation={"kind": "expected_value", "settings": {"requested_method": "gauss_kronrod", "method": gk}},
+                    operation={"kind": "expectation", "settings": {"requested_method": "gauss_kronrod", "method": gk}},
                     source={
                         "kind": "canonical_distribution",
                         "parameters": {"curve_kind": "hurdle", "curve_type": "genextreme", "curve_shape": -0.1, "curve_location": 1.0, "curve_scale": 0.5, "curve_atom_probability": 0.2, "curve_atom_location": 0.0},
@@ -699,7 +688,7 @@ def record_cases() -> Dict[str, List[Dict[str, Any]]]:
             "Histogram with digest and selection but no retained snapshot.",
             dumps(
                 record(
-                    operation={"kind": "expected_value", "settings": {"requested_method": "exact", "method": {"kind": "exact", "version": "crc-exact-piecewise/1"}}},
+                    operation={"kind": "expectation", "settings": {"requested_method": "exact", "method": {"kind": "exact", "version": "crc-exact-piecewise/1"}}},
                     source={"kind": "histogram", "interval_count": 2, "within_bin": "uniform", "original_mass_sum": 1, "normalization_factor": 1, "content_digest": {"encoding": "crc-histogram/1", "sha256": DIGEST_A}, "selection": {"rows": "region = 'EU'"}},
                     diagnostics={"exactness": "exact"},
                     replay={"status": "missing_source_snapshot", "missing_requirements": ["source_snapshot"]},
@@ -714,7 +703,7 @@ def record_cases() -> Dict[str, List[Dict[str, Any]]]:
         accepted.append(accept(n, "curve-family-" + family, "A reconstructible canonical fitted source.", dumps(curve_record(curve_type=family, curve_shape=shape))))
     rejected = [
         reject(n, "shape-u64-overflow", "Integer metadata must fit the declared Rust u64.", dumps(record(source={"kind": "point_array", "shape": [ref.U64_MAX + 1], "snapshot": SNAPSHOT})), "invalid_value", "/source/shape/0"),
-        reject(n, "evaluations-u64-overflow", "Integration budgets must fit the declared Rust u64.", dumps(record(operation={"kind": "expected_value", "settings": {"requested_method": "auto", "method": {**gk, "max_evaluations": ref.U64_MAX + 1}}})), "invalid_value", "/operation/settings/method/max_evaluations"),
+        reject(n, "evaluations-u64-overflow", "Integration budgets must fit the declared Rust u64.", dumps(record(operation={"kind": "expectation", "settings": {"requested_method": "auto", "method": {**gk, "max_evaluations": ref.U64_MAX + 1}}})), "invalid_value", "/operation/settings/method/max_evaluations"),
         reject(n, "curve-negative-scale", "Source curves require a positive fitted scale.", dumps(curve_record(curve_scale=-1.0)), "invalid_value", "/source/parameters/curve_scale"),
         reject(n, "curve-missing-location", "A fitted source requires its location.", dumps(curve_record(curve_location=None)), "invalid_value", "/source/parameters/curve_location"),
         reject(n, "curve-unknown-kind", "Arbitrary curve kinds cannot claim complete replay.", dumps(curve_record(curve_kind="invented")), "unsupported_value", "/source/parameters/curve_kind"),
@@ -734,11 +723,11 @@ def record_cases() -> Dict[str, List[Dict[str, Any]]]:
         reject(n, "complete-without-snapshot", "Hashing alone does not retain data.", dumps(record(source={"kind": "point_array", "shape": [2]})), "invalid_value", "/replay/status"),
         reject(n, "duplicate-requirement", "Requirements are duplicate-free.", dumps(record(replay={"status": "missing_source_snapshot", "missing_requirements": ["source_snapshot", "source_snapshot"]})), "duplicate_identifier", "/replay/missing_requirements/1"),
         reject(n, "unknown-requirement", "Requirements come from the closed list.", dumps(record(replay={"status": "missing_source_snapshot", "missing_requirements": ["source_snapshot", "luck"]})), "unsupported_value", "/replay/missing_requirements/1"),
-        reject(n, "method-contradiction", "An explicit request equals the resolved method.", dumps(record(operation={"kind": "expected_value", "settings": {"requested_method": "exact", "method": gk}})), "invalid_value", "/operation/settings/method"),
-        reject(n, "unresolved-auto", "Records store the resolved method, not only auto.", dumps(record(operation={"kind": "expected_value", "settings": {"requested_method": "auto", "method": {"kind": "auto"}}})), "unsupported_kind", "/operation/settings/method/kind"),
-        reject(n, "fractional-evaluations", "Integer fields reject fractional spellings.", dumps(record(operation={"kind": "expected_value", "settings": {"requested_method": "auto", "method": {**gk, "max_evaluations": 1.5}}})), "invalid_type", "/operation/settings/method/max_evaluations"),
-        reject(n, "integral-float-evaluations", "Integer fields reject float spellings.", dumps(record(operation={"kind": "expected_value", "settings": {"requested_method": "auto", "method": {**gk, "max_evaluations": 100000.0}}})), "invalid_type", "/operation/settings/method/max_evaluations"),
-        reject(n, "zero-evaluations", "Maximum evaluations is positive.", dumps(record(operation={"kind": "expected_value", "settings": {"requested_method": "auto", "method": {**gk, "max_evaluations": 0}}})), "invalid_value", "/operation/settings/method/max_evaluations"),
+        reject(n, "method-contradiction", "An explicit request equals the resolved method.", dumps(record(operation={"kind": "expectation", "settings": {"requested_method": "exact", "method": gk}})), "invalid_value", "/operation/settings/method"),
+        reject(n, "unresolved-auto", "Records store the resolved method, not only auto.", dumps(record(operation={"kind": "expectation", "settings": {"requested_method": "auto", "method": {"kind": "auto"}}})), "unsupported_kind", "/operation/settings/method/kind"),
+        reject(n, "fractional-evaluations", "Integer fields reject fractional spellings.", dumps(record(operation={"kind": "expectation", "settings": {"requested_method": "auto", "method": {**gk, "max_evaluations": 1.5}}})), "invalid_type", "/operation/settings/method/max_evaluations"),
+        reject(n, "integral-float-evaluations", "Integer fields reject float spellings.", dumps(record(operation={"kind": "expectation", "settings": {"requested_method": "auto", "method": {**gk, "max_evaluations": 100000.0}}})), "invalid_type", "/operation/settings/method/max_evaluations"),
+        reject(n, "zero-evaluations", "Maximum evaluations is positive.", dumps(record(operation={"kind": "expectation", "settings": {"requested_method": "auto", "method": {**gk, "max_evaluations": 0}}})), "invalid_value", "/operation/settings/method/max_evaluations"),
         reject(n, "tabulate-not-approximate", "Tabulation is always approximate.", dumps(record(operation={"kind": "tabulate", "settings": {"probabilities": [0.5], "interpolation": "linear_probability", "approximate": False}})), "invalid_value", "/operation/settings/approximate"),
         reject(n, "tabulate-unsorted", "Tabulation grids strictly increase.", dumps(record(operation={"kind": "tabulate", "settings": {"probabilities": [0.5, 0.1], "interpolation": "linear_probability", "approximate": True}})), "invalid_value", "/operation/settings/probabilities/1"),
         reject(n, "tabulate-no-interpolation", "Tabulation requires an interpolation choice.", dumps(record(operation={"kind": "tabulate", "settings": {"probabilities": [0.5], "approximate": True}})), "missing_field", "/operation/settings/interpolation"),
@@ -889,10 +878,10 @@ def semantics_constants() -> List[Dict[str, Any]]:
         {"id": "quadrature-relative-tolerance", "value": 1e-8, "owner": "expectation", "fixtures": ["operation:linear-gumbel-mean"]},
         {"id": "resolver-semantics-version", "value": "crc-impact-registry/1", "owner": "RegistryImpactReference", "fixtures": ["registry-reference:minimal"]},
         {"id": "spatial-semantics-version", "value": "crc-spatial-combination/1", "owner": "SpatialCombinationPolicy", "fixtures": ["spatial-policy:plan-example"]},
-        {"id": "h3-wire-length", "value": 15, "owner": "ImpactContext.cell", "fixtures": ["definition:origin-registry-legacy-fallback", "definition:registry-cell-padded", "spatial-record:h3-target-padded"]},
+        {"id": "h3-wire-length", "value": 15, "owner": "ImpactContext.cell", "fixtures": ["definition:origin-registry-h3-key", "definition:registry-cell-padded", "spatial-record:h3-target-padded"]},
         {"id": "spatial-geometry-tolerance", "value": ref.SPATIAL_GEOMETRY_TOLERANCE, "owner": "SpatialImpactEvaluationRecord.geometry", "fixtures": ["spatial-record:overlap", "spatial-record:relaxed-tolerance"]},
         {"id": "native-u64-maximum", "value": ref.U64_MAX, "owner": "integer metadata", "fixtures": ["evaluation-record:u64-max-shape", "evaluation-record:shape-u64-overflow"]},
-        {"id": "override-catalog", "rule": "factor override keys and nullability", "owner": "ImpactRegistry", "fixtures": ["definition:registry-null-override", "registry-reference:no-override-factor"]},
+        {"id": "override-catalog", "rule": "factor override keys and nullability", "owner": "RegistryImpactReference", "fixtures": ["definition:registry-null-override", "registry-reference:no-override-factor"]},
     ]
 
 
@@ -1193,7 +1182,7 @@ def operation_cases() -> Dict[str, Any]:
     return {
         "description": "Conformance vectors for impact operations. Source encodings here are fixture inputs, not persisted contracts. resolved_method 'any' accepts exact or numerical paths within tolerance.",
         "policies": policies,
-        "expected_value": expectations,
-        "transform_distribution": transforms,
+        "expectation": expectations,
+        "pushforward": transforms,
         "spatial_combination": spatial,
     }
