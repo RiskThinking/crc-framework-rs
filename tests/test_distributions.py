@@ -866,3 +866,52 @@ def test_distribution_cvar_skips_fully_excluded_rare_atom() -> None:
     law = Distribution.discrete([-1e308, 1], [1e-20, 1.0])
     value = law.statistics(metrics=[Statistic.CVAR], level=1e-20)
     assert value.values[Statistic.CVAR].value == 1
+
+
+@pytest.mark.parametrize("half", [6, 9])
+def test_empirical_rank_at_gap_uses_lower_quantile(half: int) -> None:
+    gap = 1_000_000
+    law = Distribution.empirical([*range(half), *range(gap, gap + half)])
+    assert law.cdf(half - 1) == law.exceedance(half - 1) == 0.5
+    assert law.quantile(0.5) == law._inverse_survival(0.5) == half - 1
+    assert law.quantile(math.nextafter(0.5, 1)) == gap
+    assert law._inverse_survival(math.nextafter(0.5, 0)) == gap
+
+
+def test_empirical_ninetieth_percentile_at_gap() -> None:
+    law = Distribution.empirical([*range(9), 1_000_000])
+    assert law.cdf(8) == 0.9
+    assert law.quantile(0.9) == 8
+
+
+def test_histogram_rank_at_gap_uses_lower_quantile() -> None:
+    gap = 1_000_000
+    law = Distribution.histogram(
+        [*range(7), *range(gap, gap + 7)], [1 / 12] * 6 + [0] + [1 / 12] * 6
+    )
+    assert law.cdf(6) == law.exceedance(6) == 0.5
+    assert law.quantile(0.5) == law._inverse_survival(0.5) == 6
+    assert law.quantile(math.nextafter(0.5, 1)) >= gap
+    assert law._inverse_survival(math.nextafter(0.5, 0)) >= gap
+    reflected = Impact.linear(slope=-1, input=Ratio(), output=Ratio()).pushforward(law)
+    assert reflected.quantile(0.5) == -gap
+    assert reflected._inverse_survival(0.5) == -gap
+
+
+@pytest.mark.parametrize(
+    "family,shape,location,q,endpoint",
+    [
+        (DistributionFamily.GENERALIZED_EXTREME_VALUE, 0.5, -1e308, 1, 1e308),
+        (DistributionFamily.GENERALIZED_EXTREME_VALUE, -0.5, 1e308, 0, -1e308),
+        (DistributionFamily.GENERALIZED_PARETO, -0.5, -1e308, 1, 1e308),
+    ],
+)
+def test_finite_endpoint_after_scale_shape_quotient_overflows(
+    family: DistributionFamily, shape: float, location: float, q: int, endpoint: float
+) -> None:
+    law = Distribution.parametric(family, location=location, scale=1e308, shape=shape)
+    assert law.support[q] == law.quantile(q) == law._inverse_survival(1 - q) == endpoint
+    assert law.cdf(endpoint) == q
+
+    half = Impact.linear(slope=0.5, input=Ratio(), output=Ratio()).pushforward(law)
+    assert half.support[q] == half.quantile(q) == endpoint / 2

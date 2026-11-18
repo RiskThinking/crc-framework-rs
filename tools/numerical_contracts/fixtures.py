@@ -44,12 +44,41 @@ def build():
                 Distribution.parametric(family, location=1.2, scale=2, shape=shape),
             )
         )
+    for name, family, location, shape in [
+        ("gev-upper", DistributionFamily.GENERALIZED_EXTREME_VALUE, -1e308, 0.5),
+        ("gev-lower", DistributionFamily.GENERALIZED_EXTREME_VALUE, 1e308, -0.5),
+        ("pareto-upper", DistributionFamily.GENERALIZED_PARETO, -1e308, -0.5),
+    ]:
+        objects.append(
+            (
+                f"finite-{name}-endpoint",
+                Distribution.parametric(
+                    family, location=location, scale=1e308, shape=shape
+                ),
+            )
+        )
+    gap = 1_000_000
+    gapped_histogram = Distribution.histogram(
+        [*range(7), *range(gap, gap + 7)], [1 / 12] * 6 + [0] + [1 / 12] * 6
+    )
     objects.extend(
         [
             ("point", Distribution.point_mass(-0.0)),
             ("empirical", Distribution.empirical([0, 0, 2, 10])),
+            (
+                "empirical-median-at-gap",
+                Distribution.empirical([*range(6), *range(gap, gap + 6)]),
+            ),
+            ("empirical-p90-at-gap", Distribution.empirical([*range(9), gap])),
             ("discrete", Distribution.discrete([0, 1e6], [0.999999, 0.000001])),
             ("histogram", Distribution.histogram([0, 1, 2, 3], [0.5, 0, 0.5])),
+            ("histogram-median-at-gap", gapped_histogram),
+            (
+                "reflected-histogram-median-at-gap",
+                Impact.linear(slope=-1, input=Ratio(), output=Ratio()).pushforward(
+                    gapped_histogram
+                ),
+            ),
             ("partial", QuantileCurve([0.9, 0.99], [0.5, 2])),
             ("plateau", QuantileCurve([0, 0.2, 0.5, 0.9, 1], [0, 1, 1, 8, 10])),
             (
@@ -303,6 +332,8 @@ def build():
         coordinates = [0, 0.1, 0.5, 0.9, 0.99, 1]
         if name in ("discrete-hurdle", "transformed-histogram-hurdle"):
             coordinates[2:2] = [0.2, math.nextafter(0.2, 1.0)]
+        if name.endswith("median-at-gap"):
+            coordinates[2:3] = [math.nextafter(0.5, 0), 0.5, math.nextafter(0.5, 1)]
         if name == "subnormal-probability-curve":
             coordinates = [0, tiny_probability / 2, tiny_probability, 0.1]
         if name.startswith("deep-"):

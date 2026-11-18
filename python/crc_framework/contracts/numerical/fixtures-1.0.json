@@ -266,6 +266,120 @@
       ]
     },
     {
+      "name": "finite-gev-upper-endpoint",
+      "document": {
+        "family": "genextreme",
+        "kind": "parametric",
+        "location": -1e+308,
+        "object": "distribution",
+        "scale": 1e+308,
+        "schema_version": "1.0",
+        "shape": 0.5
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.1,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.5,
+          "value": -6.651092223153956e+307
+        },
+        {
+          "probability": 0.9,
+          "value": 3.508143080509976e+307
+        },
+        {
+          "probability": 0.99,
+          "value": 7.994972733003219e+307
+        },
+        {
+          "probability": 1,
+          "value": 1e+308
+        }
+      ]
+    },
+    {
+      "name": "finite-gev-lower-endpoint",
+      "document": {
+        "family": "genextreme",
+        "kind": "parametric",
+        "location": 1e+308,
+        "object": "distribution",
+        "scale": 1e+308,
+        "schema_version": "1.0",
+        "shape": -0.5
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -1e+308
+        },
+        {
+          "probability": 0.1,
+          "value": 3.1802045796452164e+307
+        },
+        {
+          "probability": 0.5,
+          "value": 1.4022448175728995e+308
+        },
+        {
+          "probability": 0.9,
+          "outcome": "positive_infinity"
+        },
+        {
+          "probability": 0.99,
+          "outcome": "positive_infinity"
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "finite-pareto-upper-endpoint",
+      "document": {
+        "family": "genpareto",
+        "kind": "parametric",
+        "location": -1e+308,
+        "object": "distribution",
+        "scale": 1e+308,
+        "schema_version": "1.0",
+        "shape": -0.5
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -1e+308
+        },
+        {
+          "probability": 0.1,
+          "value": -8.973665961010276e+307
+        },
+        {
+          "probability": 0.5,
+          "value": -4.14213562373095e+307
+        },
+        {
+          "probability": 0.9,
+          "value": 3.675444679663242e+307
+        },
+        {
+          "probability": 0.99,
+          "value": 7.999999999999998e+307
+        },
+        {
+          "probability": 1,
+          "value": 1e+308
+        }
+      ]
+    },
+    {
       "name": "point",
       "document": {
         "kind": "point_mass",
@@ -341,6 +455,134 @@
         {
           "probability": 1,
           "value": 10.0
+        }
+      ]
+    },
+    {
+      "name": "empirical-median-at-gap",
+      "document": {
+        "kind": "discrete",
+        "object": "distribution",
+        "probabilities": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333
+        ],
+        "schema_version": "1.0",
+        "values": [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          1000000.0,
+          1000001.0,
+          1000002.0,
+          1000003.0,
+          1000004.0,
+          1000005.0
+        ]
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 0.1,
+          "value": 1.0
+        },
+        {
+          "probability": 0.49999999999999994,
+          "value": 5.0
+        },
+        {
+          "probability": 0.5,
+          "value": 5.0
+        },
+        {
+          "probability": 0.5000000000000001,
+          "value": 1000000.0
+        },
+        {
+          "probability": 0.9,
+          "value": 1000004.0
+        },
+        {
+          "probability": 0.99,
+          "value": 1000005.0
+        },
+        {
+          "probability": 1,
+          "value": 1000005.0
+        }
+      ]
+    },
+    {
+      "name": "empirical-p90-at-gap",
+      "document": {
+        "kind": "discrete",
+        "object": "distribution",
+        "probabilities": [
+          0.1,
+          0.1,
+          0.1,
+          0.1,
+          0.1,
+          0.1,
+          0.1,
+          0.1,
+          0.1,
+          0.1
+        ],
+        "schema_version": "1.0",
+        "values": [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          1000000.0
+        ]
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 0.1,
+          "value": 0.0
+        },
+        {
+          "probability": 0.5,
+          "value": 4.0
+        },
+        {
+          "probability": 0.9,
+          "value": 8.0
+        },
+        {
+          "probability": 0.99,
+          "value": 1000000.0
+        },
+        {
+          "probability": 1,
+          "value": 1000000.0
         }
       ]
     },
@@ -428,6 +670,173 @@
         {
           "probability": 1,
           "value": 3.0
+        }
+      ]
+    },
+    {
+      "name": "histogram-median-at-gap",
+      "document": {
+        "edges": [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          1000000.0,
+          1000001.0,
+          1000002.0,
+          1000003.0,
+          1000004.0,
+          1000005.0,
+          1000006.0
+        ],
+        "kind": "histogram",
+        "object": "distribution",
+        "probabilities": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.0,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333
+        ],
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 0.1,
+          "value": 1.2000000000000002
+        },
+        {
+          "probability": 0.49999999999999994,
+          "value": 5.999999999999999
+        },
+        {
+          "probability": 0.5,
+          "value": 6.0
+        },
+        {
+          "probability": 0.5000000000000001,
+          "value": 1000000.0
+        },
+        {
+          "probability": 0.9,
+          "value": 1000004.8
+        },
+        {
+          "probability": 0.99,
+          "value": 1000005.88
+        },
+        {
+          "probability": 1,
+          "value": 1000006.0
+        }
+      ]
+    },
+    {
+      "name": "reflected-histogram-median-at-gap",
+      "document": {
+        "impact": {
+          "input": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "model": {
+            "intercept": 0,
+            "kind": "linear",
+            "slope": -1
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "edges": [
+            0.0,
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            1000000.0,
+            1000001.0,
+            1000002.0,
+            1000003.0,
+            1000004.0,
+            1000005.0,
+            1000006.0
+          ],
+          "kind": "histogram",
+          "object": "distribution",
+          "probabilities": [
+            0.08333333333333333,
+            0.08333333333333333,
+            0.08333333333333333,
+            0.08333333333333333,
+            0.08333333333333333,
+            0.08333333333333333,
+            0.0,
+            0.08333333333333333,
+            0.08333333333333333,
+            0.08333333333333333,
+            0.08333333333333333,
+            0.08333333333333333,
+            0.08333333333333333
+          ],
+          "schema_version": "1.0"
+        }
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -1000006.0
+        },
+        {
+          "probability": 0.1,
+          "value": -1000004.8
+        },
+        {
+          "probability": 0.49999999999999994,
+          "value": -1000000.0
+        },
+        {
+          "probability": 0.5,
+          "value": -1000000.0
+        },
+        {
+          "probability": 0.5000000000000001,
+          "value": -5.999999999999998
+        },
+        {
+          "probability": 0.9,
+          "value": -1.1999999999999988
+        },
+        {
+          "probability": 0.99,
+          "value": -0.11999999999999966
+        },
+        {
+          "probability": 1,
+          "value": 0.0
         }
       ]
     },

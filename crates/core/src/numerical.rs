@@ -99,7 +99,7 @@ pub(crate) fn interval_fraction(lo: f64, hi: f64, a: f64, b: f64) -> f64 {
     }
 }
 
-fn cumulative(probabilities: &[f64]) -> Result<Vec<f64>> {
+fn cumulative(probabilities: &mut [f64]) -> Result<Vec<f64>> {
     if probabilities.is_empty() || probabilities.iter().any(|p| !p.is_finite() || *p < 0.0) {
         return Err(invalid("probabilities must be finite non-negative masses"));
     }
@@ -107,9 +107,13 @@ fn cumulative(probabilities: &[f64]) -> Result<Vec<f64>> {
     if (sum - 1.0).abs() > 1e-12 {
         return Err(invalid("probability mass must sum to one"));
     }
-    let mut result = vec![0.0];
+    let mut result = Vec::with_capacity(probabilities.len() + 1);
+    let mut prefix = CompensatedSum::default();
+    result.push(0.0);
     for p in probabilities {
-        result.push(result.last().unwrap() + p / sum);
+        *p /= sum;
+        prefix.add(*p);
+        result.push(prefix.total().min(1.0));
     }
     *result.last_mut().unwrap() = 1.0;
     Ok(result)
@@ -419,13 +423,17 @@ pub(crate) fn segment_quantile(segments: &[ProbabilitySegment], q: f64, upper: b
     if q == 1.0 {
         return segments.last().unwrap().1;
     }
-    let mut left = 0.0;
+    let mut prefix = CompensatedSum::default();
     for &(a, b, mass) in segments {
-        let right = left + mass;
-        if q < right || !upper && q == right {
+        let left = prefix.total();
+        prefix.add(mass);
+        let right = prefix.total();
+        if !upper && q == right {
+            return b;
+        }
+        if q < right {
             return linear_interpolate(a, b, ((q - left) / mass).clamp(0.0, 1.0));
         }
-        left = right;
     }
     segments.last().unwrap().1
 }
@@ -441,13 +449,17 @@ pub(crate) fn segment_inverse_survival(
     if survival == 1.0 {
         return segments[0].0;
     }
-    let mut right = 0.0;
+    let mut suffix = CompensatedSum::default();
     for &(a, b, mass) in segments.iter().rev() {
-        let left = right + mass;
-        if survival < left || upper && survival == left {
+        let right = suffix.total();
+        suffix.add(mass);
+        let left = suffix.total();
+        if upper && survival == left {
+            return a;
+        }
+        if survival < left {
             return linear_interpolate(b, a, ((survival - right) / mass).clamp(0.0, 1.0));
         }
-        right = left;
     }
     segments[0].0
 }
@@ -592,7 +604,7 @@ impl NumericalLaw {
             }
             Specification::Discrete {
                 values,
-                probabilities,
+                mut probabilities,
             } => {
                 if values.len() != probabilities.len()
                     || values.iter().any(|x| !x.is_finite())
@@ -603,7 +615,7 @@ impl NumericalLaw {
                         "discrete values must increase and have positive probability masses",
                     ));
                 }
-                let cumulative = cumulative(&probabilities)?;
+                let cumulative = cumulative(&mut probabilities)?;
                 Self::Discrete {
                     values,
                     probabilities,
@@ -612,7 +624,7 @@ impl NumericalLaw {
             }
             Specification::Histogram {
                 edges,
-                probabilities,
+                mut probabilities,
             } => {
                 if edges.len() != probabilities.len() + 1
                     || edges.iter().any(|x| !x.is_finite())
@@ -622,7 +634,7 @@ impl NumericalLaw {
                         "histogram requires increasing edges, one more than its masses",
                     ));
                 }
-                let cumulative = cumulative(&probabilities)?;
+                let cumulative = cumulative(&mut probabilities)?;
                 Self::Histogram {
                     edges,
                     probabilities,
@@ -740,19 +752,7 @@ impl NumericalLaw {
 
     pub fn support(&self) -> (f64, f64) {
         match self {
-            Self::Parametric(d) => {
-                let (l, s, c) = (d.location, d.scale, d.shape.unwrap_or(0.0));
-                match d.family {
-                    DistributionFamily::GenExtreme if c > 0.0 => (f64::NEG_INFINITY, l + s / c),
-                    DistributionFamily::GenExtreme if c < 0.0 => (l + s / c, f64::INFINITY),
-                    DistributionFamily::GenPareto => {
-                        (l, if c < 0.0 { l - s / c } else { f64::INFINITY })
-                    }
-                    DistributionFamily::WeibullMin => (l, f64::INFINITY),
-                    DistributionFamily::WeibullMax => (f64::NEG_INFINITY, l),
-                    _ => (f64::NEG_INFINITY, f64::INFINITY),
-                }
-            }
+            Self::Parametric(d) => d.support(),
             Self::PointMass(x) => (*x, *x),
             Self::Discrete { values, .. } | Self::Quantile { values, .. } => {
                 (values[0], *values.last().unwrap())
