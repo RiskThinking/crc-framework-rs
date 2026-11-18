@@ -13,6 +13,7 @@ from crc_framework import (
     DistributionFamily,
     Impact,
     LengthUnit,
+    Measurement,
     QuantileCurve,
     Ratio,
     TailCompletion,
@@ -79,6 +80,14 @@ def build():
     change_measurement = Impact.linear(slope=1, input=depth, output=temperature)
     atomic_temperature = change_measurement.pushforward(Distribution.point_mass(5))
     calibrated = Impact.linear(slope=2, input=temperature, output=Ratio())
+    large_integer = 2**53 + 2
+    custom = Measurement(
+        quantity="custom:depth", unit="m", fields={"value": large_integer}
+    )
+    custom_impact = Impact.linear(slope=1, input=custom, output=custom)
+    custom_chain = custom_impact.pushforward(
+        custom_impact.pushforward(Distribution.point_mass(5))
+    )
     wide_histogram = Distribution.histogram([-1e308, 1e308], [1])
     sigmoid = Impact.sigmoid(midpoint=0, steepness=1, input=Ratio(), output=Ratio())
     clamped_affine = Impact.linear(
@@ -112,6 +121,7 @@ def build():
     objects.extend(
         [
             ("chained-atomic-impacts", calibrated.pushforward(atomic_temperature)),
+            ("equivalent-scientific-numbers", custom_chain),
             ("completed", complete),
             ("conditioned", curve.condition(q_min=0.2, q_max=0.8)),
             ("conditioned-interpolated-endpoints", conditioned),
@@ -256,6 +266,16 @@ def build():
                 decreasing.pushforward(clamped_affine.pushforward(objects[0][1])),
             ),
             (
+                "downscaled-clamped-parametric",
+                Impact.linear(
+                    slope=1e-308, maximum=10, input=Ratio(), output=Ratio()
+                ).pushforward(
+                    Distribution.parametric(
+                        DistributionFamily.GUMBEL_RIGHT, location=1e308, scale=1e308
+                    )
+                ),
+            ),
+            (
                 "composed-piecewise-affine",
                 sigmoid.pushforward(clamped_affine.pushforward(complete)),
             ),
@@ -274,6 +294,8 @@ def build():
             coordinates.insert(1, 1e-20)
         if name == "decreasing-parametric-deep-ranks":
             coordinates[1:1] = [1e-18, 1e-16]
+        if name == "downscaled-clamped-parametric":
+            coordinates.insert(-1, 0.99999)
         if (
             name.startswith("deep-parametric-hurdle")
             or name == "deep-skew-normal-hurdle"
@@ -295,13 +317,20 @@ def build():
             except ValueError:
                 query = {"probability": q, "outcome": "out_of_support"}
             queries.append(query)
-        accepted.append(
-            {"name": name, "document": json.loads(value.to_json()), "queries": queries}
-        )
+        document = json.loads(value.to_json())
+        if name == "equivalent-scientific-numbers":
+            document["impact"]["input"]["fields"]["value"] = float(large_integer)
+        accepted.append({"name": name, "document": document, "queries": queries})
     rejected = []
 
     def bad(name, document, structural=True):
         rejected.append({"name": name, "document": document, "structural": structural})
+
+    for name, alias in (("integer", 2**53), ("decimal", float(2**53))):
+        document = json.loads(custom_chain.to_json())
+        document["source"]["impact"]["output"]["fields"]["value"] = 2**53 + 1
+        document["impact"]["input"]["fields"]["value"] = alias
+        bad(f"scientific-number-rounding-alias-{name}", document, False)
 
     for axis, coordinates in (("probabilities", [False, 0.9]), ("values", [0, True])):
         document = json.loads(QuantileCurve([0.1, 0.9], [0, 1]).to_json())

@@ -453,8 +453,19 @@ class Distribution:
         level = _finite(level, "level")
         if not 0 < level < 1:
             raise ValueError("level must be strictly between zero and one")
-        mean, variance = (
-            self._moments()
+        if self._compound is not None and self._data["atom_probability"] == 0.0:
+            # A compound hurdle whose threshold excludes no mass inherits the
+            # transformed base's exact statistics and divergence statuses.
+            threshold = cast(float, self._data["atom_location"])
+            base_data = cast(dict[str, object], self._data["base"])
+            base = Distribution.from_json(
+                _dump({"schema_version": "1.0", "object": "distribution", **base_data})
+            )
+            lower = base.support[0]
+            if threshold < lower or threshold == lower and base.cdf(threshold) == 0.0:
+                return base.statistics(metrics=metrics, level=level, tail=tail)
+        mean, deviation = (
+            self._mean_deviation()
             if any(
                 m in metrics
                 for m in (
@@ -470,9 +481,9 @@ class Distribution:
             if metric is Statistic.MEAN:
                 value = mean
             elif metric is Statistic.VARIANCE:
-                value = variance
+                value = deviation * deviation
             elif metric is Statistic.STANDARD_DEVIATION:
-                value = math.sqrt(variance) if variance >= 0 else math.nan
+                value = deviation
             elif metric is Statistic.MINIMUM:
                 value = self.support[0]
             elif metric is Statistic.MAXIMUM:
@@ -486,36 +497,64 @@ class Distribution:
             values, level if has_cvar else None, tail if has_cvar else None
         )
 
-    def _moments(self) -> tuple[float, float]:
+    def _mean_deviation(self) -> tuple[float, float]:
         if self._native is not None:
-            return self._native.moments()
+            return self._native.mean_deviation()
         if self._transformed is not None:
-            if (exact := self._transformed.affine_moments()) is not None:
+            if (exact := self._transformed.exact_mean_deviation()) is not None:
                 return exact
             impact, source = self._impact_source()
-            exact = impact._moments(source)
+            exact = impact._mean_deviation(source, self)
             if exact is not None:
                 return exact
         mean = self._integral(0.0, 1.0)
         if not math.isfinite(mean):
             return mean, math.nan
-        return mean, self._integral(0.0, 1.0, center=mean, square=True)
+        return mean, self._deviation(mean)
+
+    def _deviation(self, center: float) -> float:
+        lower, upper = self.support
+        if not math.isfinite(lower):
+            lower = float(self.quantile(0.25))
+        if not math.isfinite(upper):
+            upper = float(self.quantile(0.75))
+        magnitude = max(abs(lower - center), abs(upper - center))
+        # Keep intermediate squares in range before rescaling their square
+        # root. Binary powers introduce no rounding for normal values.
+        if magnitude > 1e150:
+            scale = 2.0**-600
+        elif 0.0 < magnitude < 1e-150:
+            scale = 2.0**600
+        else:
+            scale = 1.0
+        variance = self._integral(0.0, 1.0, center=center, square=True, scale=scale)
+        return math.sqrt(variance) / scale if variance >= 0.0 else math.nan
 
     def _integral(
-        self, lo: float, hi: float, *, center: float = 0.0, square: bool = False
+        self,
+        lo: float,
+        hi: float,
+        *,
+        center: float = 0.0,
+        square: bool = False,
+        survival: bool = False,
+        scale: float = 1.0,
     ) -> float:
+        moment = (center, square, scale)
         if self._native is not None:
-            return self._native.integral(lo, hi, center, square)
+            return self._native.integral(lo, hi, moment, survival)
         if self._compound is not None:
-            return self._compound.hurdle_integral(lo, hi, center, square, False)
+            return self._compound.hurdle_integral(lo, hi, moment, survival)
         # Transformed finite laws retain all exact probability atoms. General
         # transformed laws are integrated adaptively by the native engine.
         assert self._transformed is not None
         impact, source = self._impact_source()
-        exact = impact._integral(source, lo, hi, center=center, square=square)
+        exact = impact._integral(
+            source, lo, hi, center=center, square=square, survival=survival, scale=scale
+        )
         if exact is not None:
             return exact
-        return self._transformed.integral(lo, hi, center, square)
+        return self._transformed.integral(lo, hi, moment, survival)
 
     def _impact_source(self) -> tuple[Impact, Distribution]:
         from ._impacts import Impact
@@ -545,24 +584,6 @@ class Distribution:
             return self.support[0]
         assert self._transformed is not None
         return self._transformed.inverse_survival(probability)
-
-    def _tail_integral(
-        self, lo: float, hi: float, *, center: float = 0.0, square: bool = False
-    ) -> float:
-        if self._native is not None:
-            return self._native.tail_integral(lo, hi, center, square)
-        if self._compound is not None:
-            return self._compound.hurdle_integral(lo, hi, center, square, True)
-        assert self._transformed is not None
-        impact, source = self._impact_source()
-        exact = impact._integral(
-            source, lo, hi, center=center, square=square, survival=True
-        )
-        return (
-            exact
-            if exact is not None
-            else self._transformed.tail_integral(lo, hi, center, square)
-        )
 
     @classmethod
     def _from_transformed(

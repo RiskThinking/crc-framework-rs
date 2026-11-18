@@ -106,7 +106,7 @@ pub(super) fn interpolate_segment(left: (f64, f64), right: (f64, f64), value: f6
 
 pub(crate) fn raw_response(model: &Model, value: f64) -> ContractResult<f64> {
     match model {
-        Model::Linear { slope, intercept } => Ok(slope * value + intercept),
+        Model::Linear { slope, intercept } => Ok(slope.mul_add(value, *intercept)),
         Model::Sigmoid {
             midpoint,
             steepness,
@@ -192,7 +192,14 @@ pub(crate) fn evaluate(model: &Model, clamp: &Clamp, value: f64) -> ContractResu
             "exposure values must be finite",
         ));
     }
-    let result = raw_response(model, value)?;
+    let raw = raw_response(model, value)?;
+    // An overflowing affine value can still be clipped to a finite result.
+    // Other non-finite responses can arise from an invalid intermediate.
+    let result = if raw.is_finite() || raw.is_infinite() && matches!(model, Model::Linear { .. }) {
+        apply_clamp(clamp, raw)
+    } else {
+        raw
+    };
     if !result.is_finite() {
         return Err(fail(
             "non_finite_result",
@@ -200,7 +207,7 @@ pub(crate) fn evaluate(model: &Model, clamp: &Clamp, value: f64) -> ContractResu
             "impact evaluation produced a non-finite response",
         ));
     }
-    Ok(apply_clamp(clamp, result))
+    Ok(result)
 }
 
 fn sequence_class(values: &[f64]) -> &'static str {

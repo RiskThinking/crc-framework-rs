@@ -168,8 +168,8 @@ struct PyImpactDistribution {
 
 #[pymethods]
 impl PyImpactDistribution {
-    fn affine_moments(&self, py: Python<'_>) -> PyResult<Option<(f64, f64)>> {
-        py.detach(|| self.inner.affine_moments())
+    fn exact_mean_deviation(&self, py: Python<'_>) -> PyResult<Option<(f64, f64)>> {
+        py.detach(|| self.inner.exact_mean_deviation())
             .map_err(|error| impact_error(py, error))
     }
 
@@ -217,28 +217,20 @@ impl PyImpactDistribution {
         py: Python<'_>,
         lo: f64,
         hi: f64,
-        center: f64,
-        square: bool,
+        moment: (f64, bool, f64),
+        survival: bool,
     ) -> PyResult<f64> {
-        py.detach(|| self.inner.integral(lo, hi, center, square))
-            .map_err(|error| impact_error(py, error))
+        let (center, square, scale) = moment;
+        py.detach(|| {
+            self.inner
+                .scaled_integral(lo, hi, center, square, survival, scale)
+        })
+        .map_err(|error| impact_error(py, error))
     }
 
     fn inverse_survival(&self, py: Python<'_>, survival: f64) -> PyResult<f64> {
         self.inner
             .inverse_survival(survival)
-            .map_err(|error| impact_error(py, error))
-    }
-
-    fn tail_integral(
-        &self,
-        py: Python<'_>,
-        s_min: f64,
-        s_max: f64,
-        center: f64,
-        square: bool,
-    ) -> PyResult<f64> {
-        py.detach(|| self.inner.tail_integral(s_min, s_max, center, square))
             .map_err(|error| impact_error(py, error))
     }
 }

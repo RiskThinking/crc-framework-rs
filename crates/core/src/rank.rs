@@ -1,6 +1,7 @@
 //! Independent binary rank outcomes and exact tail-risk attribution.
 
 use crate::error::{CrcError, Result};
+use crate::numerical::{CompensatedSum, compensated};
 use std::collections::HashSet;
 
 #[derive(Clone, Debug)]
@@ -49,6 +50,25 @@ fn contribution(outcome: &BinaryOutcome, mask: usize, index: usize) -> f64 {
     } else {
         outcome.upper_impact
     }
+}
+
+fn sum_impacts(impacts: impl Iterator<Item = f64> + Clone) -> f64 {
+    let total = compensated(impacts.clone());
+    if total.is_finite() {
+        return total;
+    }
+    // With at most 26 factors, this power of two prevents intermediate
+    // overflow. Keep values that would enter the subnormal range separate so
+    // they survive cancellation of the large terms.
+    const SCALE: f64 = HARD_MAX_BRANCHES.ilog2().next_power_of_two() as f64;
+    const CUTOFF: f64 = f64::MIN_POSITIVE * SCALE;
+    let large = compensated(
+        impacts
+            .clone()
+            .filter(|impact| impact.abs() >= CUTOFF)
+            .map(|impact| impact / SCALE),
+    ) * SCALE;
+    large + compensated(impacts.filter(|impact| impact.abs() < CUTOFF))
 }
 
 /// Sum independent impacts. There is no implicit weighting or averaging.
@@ -105,21 +125,43 @@ pub fn compute_risk(
     if count > limit {
         return Err(exceeded(count));
     }
+    // Use a fixed enumeration for products, sums and tied branch weights while
+    // returning attributions in the order requested by the caller.
+    let mut factors: Vec<_> = outcomes.iter().enumerate().collect();
+    factors.sort_unstable_by(|(_, a), (_, b)| {
+        a.lower_rank_mass
+            .total_cmp(&b.lower_rank_mass)
+            .then_with(|| a.upper_rank_mass.total_cmp(&b.upper_rank_mass))
+            .then_with(|| a.lower_impact.total_cmp(&b.lower_impact))
+            .then_with(|| a.upper_impact.total_cmp(&b.upper_impact))
+    });
     let mut branches = Vec::new();
     branches
         .try_reserve_exact(count)
         .map_err(|_| exceeded(count))?;
     for mask in 0..count {
-        let mut mass = 1.0;
-        let mut value = 0.0;
-        for (i, outcome) in outcomes.iter().enumerate() {
-            mass *= if mask & (1 << i) == 0 {
-                outcome.lower_rank_mass
-            } else {
-                outcome.upper_rank_mass
-            };
-            value += contribution(outcome, mask, i);
-        }
+        let Some(mass) = factors
+            .iter()
+            .enumerate()
+            .map(|(i, (_, outcome))| {
+                if mask & (1 << i) == 0 {
+                    outcome.lower_rank_mass
+                } else {
+                    outcome.upper_rank_mass
+                }
+            })
+            .try_fold(1.0, |mass, state_mass| {
+                (state_mass > 0.0).then_some(mass * state_mass)
+            })
+        else {
+            continue;
+        };
+        let value = sum_impacts(
+            factors
+                .iter()
+                .enumerate()
+                .map(|(i, (_, outcome))| contribution(outcome, mask, i)),
+        );
         if !value.is_finite() {
             return Err(invalid("aggregated impacts overflowed"));
         }
@@ -128,38 +170,45 @@ pub fn compute_risk(
         }
     }
     branches.sort_unstable_by(|a, b| a.value.total_cmp(&b.value).then(a.mask.cmp(&b.mask)));
-    let total = branches.iter().map(|b| b.mass).sum::<f64>();
+    let total = compensated(branches.iter().map(|b| b.mass));
     let mut result = Vec::with_capacity(levels.len());
     for &q in levels {
-        let mut cumulative = 0.0;
+        let cutoff = q * total;
+        let mut cumulative = CompensatedSum::default();
         let mut quantile = branches.last().expect("positive total mass").value;
+        // Compare the compensated prefix and cutoff in the same mass units.
         for branch in &branches {
-            cumulative += branch.mass / total;
-            if cumulative >= q {
+            cumulative.add(branch.mass);
+            if cumulative.total() >= cutoff {
                 quantile = branch.value;
                 break;
             }
         }
         // Tied VaR states have probability-weighted attribution, independent of order.
-        let tied_mass = branches
-            .iter()
-            .filter(|b| b.value == quantile)
-            .map(|b| b.mass)
-            .sum::<f64>();
+        let tied = branches.iter().filter(|b| b.value == quantile);
+        let tied_mass = compensated(tied.clone().map(|b| b.mass));
         let mut var_parts = vec![0.0; outcomes.len()];
-        for branch in branches.iter().filter(|b| b.value == quantile) {
-            for (i, outcome) in outcomes.iter().enumerate() {
-                var_parts[i] += contribution(outcome, branch.mask, i) * (branch.mass / tied_mass);
+        for branch in tied {
+            for (i, &(index, outcome)) in factors.iter().enumerate() {
+                var_parts[index] +=
+                    contribution(outcome, branch.mask, i) * (branch.mass / tied_mass);
             }
         }
-        let mut remaining = 1.0 - q;
+        let tail_mass = (1.0 - q) * total;
+        let mut remaining = tail_mass;
         let mut cvar = 0.0;
         let mut cvar_parts = vec![0.0; outcomes.len()];
-        for branch in branches.iter().rev() {
-            let used = (branch.mass / total).min(remaining);
-            cvar += branch.value * (used / (1.0 - q));
-            for (i, outcome) in outcomes.iter().enumerate() {
-                cvar_parts[i] += contribution(outcome, branch.mask, i) * (used / (1.0 - q));
+        for tied in branches.chunk_by(|a, b| a.value == b.value).rev() {
+            let group_mass = compensated(tied.iter().map(|branch| branch.mass));
+            let used = group_mass.min(remaining);
+            let weight = used / tail_mass;
+            cvar += tied[0].value * weight;
+            // A partial cutoff includes the same fraction of each tied state.
+            for branch in tied {
+                let weight = weight * (branch.mass / group_mass);
+                for (i, &(index, outcome)) in factors.iter().enumerate() {
+                    cvar_parts[index] += contribution(outcome, branch.mask, i) * weight;
+                }
             }
             remaining -= used;
             if remaining <= 0.0 {
@@ -241,13 +290,17 @@ mod tests {
     }
 
     #[test]
-    fn tied_var_attribution_is_permutation_invariant() {
-        let a = outcome("a", 0.5, 1.0);
+    fn tied_var_and_cvar_attribution_use_probability_weights() {
+        let a = outcome("a", 0.25, 1.0);
         let b = outcome("b", 0.5, 1.0);
-        let result = compute_risk(&[a, b], &[0.5], None).unwrap();
-        assert_eq!(result.levels[0].value_at_risk, 1.0);
-        assert_eq!(result.levels[0].attribution[0].value_at_risk, 0.5);
-        assert_eq!(result.levels[0].attribution[1].value_at_risk, 0.5);
+        let result = compute_risk(&[a, b], &[0.625], None).unwrap();
+        let level = &result.levels[0];
+        assert_eq!(level.value_at_risk, 1.0);
+        assert_eq!(level.attribution[0].value_at_risk, 0.25);
+        assert_eq!(level.attribution[1].value_at_risk, 0.75);
+        assert!((level.conditional_value_at_risk - 4.0 / 3.0).abs() < 1e-12);
+        assert_eq!(level.attribution[0].conditional_value_at_risk, 0.5);
+        assert!((level.attribution[1].conditional_value_at_risk - 5.0 / 6.0).abs() < 1e-12);
     }
 
     #[test]

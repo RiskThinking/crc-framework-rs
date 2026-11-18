@@ -92,8 +92,8 @@
     },
     {
       "path": "fixtures/point-evaluations.json",
-      "sha256": "8313408f47665a7918c40f5cdd82a335efdcfa64b362184050df61969675cc60",
-      "bytes": 32549
+      "sha256": "1ef6791e36c69af8c773080875d897491a033d81e97a1bdef44fdf3fc0c013b1",
+      "bytes": 34669
     },
     {
       "path": "fixtures/registry-references.json",

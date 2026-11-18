@@ -93,6 +93,29 @@ fn inverse_survival_preserves_deep_parametric_tail_coordinates() {
 }
 
 #[test]
+fn deep_continuous_tail_preserves_conditional_integration_accuracy() {
+    use crc_framework_core::{DistributionFamily, FittedDistribution};
+    let source = ImpactSource::Fitted(
+        FittedDistribution::from_parameters(DistributionFamily::GumbelRight, None, 0.0, 1.0)
+            .unwrap(),
+    );
+    for survival in [1e-100_f64, 1e-310_f64] {
+        let function = impact(
+            json!({"kind":"sigmoid","midpoint":-survival.ln(),"steepness":20.0}),
+            serde_json::Value::Null,
+        );
+        let image = function.pushforward(&source).unwrap();
+        let tail_mean = image.tail_integral(0.0, survival, 0.0, false).unwrap() / survival;
+        // At this tail, the Gumbel quantile is -ln(s) to binary64 accuracy.
+        // The conditional mean integrates 1/(1+t^20) over [0, 1].
+        assert!(
+            (tail_mean - 0.967_291_745_549_478_6).abs() < 1e-10,
+            "{survival:e}: {tail_mean}"
+        );
+    }
+}
+
+#[test]
 fn inverse_survival_and_integral_keep_sub_ulp_atoms() {
     let function = impact(
         json!({"kind":"linear","slope":1.0,"intercept":0.0}),

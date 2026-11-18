@@ -50,6 +50,14 @@ def test_linear_does_not_hide_a_zero_clamp() -> None:
     assert not callable(response)
 
 
+def test_linear_overflow_is_checked_after_intercept_and_clamps() -> None:
+    assert linear(2, intercept=-1e308).evaluate(1e308) == 1e308
+    assert linear(2, maximum=100).evaluate(1e308) == 100
+    assert linear(2, minimum=-100).evaluate(-1e308) == -100
+    with pytest.raises(ImpactError, match="non_finite_result"):
+        linear(2, maximum=100).evaluate(-1e308)
+
+
 @pytest.mark.parametrize(
     "source",
     [
@@ -204,6 +212,14 @@ def test_binned_expectation_and_image_use_exact_boundary_probabilities() -> None
     atom_source = Distribution.discrete([0, 1, 2, 3], [0.1, 0.2, 0.3, 0.4])
     assert response.evaluate(1.0) == 1.0
     assert response.expectation(atom_source) == pytest.approx(2.7)
+
+
+@pytest.mark.parametrize("value", [False, np.bool_(True), "1"])
+def test_binned_rejects_coerced_edges_and_values(value: object) -> None:
+    with pytest.raises(TypeError, match="bin edges.*real numbers"):
+        Impact.binned([value, 2], [1], input=Ratio(), output=Ratio())  # type: ignore[list-item]
+    with pytest.raises(TypeError, match="bin values.*real numbers"):
+        Impact.binned([0, 2], [value], input=Ratio(), output=Ratio())  # type: ignore[list-item]
 
 
 def test_exact_binned_expectation_works_on_a_parametric_law() -> None:
@@ -629,3 +645,82 @@ def test_affine_downscaling_keeps_finite_variance(
     assert summary.values[Statistic.STANDARD_DEVIATION].value == pytest.approx(
         math.sqrt(expected)
     )
+
+
+@pytest.mark.parametrize(
+    ("source", "unclamped_variance", "clamped_variance"),
+    [
+        (Distribution.empirical([-1e200, 1e200]), 1.0, 0.25),
+        (Distribution.histogram([-1e200, 1e200], [1]), 1 / 3, 5 / 48),
+        (
+            Distribution.parametric(
+                DistributionFamily.GENERALIZED_PARETO,
+                location=-1e200,
+                scale=2e200,
+                shape=-1,
+            ),
+            1 / 3,
+            5 / 48,
+        ),
+    ],
+)
+@pytest.mark.parametrize("slope", [-1e-100, 1e-100])
+def test_clamped_affine_applies_slope_before_squaring(
+    source: Distribution,
+    unclamped_variance: float,
+    clamped_variance: float,
+    slope: float,
+) -> None:
+    for maximum, expected in [(2e100, unclamped_variance), (0.0, clamped_variance)]:
+        image = linear(slope, maximum=maximum).pushforward(source)
+        values = image.statistics(
+            metrics=[Statistic.VARIANCE, Statistic.STANDARD_DEVIATION]
+        ).values
+        assert values[Statistic.VARIANCE].value == pytest.approx(expected * 1e200)
+        assert values[Statistic.STANDARD_DEVIATION].value == pytest.approx(
+            math.sqrt(expected) * 1e100
+        )
+
+
+def test_clamped_continuous_image_keeps_finite_standard_deviation() -> None:
+    source = Distribution.histogram([-1e200, 1e200], [1])
+    image = linear(1, maximum=0).pushforward(source)
+    values = image.statistics(
+        metrics=[Statistic.VARIANCE, Statistic.STANDARD_DEVIATION]
+    ).values
+    assert values[Statistic.VARIANCE].status is StatisticStatus.POSITIVE_INFINITY
+    assert values[Statistic.STANDARD_DEVIATION].value == pytest.approx(
+        math.sqrt(5 / 48) * 1e200
+    )
+
+
+@pytest.mark.parametrize("orientation", [-1.0, 1.0])
+@pytest.mark.parametrize("clamped", [False, True])
+def test_affine_fitted_law_is_rescaled_before_querying_overflowing_ranks(
+    orientation: float, clamped: bool
+) -> None:
+    source = Distribution.parametric(
+        DistributionFamily.GUMBEL_RIGHT, location=1e308, scale=1e308
+    )
+    normalized = Distribution.parametric(
+        DistributionFamily.GUMBEL_RIGHT, location=1, scale=1
+    )
+    bounds = (
+        ({"maximum": 10.0} if orientation > 0 else {"minimum": -10.0})
+        if clamped
+        else {}
+    )
+    image = linear(orientation * 1e-308, **bounds).pushforward(source)
+    exact = linear(orientation, **bounds).pushforward(normalized)
+    ranks = [0.05, 0.5, 0.95]
+    assert image.quantile(ranks) == pytest.approx(exact.quantile(ranks))
+    restored = Distribution.from_json(image.to_json())
+    assert restored.quantile(ranks) == pytest.approx(exact.quantile(ranks))
+    metrics = [Statistic.MEAN, Statistic.STANDARD_DEVIATION, Statistic.CVAR]
+    for tail in (Tail.LOWER, Tail.UPPER):
+        actual = image.statistics(metrics=metrics, tail=tail).values
+        expected = exact.statistics(metrics=metrics, tail=tail).values
+        for metric in metrics:
+            assert actual[metric].value == pytest.approx(
+                expected[metric].value, rel=1e-8
+            )

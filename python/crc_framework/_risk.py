@@ -9,7 +9,7 @@ from itertools import pairwise
 from typing import cast
 
 from . import _core
-from ._distribution import Distribution, FloatArray
+from ._distribution import Distribution, FloatArray, _finite
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,19 +35,19 @@ class BinaryOutcome:
             raise ValueError(
                 "id must be an exact nonempty string without boundary whitespace"
             )
-        values = (lower_rank_mass, lower_impact, upper_rank_mass, upper_impact)
-        if any(isinstance(value, bool) or not math.isfinite(value) for value in values):
-            raise ValueError("rank masses and impacts must be finite numbers")
+        lower_rank_mass = _finite(lower_rank_mass, "lower_rank_mass")
+        lower_impact = _finite(lower_impact, "lower_impact")
+        upper_rank_mass = _finite(upper_rank_mass, "upper_rank_mass")
+        upper_impact = _finite(upper_impact, "upper_impact")
         if min(lower_rank_mass, upper_rank_mass) < 0 or not math.isclose(
             lower_rank_mass + upper_rank_mass, 1.0, rel_tol=0, abs_tol=1e-12
         ):
             raise ValueError("lower_rank_mass and upper_rank_mass must sum to one")
         object.__setattr__(self, "id", id)
-        for name, value in zip(
-            ("lower_rank_mass", "lower_impact", "upper_rank_mass", "upper_impact"),
-            values,
-        ):
-            object.__setattr__(self, name, float(value))
+        object.__setattr__(self, "lower_rank_mass", lower_rank_mass)
+        object.__setattr__(self, "lower_impact", lower_impact)
+        object.__setattr__(self, "upper_rank_mass", upper_rank_mass)
+        object.__setattr__(self, "upper_impact", upper_impact)
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,10 +97,10 @@ def rank_scenarios(
     """
     if not isinstance(distribution, Distribution):
         raise TypeError("distribution must be a Distribution")
-    qs = tuple(probabilities)
+    qs = tuple(_finite(value, "probability") for value in probabilities)
     if not qs:
         raise ValueError("at least one probability is required")
-    if any(isinstance(q, bool) or not math.isfinite(q) or not 0 <= q <= 1 for q in qs):
+    if any(not 0 <= q <= 1 for q in qs):
         raise ValueError("probabilities must be finite numbers in [0, 1]")
     if any(a >= b for a, b in pairwise(qs)):
         raise ValueError("probabilities must be strictly increasing")
@@ -119,8 +119,8 @@ def compute_risk(
 ) -> RiskResult:
     """Sum independent binary impacts and integrate their upper tail exactly.
 
-    Contributions are added in their supplied units; there is no implicit
-    averaging. VaR attribution averages equally valued states by their masses.
+    Contributions are added in their supplied units. Attribution weights
+    equally valued states by probability mass, including ties at the tail cutoff.
     """
     items = tuple(outcomes)
     if not all(isinstance(item, BinaryOutcome) for item in items):
@@ -131,9 +131,7 @@ def compute_risk(
         or max_branches <= 0
     ):
         raise ValueError("max_branches must be a positive integer")
-    qs = tuple(levels)
-    if any(isinstance(q, bool) for q in qs):
-        raise ValueError("levels must be probabilities, not booleans")
+    qs = tuple(_finite(value, "risk level") for value in levels)
     count, result = _core.rank_risk(
         [
             (o.id, o.lower_rank_mass, o.lower_impact, o.upper_rank_mass, o.upper_impact)

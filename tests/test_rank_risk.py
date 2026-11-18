@@ -3,6 +3,7 @@
 import math
 from dataclasses import FrozenInstanceError
 
+import numpy as np
 import pytest
 from crc_framework import (
     BinaryOutcome,
@@ -49,7 +50,7 @@ def test_endpoint_scenarios_keep_infinite_values() -> None:
 
 
 @pytest.mark.parametrize(
-    "probabilities", [[], [0.2, 0.2], [0.5, 0.1], [-0.1], [math.nan], [True]]
+    "probabilities", [[], [0.2, 0.2], [0.5, 0.1], [-0.1], [math.nan]]
 )
 def test_invalid_rank_grid_is_rejected(probabilities) -> None:
     with pytest.raises(ValueError):
@@ -66,6 +67,32 @@ def test_risk_retains_rare_mass() -> None:
     assert result.branch_count == 2
     with pytest.raises(KeyError):
         result.at(0.951)
+
+
+def test_var_keeps_the_lower_cutoff_when_prefix_mass_equals_level() -> None:
+    a = BinaryOutcome(
+        "a", lower_rank_mass=0.5, lower_impact=-1, upper_rank_mass=0.5, upper_impact=1
+    )
+    above = math.nextafter(0.5, 1)
+    for b, c in (("b", "c"), ("c", "b")):
+        # Write the reflected mass explicitly so the two joint tails agree.
+        down = BinaryOutcome(
+            b,
+            lower_rank_mass=0.007,
+            lower_impact=-2,
+            upper_rank_mass=0.993,
+            upper_impact=0,
+        )
+        up = BinaryOutcome(
+            c,
+            lower_rank_mass=0.993,
+            lower_impact=0,
+            upper_rank_mass=0.007,
+            upper_impact=2,
+        )
+        result = compute_risk([a, down, up], levels=[0.5, above])
+        assert result.at(0.5).value_at_risk == -1
+        assert result.at(above).value_at_risk == 1
 
 
 def test_contributions_sum_without_implicit_averaging() -> None:
@@ -89,6 +116,35 @@ def test_tied_attribution_is_independent_of_input_order() -> None:
             "a": 0.5,
             "b": 0.5,
         }
+        assert level.conditional_value_at_risk == 1.5
+        assert {
+            part.id: part.conditional_value_at_risk for part in level.attribution
+        } == {"a": 0.75, "b": 0.75}
+
+
+def test_impossible_branches_do_not_overflow() -> None:
+    result = compute_risk(
+        [outcome("a", 0, 1e308), outcome("b", 0, 1e308)], levels=[0.5]
+    )
+    assert result.branch_count == 4
+    assert result.at(0.5).value_at_risk == 0
+    assert result.at(0.5).conditional_value_at_risk == 0
+
+
+@pytest.mark.parametrize(
+    "impacts, total",
+    [
+        ([1e16, 1, -1e16], 1),
+        ([1e308, 1e308, -1e308], 1e308),
+        ([1e308, 1e308, -1e308, -1e308, math.ulp(0.0)], math.ulp(0.0)),
+    ],
+)
+def test_realizable_branches_sum_stably(impacts: list[float], total: float) -> None:
+    values = [outcome(str(i), 1, impact) for i, impact in enumerate(impacts)]
+    for ordered in (values, values[::-1]):
+        level = compute_risk(ordered, levels=[0.5]).at(0.5)
+        assert level.value_at_risk == total
+        assert level.conditional_value_at_risk == total
 
 
 def test_invalid_ids_and_risk_inputs() -> None:
@@ -100,9 +156,31 @@ def test_invalid_ids_and_risk_inputs() -> None:
     for limit in (0, -1, True, 1.5):
         with pytest.raises(ValueError):
             compute_risk([outcome("a", 0.1, 1)], levels=[0.95], max_branches=limit)
-    for levels in ([], [0], [1], [math.nan], [True]):
+    for levels in ([], [0], [1], [math.nan]):
         with pytest.raises(ValueError):
             compute_risk([outcome("a", 0.1, 1)], levels=levels)
+
+
+@pytest.mark.parametrize("value", [True, np.bool_(True), np.array(0.5), "0.5"])
+def test_risk_levels_require_real_scalar_values(value: float) -> None:
+    with pytest.raises(TypeError, match="risk level must be a real number"):
+        compute_risk([outcome("a", 0.1, 1)], levels=[value])
+    with pytest.raises(TypeError, match="probability must be a real number"):
+        rank_scenarios(Distribution.point_mass(1), probabilities=[value])
+
+
+@pytest.mark.parametrize("value", [True, np.bool_(True), "1"])
+def test_binary_outcome_rejects_non_numeric_masses_and_impacts(value: object) -> None:
+    for field in ("lower_rank_mass", "upper_rank_mass", "lower_impact", "upper_impact"):
+        numbers: dict[str, object] = {
+            "lower_rank_mass": 0.0,
+            "lower_impact": 0.0,
+            "upper_rank_mass": 1.0,
+            "upper_impact": 1.0,
+        }
+        numbers[field] = value
+        with pytest.raises(TypeError, match=f"{field} must be a real number"):
+            BinaryOutcome("custom:outcome", **numbers)  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize("limit", [None, 2**40, 2**100])
