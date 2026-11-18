@@ -315,23 +315,6 @@ fn fit_specification(value: &Value) -> Result<Value> {
     Ok(Value::Object(result))
 }
 
-fn allowed_attempts(specification: &Value, allowed: &mut BTreeSet<String>) {
-    if specification["kind"] == "model_selection" {
-        if let Some(candidates) = specification["candidates"].as_array() {
-            for candidate in candidates {
-                allowed_attempts(candidate, allowed);
-            }
-        }
-    } else {
-        allowed.insert(canonical(specification).to_string());
-        if let Some(fallbacks) = specification["fallbacks"].as_array() {
-            for fallback in fallbacks {
-                allowed_attempts(fallback, allowed);
-            }
-        }
-    }
-}
-
 fn replay_attempts(requested: &Value, attempts: &[Value], cursor: &mut usize) -> Result<bool> {
     let attempt = attempts
         .get(*cursor)
@@ -434,10 +417,65 @@ fn validate_selected_weights(weights: &[f64], specification: &Value) -> Result<(
     Ok(())
 }
 
+fn converged_score(attempt: &Value, evidence_count: &Value, used_count: &Value) -> Result<f64> {
+    let spec = fit_specification(&attempt["specification"])?;
+    let details = &attempt["diagnostics"][0]["details"];
+    let samples = spec["kind"] == "samples";
+    let effective_count = match spec["weights"].as_array() {
+        Some(weights) => {
+            if json!(weights.len()) != *evidence_count {
+                return Err(invalid(
+                    "converged specification needs one weight per supplied knot",
+                ));
+            }
+            json!(
+                weights
+                    .iter()
+                    .filter(|w| w.as_f64().unwrap_or(0.0) > 0.0)
+                    .count()
+            )
+        }
+        None if samples => used_count.clone(),
+        None => evidence_count.clone(),
+    };
+    let minimum = &spec[if samples {
+        "minimum_samples"
+    } else {
+        "minimum_knots"
+    }];
+    if greater(minimum, &effective_count) {
+        return Err(invalid(
+            "converged attempt has less than its required evidence",
+        ));
+    }
+    let partition = match spec["kind"].as_str() {
+        Some("censored_quantiles") => Some(("censored_count", "uncensored_count")),
+        Some("hurdle_quantiles") => Some(("atom_count", "tail_count")),
+        _ => None,
+    };
+    if let Some((a, b)) = partition {
+        let partition_count = natural_sum(&natural(&details[a])?, &natural(&details[b])?);
+        if partition_count != natural(&effective_count)? {
+            return Err(invalid(
+                "fit diagnostic counts contradict effective evidence",
+            ));
+        }
+    }
+    details[if samples {
+        "ks_statistic"
+    } else {
+        "normalized_rmse"
+    }]
+    .as_f64()
+    .ok_or_else(|| invalid("a converged attempt requires its selection score"))
+}
+
 fn validate_record(record: &Value) -> Result<Option<&Value>> {
     validate_structure("https://climateriskcommons.org/schemas/fitting/1.0", record)?;
-    let count = natural(&record["evidence_count"])?;
-    let used = natural(&record["used_count"])?;
+    let evidence_count = integer(&record["evidence_count"])?;
+    let used_count = integer(&record["used_count"])?;
+    let count = natural(&evidence_count)?;
+    let used = natural(&used_count)?;
     let excluded = natural(&record["excluded_count"])?;
     if natural_sum(&used, &excluded) != count {
         return Err(invalid(
@@ -445,48 +483,15 @@ fn validate_record(record: &Value) -> Result<Option<&Value>> {
         ));
     }
     let requested = fit_specification(&record["specification"])?;
-    let mut allowed = BTreeSet::new();
-    allowed_attempts(&requested, &mut allowed);
     let attempts = array(&record["attempts"])?;
-    if attempts.is_empty() {
-        return Err(invalid("fit record requires at least one attempt"));
-    }
     text(&record["engine_version"])?;
-    for attempt in attempts {
-        let reason = attempt["reason"].as_str();
+    let mut winner = None;
+    for (index, attempt) in attempts.iter().enumerate() {
         if attempt["status"] == "converged" {
-            if !attempt["reason"].is_null() {
-                return Err(invalid("a converged attempt cannot have a failure reason"));
+            let score = converged_score(attempt, &evidence_count, &used_count)?;
+            if winner.is_none_or(|(_, best)| score < best) {
+                winner = Some((index, score));
             }
-        } else if reason.is_none_or(str::is_empty) {
-            return Err(invalid("failed or rejected attempts require reasons"));
-        }
-        let actual = fit_specification(&attempt["specification"])?;
-        let converged = attempt["status"] == "converged";
-        let code = if converged {
-            format!("fit.{}", text(&actual["kind"])?)
-        } else {
-            "fit.failed".to_owned()
-        };
-        let severity = if converged { "info" } else { "error" };
-        let mut has_outcome = false;
-        for diagnostic in array(&attempt["diagnostics"])? {
-            text(&diagnostic["code"])?;
-            if diagnostic["message"].as_str().is_none_or(str::is_empty) {
-                return Err(invalid("diagnostic message must be nonempty literal text"));
-            }
-            has_outcome |= diagnostic["code"] == code && diagnostic["severity"] == severity;
-        }
-        if !has_outcome {
-            return Err(invalid(
-                "a fit attempt requires diagnostics for its outcome",
-            ));
-        }
-
-        if !allowed.contains(&canonical(&actual).to_string()) {
-            return Err(invalid(
-                "fit attempt was not requested or explicitly configured",
-            ));
         }
     }
     let mut cursor = 0;
@@ -500,22 +505,19 @@ fn validate_record(record: &Value) -> Result<Option<&Value>> {
     if cursor != attempts.len() {
         return Err(invalid("attempt trace contains unexecuted alternatives"));
     }
-    let selected = if record["selected_attempt"].is_null() {
+    let selected_index = if record["selected_attempt"].is_null() {
         None
     } else {
         let index = unsigned(&record["selected_attempt"])?;
-        let attempt = attempts
-            .get(usize::try_from(index).map_err(invalid)?)
-            .ok_or_else(|| invalid("selected attempt is out of range"))?;
-        if attempt["status"] != "converged" {
-            return Err(invalid("selected attempt did not converge"));
-        }
-        Some(&attempt["specification"])
+        Some(usize::try_from(index).map_err(invalid)?)
     };
-    if record["converged"].as_bool() != Some(selected.is_some())
-        || record["converged"].as_bool()
-            != Some(attempts.iter().any(|a| a["status"] == "converged"))
-    {
+    if selected_index != winner.map(|(index, _)| index) {
+        return Err(invalid(
+            "selected attempt must match the recorded selection criterion",
+        ));
+    }
+    let selected = selected_index.map(|index| &attempts[index]["specification"]);
+    if record["converged"].as_bool() != Some(selected.is_some()) {
         return Err(invalid("fit convergence contradicts actual attempts"));
     }
     let estimator = selected

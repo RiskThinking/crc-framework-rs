@@ -312,7 +312,14 @@ def test_effective_weights_match_the_selected_quantile_specification():
 
 
 @pytest.mark.parametrize(
-    "diagnostics", [[], [{"code": "fit.failed", "severity": "error"}]]
+    "diagnostics",
+    [
+        [],
+        [{"code": "fit.failed", "severity": "error"}],
+        [{"details": {}}],
+        [{"details": {"ks_statistic": 0.25}}],
+        [{}, {}],
+    ],
 )
 def test_attempts_require_their_outcome_diagnostic(diagnostics):
     document = json.loads(sample_record().to_json())
@@ -320,11 +327,56 @@ def test_attempts_require_their_outcome_diagnostic(diagnostics):
     document["attempts"][0]["diagnostics"] = [
         original | change for change in diagnostics
     ]
-    assert RECORD_VALIDATOR.is_valid(document) == bool(diagnostics)
+    assert not RECORD_VALIDATOR.is_valid(document)
     with pytest.raises(ValueError):
         FitRecord.from_json(json.dumps(document))
     with pytest.raises(ValueError):
         _core.validate_document(SCHEMA["$id"], json.dumps(document))
+
+
+def test_model_selection_record_must_name_the_first_best_converged_attempt():
+    candidates = tuple(
+        SampleFit(family=family, estimator=SampleEstimator.L_MOMENTS)
+        for family in (DistributionFamily.GUMBEL_RIGHT, DistributionFamily.GUMBEL_LEFT)
+    )
+    samples = [1, 1.1, 1.2, 1.3, 2, 3, 10]
+    record = fit_samples(samples, ModelSelection(candidates=candidates)).record
+    assert record.selected_attempt == 0
+    document = json.loads(record.to_json())
+    document["selected_attempt"] = 1
+    assert RECORD_VALIDATOR.is_valid(document)
+    with pytest.raises(ValueError, match="selection criterion"):
+        FitRecord.from_json(json.dumps(document))
+    with pytest.raises(ValueError, match="selection criterion"):
+        _core.validate_document(SCHEMA["$id"], json.dumps(document))
+
+
+@pytest.mark.parametrize(
+    "make_record,field",
+    [(sample_record, "minimum_samples"), (quantile_record, "minimum_knots")],
+)
+def test_record_cannot_claim_convergence_without_the_required_evidence(
+    make_record, field
+):
+    document = json.loads(make_record().to_json())
+    document["specification"][field] = document["attempts"][0]["specification"][
+        field
+    ] = 100
+    assert RECORD_VALIDATOR.is_valid(document)
+    with pytest.raises(ValueError, match="less than its required evidence"):
+        FitRecord.from_json(json.dumps(document))
+    with pytest.raises(ValueError, match="less than its required evidence"):
+        _core.validate_document(SCHEMA["$id"], json.dumps(document))
+
+
+def test_sample_record_uses_available_observations_after_exclusion():
+    document = json.loads(sample_record().to_json())
+    document.update(evidence_count=9, excluded_count=1)
+    assert FitRecord.from_json(json.dumps(document)).used_count == 8
+
+    document.update(used_count=2, excluded_count=7)
+    with pytest.raises(ValueError, match="less than its required evidence"):
+        FitRecord.from_json(json.dumps(document))
 
 
 def test_sample_record_cannot_claim_quantile_weights():

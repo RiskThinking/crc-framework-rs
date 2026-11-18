@@ -69,6 +69,33 @@ fn invalid(message: &str) -> CrcError {
     CrcError::InvalidInput(message.into())
 }
 
+/// Interpolate finite endpoints without overflowing their difference.
+pub(crate) fn linear_interpolate(a: f64, b: f64, weight: f64) -> f64 {
+    if weight == 0.0 {
+        a
+    } else if weight == 1.0 {
+        b
+    } else if (a < 0.0 && b > 0.0) || (b < 0.0 && a > 0.0) {
+        a * (1.0 - weight) + b * weight
+    } else {
+        a + (b - a) * weight
+    }
+}
+
+/// Fraction of a finite interval covered by the requested bounds.
+pub(crate) fn interval_fraction(lo: f64, hi: f64, a: f64, b: f64) -> f64 {
+    let (a, b) = (a.max(lo), b.min(hi));
+    if a >= b {
+        return 0.0;
+    }
+    let width = hi - lo;
+    if width.is_finite() {
+        (b - a) / width
+    } else {
+        (b * 0.5 - a * 0.5) / (hi * 0.5 - lo * 0.5)
+    }
+}
+
 fn cumulative(probabilities: &[f64]) -> Result<Vec<f64>> {
     if probabilities.is_empty() || probabilities.iter().any(|p| !p.is_finite() || *p < 0.0) {
         return Err(invalid("probabilities must be finite non-negative masses"));
@@ -262,7 +289,7 @@ pub(crate) fn condition_segments(
             let retained = if lo >= atom_location {
                 1.0
             } else {
-                (hi - atom_location) / (hi - lo)
+                interval_fraction(lo, hi, atom_location, hi)
             };
             let mass = (mass * retained / surviving_mass) * (1.0 - atom_probability);
             (mass > 0.0).then_some((lo.max(atom_location), hi, mass))
@@ -282,7 +309,7 @@ pub(crate) fn segment_quantile(segments: &[ProbabilitySegment], q: f64, upper: b
     for &(a, b, mass) in segments {
         let right = left + mass;
         if q < right || !upper && q == right {
-            return a + (b - a) * ((q - left) / mass).clamp(0.0, 1.0);
+            return linear_interpolate(a, b, ((q - left) / mass).clamp(0.0, 1.0));
         }
         left = right;
     }
@@ -304,7 +331,7 @@ pub(crate) fn segment_inverse_survival(
     for &(a, b, mass) in segments.iter().rev() {
         let left = right + mass;
         if survival < left || upper && survival == left {
-            return b + (a - b) * ((survival - right) / mass).clamp(0.0, 1.0);
+            return linear_interpolate(b, a, ((survival - right) / mass).clamp(0.0, 1.0));
         }
         right = left;
     }
@@ -324,7 +351,7 @@ pub(crate) fn segment_probability(
             let before = hi < upper || (include_upper && hi == upper);
             if after && before { mass } else { 0.0 }
         } else {
-            mass * ((hi.min(upper) - lo.max(lower)).max(0.0) / (hi - lo))
+            mass * interval_fraction(lo, hi, lower, upper)
         }
     }))
     .clamp(0.0, 1.0)
@@ -347,13 +374,13 @@ pub(crate) fn segment_integral(
                 (left, right, xa, xb)
             };
             let (width, a, b) = local_interval(lo, hi, start, end, mass);
-            let x = xa + (xb - xa) * a - center;
-            let y = xa + (xb - xa) * b - center;
+            let x = linear_interpolate(xa, xb, a) - center;
+            let y = linear_interpolate(xa, xb, b) - center;
             width
                 * if square {
                     (x * x + x * y + y * y) / 3.0
                 } else {
-                    (x + y) / 2.0
+                    x.midpoint(y)
                 }
         },
     ))
@@ -635,18 +662,22 @@ impl NumericalLaw {
                 let i = cumulative[1..]
                     .partition_point(|p| *p < q)
                     .min(probabilities.len() - 1);
-                edges[i]
-                    + (edges[i + 1] - edges[i])
-                        * ((q - cumulative[i]) / (cumulative[i + 1] - cumulative[i]))
+                linear_interpolate(
+                    edges[i],
+                    edges[i + 1],
+                    (q - cumulative[i]) / (cumulative[i + 1] - cumulative[i]),
+                )
             }
             Self::Quantile {
                 probabilities,
                 values,
             } => {
                 let i = probabilities.partition_point(|p| *p < q).max(1) - 1;
-                values[i]
-                    + (values[i + 1] - values[i])
-                        * ((q - probabilities[i]) / (probabilities[i + 1] - probabilities[i]))
+                linear_interpolate(
+                    values[i],
+                    values[i + 1],
+                    (q - probabilities[i]) / (probabilities[i + 1] - probabilities[i]),
+                )
             }
             Self::Hurdle {
                 base,
@@ -861,7 +892,7 @@ impl NumericalLaw {
                 probabilities
                     .iter()
                     .enumerate()
-                    .map(|(i, p)| p * ((x - edges[i]) / (edges[i + 1] - edges[i])).clamp(0.0, 1.0)),
+                    .map(|(i, p)| p * interval_fraction(edges[i], edges[i + 1], edges[i], x)),
             )
             .clamp(0.0, 1.0),
             Self::Quantile {
@@ -886,9 +917,11 @@ impl NumericalLaw {
                 if values[i] == x {
                     return probabilities[i];
                 }
-                probabilities[i]
-                    + (probabilities[i + 1] - probabilities[i]) * (x - values[i])
-                        / (values[i + 1] - values[i])
+                linear_interpolate(
+                    probabilities[i],
+                    probabilities[i + 1],
+                    interval_fraction(values[i], values[i + 1], values[i], x),
+                )
             }
             Self::Hurdle {
                 base,
@@ -916,9 +949,13 @@ impl NumericalLaw {
                 values,
                 probabilities,
                 ..
-            } => values
-                .binary_search_by(|v| v.total_cmp(&x))
-                .map_or(0.0, |i| probabilities[i]),
+            } => {
+                let i = values.partition_point(|v| *v < x);
+                values
+                    .get(i)
+                    .filter(|&&v| v == x)
+                    .map_or(0.0, |_| probabilities[i])
+            }
             Self::PointMass(v) => {
                 if *v == x {
                     1.0
@@ -981,9 +1018,12 @@ impl NumericalLaw {
                 edges,
                 probabilities,
                 ..
-            } => compensated(probabilities.iter().enumerate().map(|(i, p)| {
-                p * ((edges[i + 1] - x) / (edges[i + 1] - edges[i])).clamp(0.0, 1.0)
-            }))
+            } => compensated(
+                probabilities
+                    .iter()
+                    .enumerate()
+                    .map(|(i, p)| p * interval_fraction(edges[i], edges[i + 1], x, edges[i + 1])),
+            )
             .clamp(0.0, 1.0),
             Self::Hurdle {
                 base,
@@ -1025,13 +1065,13 @@ impl NumericalLaw {
             if a >= b {
                 return 0.0;
             }
-            let x = xa + (xb - xa) * (a - qa) / (qb - qa) - center;
-            let y = xa + (xb - xa) * (b - qa) / (qb - qa) - center;
+            let x = linear_interpolate(xa, xb, (a - qa) / (qb - qa)) - center;
+            let y = linear_interpolate(xa, xb, (b - qa) / (qb - qa)) - center;
             (b - a)
                 * if square {
                     (x * x + x * y + y * y) / 3.0
                 } else {
-                    (x + y) / 2.0
+                    x.midpoint(y)
                 }
         };
         match self {
@@ -1070,13 +1110,13 @@ impl NumericalLaw {
                     .filter(|(_, (_, _, mass))| *mass > 0.0)
                     .map(|(x, (left, right, mass))| {
                         let (width, a, b) = local_interval(lo, hi, left, right, mass);
-                        let xa = x[0] + (x[1] - x[0]) * a - center;
-                        let xb = x[0] + (x[1] - x[0]) * b - center;
+                        let xa = linear_interpolate(x[0], x[1], a) - center;
+                        let xb = linear_interpolate(x[0], x[1], b) - center;
                         width
                             * if square {
                                 (xa * xa + xa * xb + xb * xb) / 3.0
                             } else {
-                                (xa + xb) / 2.0
+                                xa.midpoint(xb)
                             }
                     }),
             )),

@@ -7,7 +7,9 @@
 
 use crate::Interpolation;
 
-use super::definition::{Clamp, Interpolation as TableInterpolation, Model, OutsideDomain};
+use super::definition::{
+    Clamp, Interpolation as TableInterpolation, Model, OriginAdjustment, OutsideDomain,
+};
 use super::error::{ContractResult, fail};
 use super::kernel;
 use super::quadrature::neumaier;
@@ -281,6 +283,130 @@ impl ImpactDistribution {
             self.source.inverse_survival(survival)?
         };
         kernel::evaluate(&self.model, &self.clamp, exposure)
+    }
+
+    /// Query the lower or upper tail directly, with explicit treatment of atoms.
+    #[doc(hidden)]
+    pub fn threshold_probability(
+        &self,
+        value: f64,
+        inclusive: bool,
+        exceedance: bool,
+    ) -> ContractResult<f64> {
+        let matches = |response: f64| match (exceedance, inclusive) {
+            (true, true) => response >= value,
+            (true, false) => response > value,
+            (false, true) => response <= value,
+            (false, false) => response < value,
+        };
+        if self.is_discrete() {
+            return Ok(neumaier(
+                self.atoms
+                    .iter()
+                    .filter(|atom| matches(atom.value))
+                    .map(|atom| atom.probability),
+            ));
+        }
+        let (lower, upper) = (self.essential(true)?, self.essential(false)?);
+        if lower == upper || value < lower || value > upper {
+            return Ok(f64::from(matches(lower)));
+        }
+        let atom_mass = self
+            .atoms
+            .iter()
+            .find(|atom| atom.value == value)
+            .map_or(0.0, |atom| atom.probability);
+        let at_bound = value == lower || value == upper;
+        if at_bound {
+            let outside_tail = if exceedance {
+                value == upper
+            } else {
+                value == lower
+            };
+            if outside_tail {
+                return Ok(if inclusive { atom_mass } else { 0.0 });
+            }
+            if inclusive || atom_mass == 0.0 {
+                return Ok(1.0);
+            }
+            // A boundary atom can round to one even when its complementary
+            // tail is positive. Measure the strict tail in source coordinates.
+        }
+
+        let inverse = match self.model {
+            Model::Linear { slope, intercept } if slope != 0.0 => {
+                Some(((value - intercept) / slope, slope > 0.0))
+            }
+            Model::Sigmoid {
+                midpoint,
+                steepness,
+                offset,
+                amplitude,
+                origin_adjustment: OriginAdjustment::None,
+                zero_below: None,
+            } if amplitude != 0.0 && steepness != 0.0 => {
+                let fraction = (value - offset) / amplitude;
+                if fraction > 0.0 && fraction < 1.0 {
+                    Some((
+                        midpoint + (fraction.ln() - (-fraction).ln_1p()) / steepness,
+                        (amplitude > 0.0) == (steepness > 0.0),
+                    ))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+        if let Some((mut threshold, increasing)) = inverse {
+            let lower_tail = increasing != exceedance;
+            if atom_mass > 0.0 {
+                // A rounded response can invert to either side of an exact source atom.
+                let endpoint = if lower_tail == inclusive {
+                    f64::max
+                } else {
+                    f64::min
+                };
+                let mut boundary = None;
+                for (location, _) in self.source.point_atoms() {
+                    if kernel::evaluate(&self.model, &self.clamp, location)? == value {
+                        boundary = Some(boundary.map_or(location, |x| endpoint(x, location)));
+                    }
+                }
+                if let Some(location) = boundary {
+                    threshold = if at_bound {
+                        // A clamp can place many source atoms on the bound.
+                        // Keep the inverse cut unless an atom extends it.
+                        endpoint(threshold, location)
+                    } else {
+                        location
+                    };
+                }
+            }
+            return Ok(match (lower_tail, inclusive) {
+                (true, true) => self.source.cdf(threshold),
+                (true, false) => self.source.cdf_below(threshold),
+                (false, _) => self.source.survival_at(threshold, inclusive),
+            });
+        }
+
+        // Positive binary64 bit patterns are ordered by value. Searching them
+        // keeps even subnormal tails reachable without subtracting from one.
+        let (mut left, mut right) = (0, 1.0f64.to_bits());
+        while right - left > 1 {
+            let mid = left + (right - left) / 2;
+            let probability = f64::from_bits(mid);
+            let response = if exceedance {
+                self.inverse_survival(probability)?
+            } else {
+                self.quantile(probability)?
+            };
+            if matches(response) {
+                left = mid;
+            } else {
+                right = mid;
+            }
+        }
+        Ok(f64::from_bits(left))
     }
 
     /// Quantile integration in direct survival coordinates.

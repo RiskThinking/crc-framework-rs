@@ -18,7 +18,7 @@ pub use registry::{
 
 pub use error::ImpactContractError;
 
-use crate::numerical::ProbabilitySegment;
+use crate::numerical::{ProbabilitySegment, interval_fraction};
 use definition::{ModelKind, compile, known_registry_factor, override_rule};
 use json::{canonical_json, content_hash, parse_json};
 
@@ -113,7 +113,7 @@ impl ImpactDefinition {
                 .filter(|cut| lower < *cut && *cut < upper)
                 .chain(std::iter::once(upper))
             {
-                let portion = mass * ((right - left) / (upper - lower));
+                let portion = mass * interval_fraction(lower, upper, left, right);
                 if portion > 0.0 {
                     let (a, b) = (self.evaluate(left)?, self.evaluate(right)?);
                     segments.push((a.min(b), a.max(b), portion));

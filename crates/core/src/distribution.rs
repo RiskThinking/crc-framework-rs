@@ -5,6 +5,7 @@ use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use crate::{
     error::{CrcError, Result},
+    numerical::{interval_fraction, linear_interpolate},
     reference::curve_fitting as reference_curve_fitting,
 };
 
@@ -244,7 +245,11 @@ impl TabulatedDistribution {
         let x0 = self.axis(self.probabilities[lower]);
         let x1 = self.axis(self.probabilities[upper]);
         let weight = (self.axis(q) - x0) / (x1 - x0);
-        Ok(self.values[lower] + weight * (self.values[upper] - self.values[lower]))
+        Ok(linear_interpolate(
+            self.values[lower],
+            self.values[upper],
+            weight,
+        ))
     }
 }
 
@@ -270,12 +275,12 @@ impl Distribution for TabulatedDistribution {
             return self.probabilities[0];
         }
         let lower = upper - 1;
-        let span = self.values[upper] - self.values[lower];
-        if span == 0.0 {
-            return self.probabilities[upper];
-        }
-        let weight = (x - self.values[lower]) / span;
-        self.probabilities[lower] + weight * (self.probabilities[upper] - self.probabilities[lower])
+        let (a, b) = (self.values[lower], self.values[upper]);
+        linear_interpolate(
+            self.probabilities[lower],
+            self.probabilities[upper],
+            interval_fraction(a, b, a, x),
+        )
     }
 
     fn cdf_below(&self, x: f64) -> f64 {
@@ -296,12 +301,12 @@ impl Distribution for TabulatedDistribution {
             return 0.0;
         }
         let lower = upper - 1;
-        let span = self.values[upper] - self.values[lower];
-        if span == 0.0 {
-            return self.probabilities[lower];
-        }
-        let weight = (x - self.values[lower]) / span;
-        self.probabilities[lower] + weight * (self.probabilities[upper] - self.probabilities[lower])
+        let (a, b) = (self.values[lower], self.values[upper]);
+        linear_interpolate(
+            self.probabilities[lower],
+            self.probabilities[upper],
+            interval_fraction(a, b, a, x),
+        )
     }
 
     fn ppf(&self, probability: f64) -> Result<f64> {
@@ -1035,6 +1040,22 @@ fn project_fit_bounds(
     if let Ok(law) =
         FittedDistribution::from_parameters(family, shape, parameters[location_index], scale)
     {
+        if let Some((probability, target)) = bounds
+            .probability
+            .zip(bounds.minimum_value)
+            .filter(|&(_, target)| bounds.maximum_value == Some(target))
+        {
+            // The two one-sided projections deliberately move inside their
+            // bounds. An equality has no interior, so place it directly.
+            let offset = FittedDistribution::from_parameters(family, shape, 0.0, scale)
+                .and_then(|centered| centered.ppf(probability));
+            if let Ok(offset) = offset {
+                if offset.is_finite() {
+                    parameters[location_index] = target - offset;
+                }
+            }
+            return;
+        }
         let mut shift: f64 = 0.0;
         if let Some(minimum) = bounds.minimum_value {
             if let Ok(q) = law.ppf(bounds.probability.unwrap_or(0.0)) {

@@ -6,7 +6,8 @@
 use std::borrow::Cow;
 
 use crate::numerical::{
-    ProbabilitySegment, segment_inverse_survival, segment_probability, segment_quantile,
+    ProbabilitySegment, interval_fraction, linear_interpolate, segment_inverse_survival,
+    segment_probability, segment_quantile,
 };
 use crate::{
     Distribution, EmpiricalDistribution, FittedDistribution, HurdleDistribution,
@@ -142,8 +143,8 @@ impl HistogramExposure {
         let bin = count - 1;
         let left = self.edges[bin];
         if x > left {
-            let width = self.edges[bin + 1] - left;
-            self.cumulative[bin] + self.normalized[bin] * (x - left) / width
+            self.cumulative[bin]
+                + self.normalized[bin] * interval_fraction(left, self.edges[bin + 1], left, x)
         } else {
             self.cumulative[bin]
         }
@@ -178,8 +179,7 @@ impl HistogramExposure {
             return *self.edges.last().expect("histogram has edges");
         }
         let weight = (probability - self.cumulative[bin]) / self.normalized[bin];
-        let left = self.edges[bin];
-        left + weight * (self.edges[bin + 1] - left)
+        linear_interpolate(self.edges[bin], self.edges[bin + 1], weight)
     }
 
     fn knots(&self) -> Vec<f64> {
@@ -193,7 +193,7 @@ impl HistogramExposure {
         for (edges, &mass) in self.edges.windows(2).zip(&self.normalized).rev() {
             let next = consumed + mass;
             if mass > 0.0 && (survival < next || (upper && survival == next)) {
-                return edges[1] + (edges[0] - edges[1]) * ((survival - consumed) / mass);
+                return linear_interpolate(edges[1], edges[0], (survival - consumed) / mass);
             }
             consumed = next;
         }
@@ -572,9 +572,11 @@ impl ImpactSource {
                 for index in (0..q.len() - 1).rev() {
                     let mass = q[index + 1] - q[index];
                     if mass > 0.0 && (survival < consumed + mass || survival == 0.0) {
-                        return Ok(
-                            x[index + 1] - (survival - consumed) / mass * (x[index + 1] - x[index])
-                        );
+                        return Ok(linear_interpolate(
+                            x[index + 1],
+                            x[index],
+                            (survival - consumed) / mass,
+                        ));
                     }
                     consumed += mass;
                 }
@@ -618,19 +620,13 @@ impl ImpactSource {
                         / distribution.base().sf(distribution.atom_location())
                 }
             }
-            Self::Histogram(histogram) => {
-                neumaier(histogram.edges.windows(2).zip(&histogram.normalized).map(
-                    |(bounds, p)| {
-                        p * if x <= bounds[0] {
-                            1.0
-                        } else if x >= bounds[1] {
-                            0.0
-                        } else {
-                            (bounds[1] - x) / (bounds[1] - bounds[0])
-                        }
-                    },
-                ))
-            }
+            Self::Histogram(histogram) => neumaier(
+                histogram
+                    .edges
+                    .windows(2)
+                    .zip(&histogram.normalized)
+                    .map(|(bounds, p)| p * interval_fraction(bounds[0], bounds[1], x, bounds[1])),
+            ),
             Self::Tabulated(distribution) => neumaier(
                 distribution
                     .values()
@@ -643,12 +639,8 @@ impl ImpactSource {
                             } else {
                                 bounds[0] > x
                             })
-                        } else if x <= bounds[0] {
-                            1.0
-                        } else if x >= bounds[1] {
-                            0.0
                         } else {
-                            (bounds[1] - x) / (bounds[1] - bounds[0])
+                            interval_fraction(bounds[0], bounds[1], x, bounds[1])
                         };
                         (q[1] - q[0]) * fraction
                     }),

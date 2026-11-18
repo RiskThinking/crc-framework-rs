@@ -411,9 +411,10 @@ class Distribution:
                 self._compound_cdf(float(x), inclusive) for x in query.reshape(-1)
             ]
         else:
-            result = [
-                self._transformed_cdf(float(x), inclusive) for x in query.reshape(-1)
-            ]
+            assert self._transformed is not None
+            result = self._transformed.threshold_probabilities(
+                query.reshape(-1).tolist(), inclusive, False
+            )
         return _output(result, query.shape, scalar)
 
     def exceedance(self, values: Values, *, inclusive: bool = False) -> ValueResult:
@@ -445,10 +446,10 @@ class Distribution:
                 for x in query.reshape(-1)
             ]
         else:
-            result = [
-                self._transformed_exceedance(float(x), inclusive)
-                for x in query.reshape(-1)
-            ]
+            assert self._transformed is not None
+            result = self._transformed.threshold_probabilities(
+                query.reshape(-1).tolist(), inclusive, True
+            )
         return _output(result, query.shape, scalar)
 
     def mass(self, values: Values) -> ValueResult:
@@ -678,48 +679,6 @@ class Distribution:
         return p + (1 - p) * (
             1
             - cast(float, self._base.exceedance(x, inclusive=not inclusive)) / surviving
-        )
-
-    def _transformed_cdf(self, x: float, inclusive: bool) -> float:
-        assert self._transformed is not None
-        exact = self._threshold_probability(x, inclusive, exceedance=False)
-        if exact is not None:
-            return exact
-        lower, upper = self.support
-        if x < lower or (not inclusive and x == lower):
-            return 0.0
-        if x > upper or (inclusive and x == upper):
-            return 1.0
-        left, right = 0.0, 1.0
-        for _ in range(64):
-            midpoint = (left + right) / 2
-            value = self._transformed.quantile(midpoint)
-            if value <= x if inclusive else value < x:
-                left = midpoint
-            else:
-                right = midpoint
-        return (left + right) / 2
-
-    def _threshold_probability(
-        self, x: float, inclusive: bool, *, exceedance: bool
-    ) -> float | None:
-        from ._impacts import Impact
-
-        impact = Impact.from_json(_dump(self._data["impact"]))
-        source = Distribution.from_json(_dump(self._data["source"]))
-        assert self._transformed is not None
-        return impact._threshold_probability(
-            source,
-            x,
-            inclusive,
-            exceedance=exceedance,
-            at_atom=any(value == x for value, _ in self._transformed.atoms()),
-        )
-
-    def _transformed_exceedance(self, x: float, inclusive: bool) -> float:
-        exact = self._threshold_probability(x, inclusive, exceedance=True)
-        return (
-            exact if exact is not None else 1 - self._transformed_cdf(x, not inclusive)
         )
 
     @classmethod
@@ -979,7 +938,7 @@ class QuantileCurve:
             or (numpy.diff(q) <= 0).any()
             or (q < 0).any()
             or (q > 1).any()
-            or (numpy.diff(x) < 0).any()
+            or (x[1:] < x[:-1]).any()
         ):
             raise ValueError(
                 "quantile evidence requires matching ordered knots, probabilities strictly increasing in [0, 1] and values nondecreasing"
@@ -1006,11 +965,24 @@ class QuantileCurve:
             raise ValueError(
                 f"query lies outside supplied probability interval [{lo}, {hi}]"
             )
-        return _output(
-            numpy.interp(query.reshape(-1), self._probabilities, self._values),
-            query.shape,
-            scalar,
+        values = query.reshape(-1)
+        right = numpy.maximum(numpy.searchsorted(self._probabilities, values), 1)
+        left = right - 1
+        low, high = self._values[left], self._values[right]
+        q_low, q_high = self._probabilities[left], self._probabilities[right]
+        weight = (values - q_low) / (q_high - q_low)
+        result = numpy.empty_like(values)
+        # Weight first to avoid overflowing the slope. Interpolate opposite
+        # signs as a weighted sum to keep the value difference finite too.
+        opposite = (low < 0) & (high > 0)
+        same = ~opposite
+        result[opposite] = (
+            low[opposite] * (1 - weight[opposite]) + high[opposite] * weight[opposite]
         )
+        result[same] = low[same] + (high[same] - low[same]) * weight[same]
+        result[weight == 0] = low[weight == 0]
+        result[weight == 1] = high[weight == 1]
+        return _output(result, query.shape, scalar)
 
     def condition(self, *, q_min: float, q_max: float) -> Distribution:
         q_min = _finite(q_min, "q_min")

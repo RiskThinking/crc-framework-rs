@@ -87,6 +87,25 @@ def test_fixed_family_constraints_are_fitted_inside_requested_family() -> None:
     )
 
 
+def test_quantile_fit_can_hold_a_quantile_at_an_exact_constraint() -> None:
+    family = DistributionFamily.GUMBEL_RIGHT
+    law = Distribution.parametric(family, location=1, scale=2)
+    probabilities = [0.1, 0.2, 0.4, 0.5, 0.7, 0.8, 0.9]
+    values = law.quantile(probabilities)
+    median = law.quantile(0.5)
+    result = fit_quantiles(
+        QuantileCurve(probabilities, values),
+        QuantileFit(
+            family=family,
+            constraints=FitConstraints(
+                probability=0.5, minimum_value=median, maximum_value=median
+            ),
+        ),
+    )
+    assert result.distribution.quantile(0.5) == median
+    np.testing.assert_allclose(result.distribution.quantile(probabilities), values)
+
+
 def test_failed_mle_does_not_masquerade_as_moments(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

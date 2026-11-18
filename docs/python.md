@@ -148,11 +148,13 @@ only its explicit candidate specifications. Sample selection uses
 not treated as an independent sample for a KS test. `FitConstraints` apply to the
 requested fit; they do not authorize fitting other families.
 
-A `FitResult` contains the law, diagnostics, and an authoritative `FitRecord`:
-requested specification, actual estimator, convergence, attempts, the
-`selected_attempt` index, effective weights, evidence counts and support, and engine version. Distribution
-parameters remain in the numerical representation rather than being duplicated
-inside diagnostics.
+A `FitResult` contains the law, diagnostics, and a `FitRecord` with the requested
+specification, actual estimator, convergence, attempts, the selected attempt
+index, effective weights, evidence counts and support, and engine version.
+Sample attempts report their KS statistic and p-value. Quantile attempts
+report normalized RMSE and the residual measures for the requested operation.
+Model selection picks the first converged candidate with the lowest recorded
+score. Distribution parameters are available on the fitted law.
 
 ## Evaluate impacts explicitly
 
