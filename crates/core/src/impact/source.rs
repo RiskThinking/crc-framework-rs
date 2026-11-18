@@ -3,6 +3,9 @@
 //! Histogram bins are uniform. Discrete and point-mass laws keep their atoms.
 //! Canonical curves are accepted only as full distributions.
 
+use std::borrow::Cow;
+
+use crate::numerical::{ProbabilitySegment, segment_inverse_survival, segment_quantile};
 use crate::{
     Distribution, EmpiricalDistribution, FittedDistribution, HurdleDistribution,
     PointMassDistribution, TabulatedDistribution,
@@ -182,6 +185,18 @@ impl HistogramExposure {
         *knots.last_mut().expect("knots exist") = 1.0;
         knots
     }
+
+    fn inverse_survival(&self, survival: f64, upper: bool) -> f64 {
+        let mut consumed = 0.0;
+        for (edges, &mass) in self.edges.windows(2).zip(&self.normalized).rev() {
+            let next = consumed + mass;
+            if mass > 0.0 && (survival < next || (upper && survival == next)) {
+                return edges[1] + (edges[0] - edges[1]) * ((survival - consumed) / mass);
+            }
+            consumed = next;
+        }
+        self.edges[self.normalized.iter().position(|&p| p > 0.0).unwrap()]
+    }
 }
 
 /// Finite support with explicit probability atoms.
@@ -307,8 +322,27 @@ impl DiscreteDistribution {
     }
 }
 
-/// Exposure law accepted by expectation and distribution transformation.
+/// Ordered finite intervals and atoms with their own probability masses.
 #[derive(Clone, Debug)]
+pub struct WeightedSegments(Vec<ProbabilitySegment>);
+
+impl WeightedSegments {
+    fn probability(&self, start: f64, end: f64, start_closed: bool, end_closed: bool) -> f64 {
+        neumaier(self.0.iter().map(|&(lo, hi, mass)| {
+            if lo == hi {
+                let after = lo > start || (start_closed && lo == start);
+                let before = hi < end || (end_closed && hi == end);
+                if after && before { mass } else { 0.0 }
+            } else {
+                mass * ((hi.min(end) - lo.max(start)).max(0.0) / (hi - lo))
+            }
+        }))
+        .clamp(0.0, 1.0)
+    }
+}
+
+#[derive(Clone, Debug)]
+/// Exposure law accepted by expectation and distribution transformation.
 pub enum ImpactSource {
     Histogram(HistogramExposure),
     Discrete(DiscreteDistribution),
@@ -317,9 +351,91 @@ pub enum ImpactSource {
     Fitted(FittedDistribution),
     Hurdle(HurdleDistribution),
     Empirical(EmpiricalDistribution),
+    Segments(WeightedSegments),
 }
 
 impl ImpactSource {
+    /// Exact masses for ordered uniform intervals and atoms, including gaps.
+    pub fn from_segments(mut segments: Vec<(f64, f64, f64)>) -> ContractResult<Self> {
+        let total = neumaier(segments.iter().map(|&(_, _, mass)| mass));
+        if !total.is_finite()
+            || (total - 1.0).abs() > MASS_TOLERANCE
+            || segments.iter().any(|&(lo, hi, mass)| {
+                !lo.is_finite() || !hi.is_finite() || lo > hi || !mass.is_finite() || mass < 0.0
+            })
+        {
+            return Err(fail(
+                "invalid_value",
+                "",
+                "finite segments require ordered bounds and masses summing to one",
+            ));
+        }
+        segments.retain(|&(_, _, mass)| mass > 0.0);
+        if segments.windows(2).any(|pair| pair[0].1 > pair[1].0) {
+            return Err(fail(
+                "invalid_value",
+                "",
+                "finite segments must be ordered and non-overlapping",
+            ));
+        }
+        if segments.iter().all(|&(lo, hi, _)| lo == hi) {
+            return DiscreteDistribution::new(
+                segments.iter().map(|&(x, _, _)| x).collect(),
+                segments.iter().map(|&(_, _, mass)| mass).collect(),
+            )
+            .map(Self::Discrete);
+        }
+        for (_, _, mass) in &mut segments {
+            *mass /= total;
+        }
+        Ok(Self::Segments(WeightedSegments(segments)))
+    }
+
+    pub(crate) fn weighted_segments(&self) -> Option<Cow<'_, [ProbabilitySegment]>> {
+        match self {
+            Self::Segments(segments) => Some(Cow::Borrowed(&segments.0)),
+            Self::Histogram(histogram) => Some(Cow::Owned(
+                histogram
+                    .edges
+                    .windows(2)
+                    .zip(&histogram.normalized)
+                    .filter(|&(_, &mass)| mass > 0.0)
+                    .map(|(edges, &mass)| (edges[0], edges[1], mass))
+                    .collect(),
+            )),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn interval_probability(
+        &self,
+        start: f64,
+        end: f64,
+        start_closed: bool,
+        end_closed: bool,
+    ) -> f64 {
+        if let Self::Segments(segments) = self {
+            return segments.probability(start, end, start_closed, end_closed);
+        }
+        let left = if start_closed {
+            self.cdf_below(start)
+        } else {
+            self.cdf(start)
+        };
+        if left > 0.5 {
+            let left_tail = self.survival_at(start, start_closed);
+            let right_tail = self.survival_at(end, !end_closed);
+            (left_tail - right_tail).max(0.0)
+        } else {
+            let right = if end_closed {
+                self.cdf(end)
+            } else {
+                self.cdf_below(end)
+            };
+            (right - left).max(0.0)
+        }
+    }
+
     pub fn from_curve(curve: KernelCurve) -> ContractResult<Self> {
         match curve {
             KernelCurve::Fitted(distribution) => Ok(Self::Fitted(distribution)),
@@ -346,7 +462,7 @@ impl ImpactSource {
 
     pub(crate) fn is_full_probability_support(&self) -> bool {
         match self {
-            Self::Histogram(_) | Self::Discrete(_) | Self::PointMass(_) => true,
+            Self::Histogram(_) | Self::Discrete(_) | Self::PointMass(_) | Self::Segments(_) => true,
             Self::Tabulated(distribution) => distribution.has_full_probability_support(),
             Self::Fitted(distribution) => distribution.has_full_probability_support(),
             Self::Hurdle(distribution) => distribution.has_full_probability_support(),
@@ -371,6 +487,7 @@ impl ImpactSource {
                 | Self::PointMass(_)
                 | Self::Tabulated(_)
                 | Self::Empirical(_)
+                | Self::Segments(_)
         )
     }
 
@@ -398,6 +515,7 @@ impl ImpactSource {
             Self::Hurdle(distribution) => {
                 distribution.ppf(probability).map_err(distribution_error)?
             }
+            Self::Segments(segments) => segment_quantile(&segments.0, probability, false),
         };
         if value.is_finite() {
             Ok(value)
@@ -423,6 +541,11 @@ impl ImpactSource {
             Self::Tabulated(distribution) => distribution
                 .upper_quantile(probability)
                 .map_err(distribution_error),
+            Self::Segments(segments)
+                if probability.is_finite() && (0.0..=1.0).contains(&probability) =>
+            {
+                Ok(segment_quantile(&segments.0, probability, true))
+            }
             _ => self.quantile(probability),
         }
     }
@@ -448,23 +571,7 @@ impl ImpactSource {
                     .isf(survival / weight * distribution.base().sf(distribution.atom_location()))
                     .map_err(distribution_error)
             }
-            Self::Histogram(histogram) => {
-                let mut consumed = 0.0;
-                for index in (0..histogram.normalized.len()).rev() {
-                    let mass = histogram.normalized[index];
-                    if mass > 0.0 && (survival < consumed + mass || survival == 0.0) {
-                        return Ok(histogram.edges[index + 1]
-                            - (survival - consumed) / mass
-                                * (histogram.edges[index + 1] - histogram.edges[index]));
-                    }
-                    consumed += mass;
-                }
-                Ok(histogram.edges[histogram
-                    .normalized
-                    .iter()
-                    .position(|p| *p > 0.0)
-                    .expect("positive mass")])
-            }
+            Self::Histogram(histogram) => Ok(histogram.inverse_survival(survival, false)),
             Self::Tabulated(distribution) => {
                 let mut consumed = 0.0;
                 let q = distribution.probabilities();
@@ -481,6 +588,7 @@ impl ImpactSource {
                 Ok(x[0])
             }
             Self::PointMass(distribution) => Ok(distribution.location()),
+            Self::Segments(segments) => Ok(segment_inverse_survival(&segments.0, survival, false)),
             Self::Discrete(_) | Self::Empirical(_) => {
                 let atoms = self.point_atoms();
                 let mut consumed = 0.0;
@@ -492,6 +600,14 @@ impl ImpactSource {
                 }
                 Ok(atoms[0].0)
             }
+        }
+    }
+
+    pub(crate) fn upper_quantile_from_survival(&self, survival: f64) -> ContractResult<f64> {
+        match self {
+            Self::Segments(segments) => Ok(segment_inverse_survival(&segments.0, survival, true)),
+            Self::Histogram(histogram) => Ok(histogram.inverse_survival(survival, true)),
+            _ => self.upper_quantile(1.0 - survival),
         }
     }
 
@@ -550,6 +666,7 @@ impl ImpactSource {
                     .filter(|(v, _)| if inclusive { *v >= x } else { *v > x })
                     .map(|(_, p)| *p),
             ),
+            Self::Segments(segments) => segments.probability(x, f64::INFINITY, inclusive, false),
         }
     }
 
@@ -562,6 +679,7 @@ impl ImpactSource {
             Self::Fitted(distribution) => distribution.cdf(x),
             Self::Hurdle(distribution) => distribution.cdf(x),
             Self::Empirical(distribution) => distribution.cdf(x),
+            Self::Segments(segments) => segments.probability(f64::NEG_INFINITY, x, false, true),
         }
     }
 
@@ -574,6 +692,7 @@ impl ImpactSource {
             Self::Fitted(distribution) => distribution.cdf_below(x),
             Self::Hurdle(distribution) => distribution.cdf_below(x),
             Self::Empirical(distribution) => distribution.cdf_below(x),
+            Self::Segments(segments) => segments.probability(f64::NEG_INFINITY, x, false, false),
         }
     }
 
@@ -607,6 +726,11 @@ impl ImpactSource {
                 atoms
             }
             Self::Histogram(_) | Self::Fitted(_) => Vec::new(),
+            Self::Segments(segments) => segments
+                .0
+                .iter()
+                .filter_map(|&(lo, hi, mass)| (lo == hi).then_some((lo, mass)))
+                .collect(),
         }
     }
 
@@ -632,6 +756,14 @@ impl ImpactSource {
                     .collect()
             }
             Self::Fitted(_) | Self::Hurdle(_) => vec![0.0, 1.0],
+            Self::Segments(segments) => {
+                let mut knots = vec![0.0];
+                for &(_, _, mass) in &segments.0 {
+                    knots.push(knots.last().unwrap() + mass);
+                }
+                *knots.last_mut().unwrap() = 1.0;
+                knots
+            }
         }
     }
 
@@ -675,6 +807,10 @@ impl ImpactSource {
                 let (_, upper) = fitted_support(distribution.base());
                 (Tail::Finite(distribution.atom_location()), upper)
             }
+            Self::Segments(segments) => (
+                Tail::Finite(segments.0[0].0),
+                Tail::Finite(segments.0.last().unwrap().1),
+            ),
         }
     }
 
@@ -694,7 +830,8 @@ impl ImpactSource {
             | Self::Discrete(_)
             | Self::PointMass(_)
             | Self::Tabulated(_)
-            | Self::Empirical(_) => true,
+            | Self::Empirical(_)
+            | Self::Segments(_) => true,
             Self::Fitted(distribution) => fitted_mean_is_finite(distribution),
             Self::Hurdle(distribution) => fitted_mean_is_finite(distribution.base()),
         }

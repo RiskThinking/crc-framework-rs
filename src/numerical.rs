@@ -47,6 +47,9 @@ impl PyNumericalLaw {
     fn support(&self) -> (f64, f64) {
         self.inner.support()
     }
+    fn atoms(&self, py: Python<'_>) -> Vec<(f64, f64)> {
+        py.detach(|| self.inner.atoms())
+    }
     fn quantile(&self, py: Python<'_>, values: Vec<f64>) -> PyResult<Vec<f64>> {
         py.detach(|| {
             values

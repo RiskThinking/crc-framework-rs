@@ -50,10 +50,21 @@ def build():
     )
     curve = QuantileCurve([0.1, 0.5, 0.9], [0, 1, 3])
     complete = curve.complete(TailCompletion(lower=-1, upper=4))
+    conditioned = QuantileCurve(
+        [0.1, 0.4, 0.7, 0.9], [-50, -31, 7, 11]
+    ).condition(q_min=0.2, q_max=0.6)
+    discrete_base = Distribution.discrete([-1, 2, 3], [0.5, 0.1, 0.4])
+    discrete_hurdle = Distribution.hurdle(discrete_base, atom_probability=0.2)
+    decreasing = Impact.linear(slope=-2, intercept=1, input=Ratio(), output=Ratio())
+    sigmoid = Impact.sigmoid(midpoint=0, steepness=1, input=Ratio(), output=Ratio())
+    clamped_affine = Impact.linear(
+        slope=0.5, intercept=3, maximum=6, input=Ratio(), output=Ratio()
+    )
     objects.extend(
         [
             ("completed", complete),
             ("conditioned", curve.condition(q_min=0.2, q_max=0.8)),
+            ("conditioned-interpolated-endpoints", conditioned),
             (
                 "hurdle",
                 Distribution.hurdle(
@@ -63,22 +74,34 @@ def build():
                     atom_probability=0.3,
                 ),
             ),
+            ("discrete-hurdle", discrete_hurdle),
+            (
+                "conditioned-discrete-law",
+                Distribution.hurdle(discrete_base, atom_probability=0.0),
+            ),
         ]
     )
     objects.extend(
         [
             ("hurdle-completed", Distribution.hurdle(complete, atom_probability=0.2)),
+            ("decreasing", decreasing.pushforward(objects[0][1])),
+            ("transformed-discrete-hurdle", decreasing.pushforward(discrete_hurdle)),
             (
-                "decreasing",
-                Impact.linear(
-                    slope=-2, intercept=1, input=Ratio(), output=Ratio()
-                ).pushforward(objects[0][1]),
+                "composed-clamped-affine",
+                decreasing.pushforward(clamped_affine.pushforward(objects[0][1])),
+            ),
+            (
+                "composed-piecewise-affine",
+                sigmoid.pushforward(clamped_affine.pushforward(complete)),
             ),
         ]
     )
     for name, value in objects:
         queries = []
-        for q in [0, 0.1, 0.5, 0.9, 0.99, 1]:
+        coordinates = [0, 0.1, 0.5, 0.9, 0.99, 1]
+        if name == "discrete-hurdle":
+            coordinates[2:2] = [0.2, math.nextafter(0.2, 1.0)]
+        for q in coordinates:
             try:
                 result = float(value.quantile(q))
                 query = (
@@ -204,6 +227,12 @@ def build():
     broken = json.loads(complete.to_json())
     broken["values"][1] = 0.2
     bad("forged-completion", broken, False)
+    broken = json.loads(conditioned.to_json())
+    broken["values"][-1] += 1
+    bad("forged-conditioning", broken, False)
+    broken = json.loads(complete.to_json())
+    broken["evidence"] = None
+    bad("null-modelling-record", broken)
     return {
         "schema_version": "1.0",
         "accepted": accepted,

@@ -3,7 +3,10 @@ use serde_json::{Value, json};
 use std::sync::LazyLock;
 
 use crate::error::{CrcError, Result};
-use crate::numerical::NumericalLaw;
+use crate::numerical::{
+    NumericalLaw, ProbabilitySegment, condition_segments, segment_inverse_survival,
+    segment_quantile,
+};
 use crate::{
     DiscreteDistribution, HistogramExposure, HurdleDistribution, ImpactDefinition,
     ImpactDistribution, ImpactSource, Interpolation, PointMassDistribution, TabulatedDistribution,
@@ -416,7 +419,7 @@ enum Compiled {
     },
     Transformed {
         source: Box<Numerical>,
-        document: Value,
+        definition: Box<ImpactDefinition>,
         image: Box<ImpactDistribution>,
     },
 }
@@ -454,13 +457,6 @@ fn bare(document: &Value) -> Value {
     map.remove("schema_version");
     map.remove("object");
     map.remove("evidence");
-    if let Some(base) = map.get_mut("base") {
-        let enveloped =
-            json!({"schema_version":"1.0","object":"distribution", "kind":base["kind"]});
-        let mut full = enveloped.as_object().unwrap().clone();
-        full.extend(base.as_object().unwrap().clone());
-        *base = bare(&Value::Object(full));
-    }
     data
 }
 fn envelope(data: &Value) -> Value {
@@ -489,13 +485,11 @@ impl Numerical {
             }
         } else if document["kind"] == "transformed" {
             let source = Box::new(Self::from_value(document["source"].clone())?);
-            let function = compile_impact(&document["impact"])?;
-            let image = function
-                .transform_distribution(&source.impact_source()?)
-                .map_err(invalid)?;
+            let definition = compile_impact(&document["impact"])?;
+            let image = source.transform(&definition, &document["impact"])?;
             Compiled::Transformed {
                 source,
-                document: document["impact"].clone(),
+                definition: Box::new(definition),
                 image: Box::new(image),
             }
         } else if document["kind"] == "hurdle" {
@@ -509,10 +503,17 @@ impl Numerical {
                     "hurdle requires a complete nonempty conditional tail",
                 ));
             }
-            Compiled::Hurdle {
-                base,
-                probability,
-                location,
+            match base.compiled {
+                Compiled::Law(law) => Compiled::Law(NumericalLaw::Hurdle {
+                    base: Box::new(law),
+                    atom_probability: probability,
+                    atom_location: location,
+                }),
+                _ => Compiled::Hurdle {
+                    base,
+                    probability,
+                    location,
+                },
             }
         } else {
             Compiled::Law(NumericalLaw::from_json(&bare(&document).to_string())?)
@@ -544,8 +545,12 @@ impl Numerical {
             } => {
                 if *p == 1.0 || q <= *p && *p > 0.0 {
                     Ok(*a)
+                } else if let Some(segments) = self.finite_segments()? {
+                    Ok(segment_quantile(&segments, q, false))
                 } else {
-                    base.inverse_survival((1.0 - q) / (1.0 - p) * base.exceedance(*a, false)?)
+                    Ok(base
+                        .inverse_survival((1.0 - q) / (1.0 - p) * base.exceedance(*a, false)?)?
+                        .max(*a))
                 }
             }
             Compiled::Transformed { image, .. } => image.quantile(q).map_err(invalid),
@@ -560,10 +565,14 @@ impl Numerical {
                 probability: p,
                 location: a,
             } => {
-                if *p == 1.0 || s >= 1.0 - p {
+                if *p == 1.0 || *p > 0.0 && s >= 1.0 - p {
                     Ok(*a)
+                } else if let Some(segments) = self.finite_segments()? {
+                    Ok(segment_inverse_survival(&segments, s, false))
                 } else {
-                    base.inverse_survival(s / (1.0 - p) * base.exceedance(*a, false)?)
+                    Ok(base
+                        .inverse_survival(s / (1.0 - p) * base.exceedance(*a, false)?)?
+                        .max(*a))
                 }
             }
             Compiled::Curve { .. } => Err(invalid("partial quantile evidence is not a law")),
@@ -585,11 +594,12 @@ impl Numerical {
                     Ok((1.0 - p) * base.exceedance(x, inclusive)? / base.exceedance(*a, false)?)
                 }
             }
-            Compiled::Transformed {
-                source,
-                document,
-                image,
-            } => {
+            Compiled::Transformed { source, image, .. } => {
+                if let Some(segments) = self.finite_segments()? {
+                    let image = ImpactSource::from_segments(segments).map_err(invalid)?;
+                    return Ok(image.survival_at(x, inclusive));
+                }
+                let document = &self.document["impact"];
                 let model = &document["model"];
                 if model["kind"] == "linear" && document.get("clamp").is_none() {
                     let slope = number(model, "slope")?;
@@ -626,6 +636,26 @@ impl Numerical {
             )),
         }
     }
+    fn transform(
+        &self,
+        function: &ImpactDefinition,
+        document: &Value,
+    ) -> Result<ImpactDistribution> {
+        match self.impact_source() {
+            Ok(source) => function.transform_distribution(&source).map_err(invalid),
+            Err(error @ CrcError::Unsupported(_)) => {
+                if let Compiled::Transformed { source, .. } = &self.compiled {
+                    if let Some(composed) = compose_affine(document, &self.document["impact"]) {
+                        let function = compile_impact(&composed)?;
+                        return source.transform(&function, &composed);
+                    }
+                }
+                Err(error)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
     pub fn impact_source(&self) -> Result<ImpactSource> {
         if !self.is_distribution() {
             return Err(invalid(
@@ -634,39 +664,53 @@ impl Numerical {
         }
         match &self.compiled {
             Compiled::Law(law) => law_source(law),
+            Compiled::Hurdle { .. } | Compiled::Transformed { .. } => {
+                let segments = self.finite_segments()?.ok_or_else(|| {
+                    CrcError::Unsupported("no exact source for this compound law".into())
+                })?;
+                ImpactSource::from_segments(segments).map_err(invalid)
+            }
+            Compiled::Curve { .. } => unreachable!(),
+        }
+    }
+
+    fn finite_segments(&self) -> Result<Option<Vec<ProbabilitySegment>>> {
+        match &self.compiled {
+            Compiled::Law(law) => Ok(law.finite_segments()),
             Compiled::Hurdle {
                 base,
                 probability,
                 location,
             } => {
                 if *probability == 1.0 {
-                    return PointMassDistribution::new(*location).map(ImpactSource::PointMass);
+                    return Ok(Some(vec![(*location, *location, 1.0)]));
                 }
-                match base.impact_source()? {
-                    ImpactSource::Fitted(fitted) => {
-                        HurdleDistribution::new(*location, *probability, fitted)
-                            .map(ImpactSource::Hurdle)
-                    }
-                    _ => Err(CrcError::Unsupported("exact compound hurdle source".into())),
-                }
+                let Some(segments) = base.finite_segments()? else {
+                    return Ok(None);
+                };
+                Ok(Some(condition_segments(
+                    segments,
+                    *probability,
+                    *location,
+                    base.exceedance(*location, false)?,
+                )))
             }
-            Compiled::Transformed { image, .. } => {
-                let atoms = image.atoms();
-                let mass = atoms.iter().map(|a| a.probability).sum::<f64>();
-                if mass == 1.0 {
-                    DiscreteDistribution::new(
-                        atoms.iter().map(|a| a.value).collect(),
-                        atoms.iter().map(|a| a.probability).collect(),
-                    )
-                    .map(ImpactSource::Discrete)
-                    .map_err(invalid)
-                } else {
-                    Err(CrcError::Unsupported(
-                        "exact compound transformed source".into(),
-                    ))
-                }
+            Compiled::Transformed { image, .. } if image.is_discrete() => Ok(Some(
+                image
+                    .atoms()
+                    .iter()
+                    .map(|atom| (atom.value, atom.value, atom.probability))
+                    .collect(),
+            )),
+            Compiled::Transformed {
+                source, definition, ..
+            } => {
+                let Some(segments) = source.finite_segments()? else {
+                    return Ok(None);
+                };
+                definition.image_segments(&segments).map_err(invalid)
             }
-            Compiled::Curve { .. } => unreachable!(),
+            Compiled::Curve { .. } => Ok(None),
         }
     }
     fn validate_evidence(&self) -> Result<()> {
@@ -755,11 +799,14 @@ fn interpolate(q: &[f64], x: &[f64], p: f64) -> Result<f64> {
     let upper = q.partition_point(|a| *a < p);
     if upper == 0 {
         Ok(x[0])
-    } else if upper == q.len() {
-        Ok(*x.last().unwrap())
+    } else if q[upper] == p {
+        Ok(x[upper])
     } else {
         let i = upper - 1;
-        Ok(x[i] + (x[i + 1] - x[i]) * (p - q[i]) / (q[i + 1] - q[i]))
+        // Match the public quantile curve's slope-first interpolation exactly
+        // when reconstructing the endpoints of recorded conditioning.
+        let slope = (x[upper] - x[i]) / (q[upper] - q[i]);
+        Ok(slope * (p - q[i]) + x[i])
     }
 }
 fn law_source(law: &NumericalLaw) -> Result<ImpactSource> {
@@ -794,14 +841,60 @@ fn law_source(law: &NumericalLaw) -> Result<ImpactSource> {
             base,
             atom_probability,
             atom_location,
-        } => match base.as_ref() {
-            NumericalLaw::Parametric(d) => {
+        } => match (*atom_probability, base.as_ref()) {
+            (1.0, _) => PointMassDistribution::new(*atom_location).map(ImpactSource::PointMass),
+            (p, NumericalLaw::Parametric(d)) if p > 0.0 => {
                 HurdleDistribution::new(*atom_location, *atom_probability, d.clone())
                     .map(ImpactSource::Hurdle)
             }
-            _ => Err(CrcError::Unsupported("exact nested hurdle source".into())),
+            _ => {
+                let segments = law.finite_segments().ok_or_else(|| {
+                    CrcError::Unsupported("no exact source for this hurdle law".into())
+                })?;
+                ImpactSource::from_segments(segments).map_err(invalid)
+            }
         },
     }
+}
+
+fn compose_affine(outer: &Value, inner: &Value) -> Option<Value> {
+    let outer_model = &outer["model"];
+    let inner_model = &inner["model"];
+    if outer_model["kind"] != "linear"
+        || inner_model["kind"] != "linear"
+        || outer.get("clamp").is_some()
+    {
+        return None;
+    }
+    let slope = outer_model["slope"].as_f64()?;
+    let intercept = outer_model["intercept"].as_f64().unwrap_or(0.0);
+    let mut composed = json!({
+        "schema_version": "2.0",
+        "input": inner["input"],
+        "output": outer["output"],
+        "model": {
+            "kind": "linear",
+            "slope": slope * inner_model["slope"].as_f64()?,
+            "intercept": slope * inner_model["intercept"].as_f64().unwrap_or(0.0) + intercept,
+        },
+    });
+    if let Some(clamp) = inner.get("clamp") {
+        let minimum = clamp["minimum"].as_f64().map(|x| slope * x + intercept);
+        let maximum = clamp["maximum"].as_f64().map(|x| slope * x + intercept);
+        let (minimum, maximum) = if slope < 0.0 {
+            (maximum, minimum)
+        } else {
+            (minimum, maximum)
+        };
+        let mut mapped = serde_json::Map::new();
+        for (bound, value) in [("minimum", minimum), ("maximum", maximum)] {
+            if let Some(value) = value {
+                mapped.insert(bound.into(), json!(value));
+            }
+        }
+        composed["clamp"] = Value::Object(mapped);
+    }
+    Some(composed)
 }
 fn compile_impact(document: &Value) -> Result<ImpactDefinition> {
     validate_structure(

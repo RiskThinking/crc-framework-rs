@@ -653,6 +653,71 @@
       ]
     },
     {
+      "name": "conditioned-interpolated-endpoints",
+      "document": {
+        "evidence": {
+          "operation": "condition",
+          "q_max": 0.6,
+          "q_min": 0.2,
+          "source": {
+            "object": "quantile_curve",
+            "probabilities": [
+              0.1,
+              0.4,
+              0.7,
+              0.9
+            ],
+            "schema_version": "1.0",
+            "values": [
+              -50.0,
+              -31.0,
+              7.0,
+              11.0
+            ]
+          }
+        },
+        "kind": "quantile",
+        "object": "distribution",
+        "probabilities": [
+          0.0,
+          0.5000000000000001,
+          1.0
+        ],
+        "schema_version": "1.0",
+        "values": [
+          -43.66666666666667,
+          -31.0,
+          -5.666666666666664
+        ]
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -43.66666666666667
+        },
+        {
+          "probability": 0.1,
+          "value": -41.13333333333334
+        },
+        {
+          "probability": 0.5,
+          "value": -31.000000000000004
+        },
+        {
+          "probability": 0.9,
+          "value": -10.73333333333333
+        },
+        {
+          "probability": 0.99,
+          "value": -6.173333333333332
+        },
+        {
+          "probability": 1,
+          "value": -5.666666666666664
+        }
+      ]
+    },
+    {
       "name": "hurdle",
       "document": {
         "atom_location": 0.0,
@@ -691,6 +756,112 @@
         {
           "probability": 1,
           "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "discrete-hurdle",
+      "document": {
+        "atom_location": 0.0,
+        "atom_probability": 0.2,
+        "base": {
+          "kind": "discrete",
+          "probabilities": [
+            0.5,
+            0.1,
+            0.4
+          ],
+          "values": [
+            -1.0,
+            2.0,
+            3.0
+          ]
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 0.1,
+          "value": 0.0
+        },
+        {
+          "probability": 0.2,
+          "value": 0.0
+        },
+        {
+          "probability": 0.20000000000000004,
+          "value": 2.0
+        },
+        {
+          "probability": 0.5,
+          "value": 3.0
+        },
+        {
+          "probability": 0.9,
+          "value": 3.0
+        },
+        {
+          "probability": 0.99,
+          "value": 3.0
+        },
+        {
+          "probability": 1,
+          "value": 3.0
+        }
+      ]
+    },
+    {
+      "name": "conditioned-discrete-law",
+      "document": {
+        "atom_location": 0.0,
+        "atom_probability": 0.0,
+        "base": {
+          "kind": "discrete",
+          "probabilities": [
+            0.5,
+            0.1,
+            0.4
+          ],
+          "values": [
+            -1.0,
+            2.0,
+            3.0
+          ]
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 2.0
+        },
+        {
+          "probability": 0.1,
+          "value": 2.0
+        },
+        {
+          "probability": 0.5,
+          "value": 3.0
+        },
+        {
+          "probability": 0.9,
+          "value": 3.0
+        },
+        {
+          "probability": 0.99,
+          "value": 3.0
+        },
+        {
+          "probability": 1,
+          "value": 3.0
         }
       ]
     },
@@ -753,15 +924,15 @@
         },
         {
           "probability": 0.5,
-          "value": 0.84375
+          "value": 0.8437499999999998
         },
         {
           "probability": 0.9,
-          "value": 2.9375
+          "value": 2.9374999999999996
         },
         {
           "probability": 0.99,
-          "value": 3.8875
+          "value": 3.8874999999999993
         },
         {
           "probability": 1,
@@ -825,6 +996,276 @@
         {
           "probability": 1,
           "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "transformed-discrete-hurdle",
+      "document": {
+        "impact": {
+          "input": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "model": {
+            "intercept": 1,
+            "kind": "linear",
+            "slope": -2
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "atom_location": 0.0,
+          "atom_probability": 0.2,
+          "base": {
+            "kind": "discrete",
+            "probabilities": [
+              0.5,
+              0.1,
+              0.4
+            ],
+            "values": [
+              -1.0,
+              2.0,
+              3.0
+            ]
+          },
+          "kind": "hurdle",
+          "object": "distribution",
+          "schema_version": "1.0"
+        }
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -5.0
+        },
+        {
+          "probability": 0.1,
+          "value": -5.0
+        },
+        {
+          "probability": 0.5,
+          "value": -5.0
+        },
+        {
+          "probability": 0.9,
+          "value": 1.0
+        },
+        {
+          "probability": 0.99,
+          "value": 1.0
+        },
+        {
+          "probability": 1,
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "name": "composed-clamped-affine",
+      "document": {
+        "impact": {
+          "input": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "model": {
+            "intercept": 1,
+            "kind": "linear",
+            "slope": -2
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "impact": {
+            "clamp": {
+              "maximum": 6
+            },
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "intercept": 3,
+              "kind": "linear",
+              "slope": 0.5
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "object": "distribution",
+          "schema_version": "1.0",
+          "source": {
+            "family": "genextreme",
+            "kind": "parametric",
+            "location": 1.2,
+            "object": "distribution",
+            "scale": 2.0,
+            "schema_version": "1.0",
+            "shape": 0.1
+          }
+        }
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -11.0
+        },
+        {
+          "probability": 0.1,
+          "value": -10.230262247671426
+        },
+        {
+          "probability": 0.5,
+          "value": -6.919755290644206
+        },
+        {
+          "probability": 0.9,
+          "value": -4.460399221308794
+        },
+        {
+          "probability": 0.99,
+          "value": -2.9000727992654287
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "composed-piecewise-affine",
+      "document": {
+        "impact": {
+          "input": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "model": {
+            "amplitude": 1,
+            "kind": "sigmoid",
+            "midpoint": 0,
+            "offset": 0,
+            "steepness": 1
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "impact": {
+            "clamp": {
+              "maximum": 6
+            },
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "intercept": 3,
+              "kind": "linear",
+              "slope": 0.5
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "object": "distribution",
+          "schema_version": "1.0",
+          "source": {
+            "evidence": {
+              "operation": "complete",
+              "policy": {
+                "lower": -1,
+                "name": "finite_endpoints",
+                "upper": 4
+              },
+              "source": {
+                "object": "quantile_curve",
+                "probabilities": [
+                  0.1,
+                  0.5,
+                  0.9
+                ],
+                "schema_version": "1.0",
+                "values": [
+                  0.0,
+                  1.0,
+                  3.0
+                ]
+              }
+            },
+            "kind": "quantile",
+            "object": "distribution",
+            "probabilities": [
+              0.0,
+              0.1,
+              0.5,
+              0.9,
+              1.0
+            ],
+            "schema_version": "1.0",
+            "values": [
+              -1,
+              0.0,
+              1.0,
+              3.0,
+              4
+            ]
+          }
+        }
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.9241418199787566
+        },
+        {
+          "probability": 0.1,
+          "value": 0.9525741268224334
+        },
+        {
+          "probability": 0.5,
+          "value": 0.9706877692486436
+        },
+        {
+          "probability": 0.9,
+          "value": 0.9890130573694068
+        },
+        {
+          "probability": 0.99,
+          "value": 0.9929664128450049
+        },
+        {
+          "probability": 1,
+          "value": 0.9933071490757153
         }
       ]
     }
@@ -1020,6 +1461,70 @@
         ]
       },
       "structural": false
+    },
+    {
+      "name": "forged-conditioning",
+      "document": {
+        "evidence": {
+          "operation": "condition",
+          "q_max": 0.6,
+          "q_min": 0.2,
+          "source": {
+            "object": "quantile_curve",
+            "probabilities": [
+              0.1,
+              0.4,
+              0.7,
+              0.9
+            ],
+            "schema_version": "1.0",
+            "values": [
+              -50.0,
+              -31.0,
+              7.0,
+              11.0
+            ]
+          }
+        },
+        "kind": "quantile",
+        "object": "distribution",
+        "probabilities": [
+          0.0,
+          0.5000000000000001,
+          1.0
+        ],
+        "schema_version": "1.0",
+        "values": [
+          -43.66666666666667,
+          -31.0,
+          -4.666666666666664
+        ]
+      },
+      "structural": false
+    },
+    {
+      "name": "null-modelling-record",
+      "document": {
+        "evidence": null,
+        "kind": "quantile",
+        "object": "distribution",
+        "probabilities": [
+          0.0,
+          0.1,
+          0.5,
+          0.9,
+          1.0
+        ],
+        "schema_version": "1.0",
+        "values": [
+          -1,
+          0.0,
+          1.0,
+          3.0,
+          4
+        ]
+      },
+      "structural": true
     }
   ],
   "rejected_text": [

@@ -233,25 +233,26 @@ fn exact_expectation(
         }
         let mut contributions = Vec::new();
         for (index, &value) in values.iter().enumerate() {
-            let lower = if index == 0 && *outside_domain == OutsideDomain::Clamp {
-                0.0
+            let start = if index == 0 && *outside_domain == OutsideDomain::Clamp {
+                f64::NEG_INFINITY
             } else {
-                source.cdf_below(edges[index])
+                edges[index]
             };
-            let upper = if index + 1 == values.len() {
+            let last = index + 1 == values.len();
+            let end = if last {
                 if *outside_domain == OutsideDomain::Clamp {
-                    1.0
+                    f64::INFINITY
                 } else {
-                    source.cdf(edges[index + 1])
+                    edges[index + 1]
                 }
             } else {
-                source.cdf_below(edges[index + 1])
+                edges[index + 1]
             };
             let response = clamp.maximum.map_or(value, |maximum| value.min(maximum));
             let response = clamp
                 .minimum
                 .map_or(response, |minimum| response.max(minimum));
-            contributions.push((upper - lower).max(0.0) * response);
+            contributions.push(source.interval_probability(start, end, true, last) * response);
         }
         return Ok(Some((neumaier(contributions), EXACT_PIECEWISE_VERSION)));
     }
@@ -285,6 +286,9 @@ fn piecewise_expectation(
     clamp: &Clamp,
     source: &ImpactSource,
 ) -> ContractResult<f64> {
+    if let Some(segments) = source.weighted_segments() {
+        return weighted_expectation(model, clamp, &segments);
+    }
     let mut breaks = source.probability_knots();
     for exposure in response_breakpoints(model, clamp) {
         let probability = source.cdf(exposure);
@@ -311,6 +315,42 @@ fn piecewise_expectation(
         let exposure = source.quantile(probability)?;
         let response = kernel::evaluate(model, clamp, exposure)?;
         contributions.push(width * response);
+    }
+    let value = neumaier(contributions);
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(fail(
+            "non_finite_result",
+            "",
+            "exact expectation is not finite",
+        ))
+    }
+}
+
+fn weighted_expectation(
+    model: &Model,
+    clamp: &Clamp,
+    segments: &[crate::numerical::ProbabilitySegment],
+) -> ContractResult<f64> {
+    let mut cuts = response_breakpoints(model, clamp);
+    cuts.sort_by(f64::total_cmp);
+    cuts.dedup();
+    let mut contributions = Vec::new();
+    for &(lo, hi, mass) in segments {
+        if lo == hi {
+            contributions.push(mass * kernel::evaluate(model, clamp, lo)?);
+            continue;
+        }
+        let start = cuts.partition_point(|cut| *cut <= lo);
+        let end = cuts.partition_point(|cut| *cut < hi);
+        let mut left = lo;
+        for right in cuts[start..end].iter().copied().chain(std::iter::once(hi)) {
+            let fraction = (right - left) / (hi - lo);
+            let midpoint = left + (right - left) * 0.5;
+            contributions.push(mass * fraction * kernel::evaluate(model, clamp, midpoint)?);
+            left = right;
+        }
     }
     let value = neumaier(contributions);
     if value.is_finite() {

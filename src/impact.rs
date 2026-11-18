@@ -100,15 +100,10 @@ struct PyImpactSource {
 #[pymethods]
 impl PyImpactSource {
     #[staticmethod]
-    fn segments(py: Python<'_>, probabilities: Vec<f64>, values: Vec<f64>) -> PyResult<Self> {
-        let distribution =
-            crc_framework_core::TabulatedDistribution::from_segments(probabilities, values)
-                .map_err(|error| {
-                    impact_error(py, value_error("invalid_value", "", &error.to_string()))
-                })?;
-        Ok(Self {
-            inner: ImpactSource::Tabulated(distribution),
-        })
+    fn segments(py: Python<'_>, segments: Vec<(f64, f64, f64)>) -> PyResult<Self> {
+        py.detach(|| ImpactSource::from_segments(segments))
+            .map(|inner| Self { inner })
+            .map_err(|error| impact_error(py, error))
     }
 
     #[staticmethod]

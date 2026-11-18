@@ -10,6 +10,7 @@ from enum import Enum
 from typing import TypedDict, cast
 
 import numpy as np
+import numpy.typing as npt
 
 from . import _core
 from ._diagnostics import Diagnostic, DiagnosticSeverity, ScientificValue
@@ -430,6 +431,18 @@ def _label(specification: FitSpec) -> str:
     return specification.kind.value
 
 
+def _normalized_weights(weights: npt.NDArray[np.float64]) -> tuple[float, ...]:
+    scaled = weights / float(np.max(weights))
+    normalized = tuple(float(value) for value in scaled / float(np.sum(scaled)))
+    if any(
+        weight == 0 and original > 0 for weight, original in zip(normalized, weights)
+    ):
+        raise ValueError(
+            "relative weights are too small to represent; positive weights cannot be silently dropped"
+        )
+    return normalized
+
+
 def _failure(
     specification: FitSpec,
     attempts: list[FitAttempt],
@@ -623,17 +636,7 @@ def fit_quantiles(
                 raise ValueError(
                     f"requires at least {candidate.minimum_knots} positive-weight knots"
                 )
-            scaled_weights = weights / float(np.max(weights))
-            normalized = tuple(
-                float(value) for value in scaled_weights / float(np.sum(scaled_weights))
-            )
-            if any(
-                weight == 0 and original > 0
-                for weight, original in zip(normalized, weights)
-            ):
-                raise ValueError(
-                    "relative weights are too small to represent; positive weights cannot be silently dropped"
-                )
+            normalized = _normalized_weights(weights)
             last_used, last_weights = used, normalized
             fit_probabilities, fit_values = probabilities[active], values[active]
             fit_weights = np.asarray(normalized, dtype=np.float64)[active]
@@ -1041,6 +1044,20 @@ def _decode_record(value: object) -> FitRecord:
             raise ValueError("a converged attempt cannot have a failure reason")
         if attempt.status is not FitStatus.CONVERGED and not reason:
             raise ValueError("a failed or rejected attempt requires its reason")
+        converged_attempt = attempt.status is FitStatus.CONVERGED
+        expected_code = (
+            f"fit.{attempt.specification.kind.value}"
+            if converged_attempt
+            else "fit.failed"
+        )
+        expected_severity = (
+            DiagnosticSeverity.INFO if converged_attempt else DiagnosticSeverity.ERROR
+        )
+        if not any(
+            d.code == expected_code and d.severity is expected_severity and d.message
+            for d in attempt.diagnostics
+        ):
+            raise ValueError("a fit attempt requires diagnostics for its outcome")
     if not attempts:
         raise ValueError("a fitting record requires at least one attempt")
     cursor = 0
@@ -1099,17 +1116,43 @@ def _decode_record(value: object) -> FitRecord:
         raise ValueError("actual estimator contradicts the selected attempt")
     weights = None
     if data["weights"] is not None:
-        weights = tuple(_optional_float(v) for v in _items(data["weights"]))
+        parsed = tuple(_optional_float(v) for v in _items(data["weights"]))
         if (
-            len(weights) != count
-            or any(v is None or v < 0 for v in weights)
+            len(parsed) != count
+            or any(v is None or not 0 <= v <= 1 for v in parsed)
             or not math.isclose(
-                math.fsum(cast(tuple[float, ...], weights)), 1, rel_tol=0, abs_tol=1e-12
+                math.fsum(cast(tuple[float, ...], parsed)), 1, rel_tol=0, abs_tol=1e-12
             )
         ):
             raise ValueError("effective weights must match evidence and sum to one")
-        if sum(v > 0 for v in cast(tuple[float, ...], weights)) != used:
+        weights = cast(tuple[float, ...], parsed)
+        if sum(v > 0 for v in weights) != used:
             raise ValueError("positive weights must agree with used_count")
+        if isinstance(actual, (QuantileFit, CensoredQuantileFit, HurdleQuantileFit)):
+            requested_weights = (
+                actual.weights if isinstance(actual, QuantileFit) else None
+            )
+            if requested_weights is not None and len(requested_weights) != count:
+                raise ValueError(
+                    "selected specification needs one weight per supplied knot"
+                )
+            expected = _normalized_weights(
+                np.asarray(requested_weights, dtype=np.float64)
+                if requested_weights is not None
+                else np.ones(count, dtype=np.float64)
+            )
+            # Native validation uses a different summation order. Allow a
+            # rounding unit for subnormals without changing positive support.
+            if any(
+                (weight == 0) != (target == 0)
+                or not math.isclose(
+                    weight, target, rel_tol=1e-12, abs_tol=math.ulp(0.0)
+                )
+                for weight, target in zip(weights, expected, strict=True)
+            ):
+                raise ValueError(
+                    "effective weights contradict the selected specification"
+                )
     support = None
     if data["evidence_support"] is not None:
         values = tuple(_optional_float(v) for v in _items(data["evidence_support"]))
@@ -1142,7 +1185,7 @@ def _decode_record(value: object) -> FitRecord:
         evidence_count=count,
         used_count=used,
         excluded_count=excluded,
-        weights=cast(tuple[float, ...] | None, weights),
+        weights=weights,
         evidence_support=support,
         engine_version=_text(data["engine_version"]),
     )

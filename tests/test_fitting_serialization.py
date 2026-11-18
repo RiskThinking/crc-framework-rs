@@ -23,6 +23,7 @@ from crc_framework import (
     SampleEstimator,
     SampleFit,
     SelectionCriterion,
+    _core,
     fit_quantiles,
     fit_samples,
 )
@@ -294,6 +295,36 @@ def test_quantile_record_requires_probability_support_and_effective_weights():
         malformed[field] = value
         with pytest.raises(ValueError):
             FitRecord.from_json(json.dumps(malformed))
+
+
+def test_effective_weights_match_the_selected_quantile_specification():
+    document = json.loads(quantile_record().to_json())
+    _core.validate_document(SCHEMA["$id"], json.dumps(document))
+    document["weights"][0], document["weights"][-1] = (
+        document["weights"][-1],
+        document["weights"][0],
+    )
+    assert RECORD_VALIDATOR.is_valid(document)
+    with pytest.raises(ValueError, match="effective weights contradict"):
+        FitRecord.from_json(json.dumps(document))
+    with pytest.raises(ValueError, match="effective weights contradict"):
+        _core.validate_document(SCHEMA["$id"], json.dumps(document))
+
+
+@pytest.mark.parametrize(
+    "diagnostics", [[], [{"code": "fit.failed", "severity": "error"}]]
+)
+def test_attempts_require_their_outcome_diagnostic(diagnostics):
+    document = json.loads(sample_record().to_json())
+    original = document["attempts"][0]["diagnostics"][0]
+    document["attempts"][0]["diagnostics"] = [
+        original | change for change in diagnostics
+    ]
+    assert RECORD_VALIDATOR.is_valid(document) == bool(diagnostics)
+    with pytest.raises(ValueError):
+        FitRecord.from_json(json.dumps(document))
+    with pytest.raises(ValueError):
+        _core.validate_document(SCHEMA["$id"], json.dumps(document))
 
 
 def test_sample_record_cannot_claim_quantile_weights():
