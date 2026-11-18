@@ -184,7 +184,7 @@
       "properties": {
         "amplitude": {
           "$ref": "#/$defs/non_negative_number",
-          "description": "Curve height (legacy maximum minus minimum)."
+          "description": "Difference between the upper and lower asymptotes."
         },
         "kind": {
           "const": "sigmoid",
@@ -197,7 +197,7 @@
         },
         "offset": {
           "$ref": "#/$defs/number",
-          "description": "Lower curve level (legacy minimum)."
+          "description": "Lower asymptote of the response."
         },
         "origin_adjustment": {
           "description": "subtract_at_zero subtracts the unit logistic at x = 0 without renormalizing the upper asymptote.",

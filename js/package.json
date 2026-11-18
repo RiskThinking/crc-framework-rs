@@ -12,7 +12,8 @@
   "exports": {
     ".": {
       "types": "./src/index.d.ts",
-      "import": "./src/index.js"
+      "node": "./src/node.js",
+      "default": "./src/index.js"
     },
     "./crc_framework_bg.wasm": "./wasm/crc_framework_bg.wasm",
     "./contracts/*": "./contracts/*"

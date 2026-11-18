@@ -1,8 +1,8 @@
 import {readFileSync} from 'node:fs';
 import {gzipSync} from 'node:zlib';
-import init,{quantile,prepareNumerical,prepareNumericals} from '../src/index.js';
+import init,{quantile,prepareNumerical,prepareNumericals} from '../src/node.js';
 const bytes=readFileSync(new URL('../wasm/crc_framework_bg.wasm',import.meta.url));
-const start=performance.now();await init({module_or_path:bytes});
+const start=performance.now();await init();
 console.log(`WASM ${bytes.length} bytes (${gzipSync(bytes).length} gzip); init ${performance.now()-start}ms`);
 const cases=JSON.parse(readFileSync(new URL('../../python/crc_framework/contracts/numerical/fixtures-1.0.json',import.meta.url)));
 const documents=cases.accepted.filter(c=>c.document.kind==='parametric').map(c=>c.document);

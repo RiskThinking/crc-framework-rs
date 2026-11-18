@@ -291,8 +291,8 @@ def _models() -> Dict[str, Dict[str, Any]]:
                 "kind": kind("sigmoid", "ModelSpec::Sigmoid"),
                 "midpoint": field(ref("number"), "Logistic midpoint.", NUMBER, "SigmoidKernel::midpoint: f64"),
                 "steepness": field(ref("number"), "Logistic steepness; zero gives a constant response.", NUMBER, "SigmoidKernel::steepness: f64"),
-                "offset": field(ref("number"), "Lower curve level (legacy minimum).", f"{NUMBER}; {ALWAYS}", "SigmoidKernel::offset: f64", 0.0),
-                "amplitude": field(ref("non_negative_number"), "Curve height (legacy maximum minus minimum).", f"{NUMBER}; {ALWAYS}", "SigmoidKernel::amplitude: f64", 1.0),
+                "offset": field(ref("number"), "Lower asymptote of the response.", f"{NUMBER}; {ALWAYS}", "SigmoidKernel::offset: f64", 0.0),
+                "amplitude": field(ref("non_negative_number"), "Difference between the upper and lower asymptotes.", f"{NUMBER}; {ALWAYS}", "SigmoidKernel::amplitude: f64", 1.0),
                 "origin_adjustment": field(
                     enum(("none", "subtract_at_zero")),
                     "subtract_at_zero subtracts the unit logistic at x = 0 without renormalizing the upper asymptote.",

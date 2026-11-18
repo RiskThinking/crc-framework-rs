@@ -8,12 +8,10 @@ mod kernel_curve;
 pub use kernel_curve::{KernelCurve, KernelCurveParameters};
 mod pushforward;
 pub(crate) mod quadrature;
-mod record;
 mod reference;
 mod registry;
 mod source;
 
-pub use record::{ImpactEvaluationRecord, RecordedSource, SnapshotRef, array_content_sha256};
 pub use registry::{
     RegistryImpactReference, ResolutionContext, manifest_json, manifest_sha256, registry_identity,
 };

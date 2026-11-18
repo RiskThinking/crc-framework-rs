@@ -767,7 +767,7 @@ class Impact:
         except (TypeError, ValueError) as error:
             raise ImpactError("exact_method_unavailable", "", str(error)) from error
         try:
-            return float(native.expected_value(source, "exact").value)
+            return native.expected_value(source)
         except Exception as error:
             raise _error(error) from error
 

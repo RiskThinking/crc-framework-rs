@@ -2,6 +2,20 @@
 
 [Documentation index](README.md) · [Project README](../README.md)
 
+## 1.0.0
+
+This major release replaces the public Python and JavaScript interfaces. Python
+exposes complete probability laws as `Distribution` and finite probability
+evidence as `QuantileCurve`. Fitting uses typed specifications. Impacts use
+typed input and output measurements and resolve built-in reference tables
+through explicit model context. JavaScript loads the same numerical documents
+in Node and browsers, and validates the shared scientific and data contracts.
+
+The framework supports numerical and fitting format `1.0`, impact format
+`2.0`, and typed measurement and context format `1.0`. Dataset schema `2.0`
+and taxonomy schema `1.0` are shared with CRC-SDK. See the [Python guide](python.md)
+and the [JavaScript guide](javascript.md) for runnable workflows.
+
 ## Release contract
 
 The package and artifact versions are declared in
@@ -29,12 +43,18 @@ surface:
 /path/to/wheel-venv/bin/python -I /path/to/repository/tools/api_contracts/check.py --runtime
 ```
 
-The runtime check loads its declarations from the installed package and rejects
-missing methods, incorrect signatures or defaults, extra enum aliases, removed
-names that remain importable, and Python/native version mismatches. Passing a
-static declaration check does not authorize publishing an incomplete interface.
-Numerical, schema, native/WASM parity, and installed-consumer checks must also
-pass.
+The runtime check validates exports, signatures, enums, and Python/native
+versions against the checkout. It also checks that the wheel contains the
+current Python modules, stubs, and contract resources. Run the examples with
+the same wheel:
+
+```sh
+/path/to/wheel-venv/bin/python -I /path/to/repository/tools/check_examples.py
+```
+
+The Python release workflow tests each wheel and also builds and tests a wheel
+from the source distribution. The JavaScript workflow tests the packed tarball
+with Node, TypeScript, Vite server-side rendering, and Chromium.
 
 ## Publishing
 

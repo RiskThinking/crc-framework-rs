@@ -15,6 +15,10 @@ const metadata = JSON.parse(execFileSync('cargo', [
 ], { cwd: root, encoding: 'utf8' }));
 const framework = metadata.packages.find(pkg => pkg.manifest_path === path.join(root, 'Cargo.toml'));
 const version = framework.version;
+const ledger = JSON.parse(readFileSync(path.join(root, 'python/crc_framework/contracts/api/release.json'), 'utf8'));
+if (ledger.packages.framework !== version) {
+  throw new Error('Workspace version differs from the release ledger');
+}
 for (const name of ['crc-framework-core', 'crc-framework-wasm']) {
   if (metadata.packages.find(pkg => pkg.name === name)?.version !== version) {
     throw new Error(`Version mismatch: ${name}`);

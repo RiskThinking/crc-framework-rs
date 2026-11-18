@@ -1,0 +1,43 @@
+name: Verify framework wheels
+description: Run the public API, tests, and user examples on the built artifacts
+inputs:
+  python-versions:
+    description: Space-separated CPython versions represented in the wheel directory
+    required: true
+  wheel-directory:
+    description: Directory containing the candidate wheels
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: astral-sh/setup-uv@v10.2.0
+    - name: Test each installed wheel
+      shell: bash
+      env:
+        PYTHON_VERSIONS: ${{ inputs.python-versions }}
+        WHEEL_DIRECTORY: ${{ inputs.wheel-directory }}
+      run: |
+        set -euo pipefail
+        shopt -s nullglob
+        for version in $PYTHON_VERSIONS; do
+          abi="${version/./}"
+          wheels=( "$WHEEL_DIRECTORY"/crc_framework-*-cp"${abi%t}"-cp"$abi"-*.whl )
+          if [[ "${#wheels[@]}" != 1 ]]; then
+            echo "Expected exactly one candidate wheel for CPython $version" >&2
+            exit 1
+          fi
+          venv="$RUNNER_TEMP/framework-$version"
+          uv venv --python "$version" "$venv"
+          wheel_python="$venv/bin/python"
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            wheel_python="$venv/Scripts/python.exe"
+          fi
+          uv pip install --python "$wheel_python" "${wheels[0]}[test]"
+          uv pip check --python "$wheel_python"
+          (
+            cd "$RUNNER_TEMP"
+            "$wheel_python" -I "$GITHUB_WORKSPACE/tools/api_contracts/check.py" --runtime
+            "$wheel_python" -I -m pytest -q --import-mode=importlib "$GITHUB_WORKSPACE/tests"
+            "$wheel_python" -I "$GITHUB_WORKSPACE/tools/check_examples.py"
+          )
+        done

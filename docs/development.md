@@ -57,8 +57,8 @@ bindings and signatures, properties, enums, and Python/native version agreement.
 installation directory; in declaration mode it reads an unpacked wheel directory
 containing `crc_framework`. Without that explicit option it uses the interpreter's
 installed package and never inserts a checkout into Python's import path. The
-installed API declaration and ledger must also match the release checkout; a
-stale wheel cannot certify itself against a different draft.
+installed Python modules, stubs, API declarations, and schema resources must
+match the release checkout.
 
 Do not regenerate declarations from the runtime to conceal a mismatch. Numerical
 regressions and cross-language fixtures test scientific behavior; an old symbol

@@ -22,6 +22,23 @@ CHECK = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CHECK)
 
 
+def test_installed_package_inventory_detects_artifact_drift(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    installed = tmp_path / "installed"
+    source.mkdir()
+    installed.mkdir()
+    (source / "py.typed").touch()
+    (installed / "removed.py").touch()
+    (source / "contract.json").write_text("{}", encoding="utf-8")
+    (installed / "contract.json").write_text("[]", encoding="utf-8")
+
+    assert CHECK.packaged_errors(installed, source) == [
+        "py.typed: missing from installed package",
+        "removed.py: unexpected file in installed package",
+        "contract.json: installed resource differs from release checkout",
+    ]
+
+
 def test_declared_contract_and_source_versions_are_coherent() -> None:
     contract, release = CHECK.load_contracts()
     CHECK.validate_contract(contract, release)
@@ -77,11 +94,11 @@ def test_enum_default_must_match_declared_type() -> None:
         CHECK.validate_contract(contract, release)
 
 
-def test_superseded_draft_versions_cannot_force_another_major_bump() -> None:
-    contract, release = CHECK.load_contracts()
-    release["formats"]["evaluation"] = "3.0"
-    with pytest.raises(CHECK.ContractError, match="single release ledger"):
-        CHECK.validate_contract(contract, release)
+def test_release_ledger_must_match_owned_formats() -> None:
+    _, release = CHECK.load_contracts()
+    release["formats"]["impact"] = "3.0"
+    with pytest.raises(CHECK.ContractError, match="impact schema does not match"):
+        CHECK.validate_source_versions(ROOT, release)
 
 
 def _fixture() -> tuple[dict[str, Any], ModuleType]:

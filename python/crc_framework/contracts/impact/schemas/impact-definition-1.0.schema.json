@@ -193,14 +193,14 @@
         },
         "offset": {
           "$ref": "#/$defs/number",
-          "description": "Lower curve level (legacy minimum).",
+          "description": "Lower asymptote of the response.",
           "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; always present in canonical form",
           "x-crc-native": "SigmoidKernel::offset: f64",
           "default": 0.0
         },
         "amplitude": {
           "$ref": "#/$defs/non_negative_number",
-          "description": "Curve height (legacy maximum minus minimum).",
+          "description": "Difference between the upper and lower asymptotes.",
           "x-crc-canonical": "binary64 shortest round-trip number; negative zero emitted as 0.0; always present in canonical form",
           "x-crc-native": "SigmoidKernel::amplitude: f64",
           "default": 1.0

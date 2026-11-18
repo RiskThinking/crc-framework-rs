@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
-import init, * as api from '../src/index.js';
+import init, * as api from '../src/node.js';
 const directory=new URL('../../python/crc_framework/contracts/',import.meta.url);
 // Retain exact large integer tokens when passing source documents through JS.
 function fixtures(path) {
@@ -10,7 +10,7 @@ function fixtures(path) {
      ? JSON.rawJSON(context.source) : value);
 }
 const numerical=fixtures('numerical/fixtures-1.0.json');
-await init({module_or_path:readFileSync(new URL('../wasm/crc_framework_bg.wasm',import.meta.url))});
+await init();
 for (const fixture of numerical.accepted) test(`numerical ${fixture.name}`,()=>{
  const text=JSON.stringify(fixture.document);
  api.validateDocument(api.DocumentSchema.NUMERICAL,text);
@@ -44,4 +44,26 @@ test('scalar and batch queries share one name and preserve infinities',()=>{
  const prepared=api.prepareNumericals(`[${text},${text}]`);
  try {assert.equal(prepared.quantile(.5).length,2);} finally {prepared.free();}
  for(const name of ['evaluateCurve','evaluateCurves','prepareCurve','prepareCurves']) assert.equal(api[name],undefined);
+});
+
+test('WASM queries reject values that JavaScript could coerce to a probability', () => {
+ const text = JSON.stringify(numerical.accepted.find(fixture => fixture.name === 'point').document);
+ const single = api.prepareNumerical(text);
+ const batch = api.prepareNumericals(`[${text}]`);
+ try {
+  for (const invalid of ['0.5', null, true, undefined]) {
+   assert.throws(() => single.quantile(invalid), TypeError);
+   assert.throws(() => single.quantile([invalid]), TypeError);
+   assert.throws(() => batch.quantile(invalid), TypeError);
+  }
+  assert.throws(() => single.quantile(new Array(1)), TypeError);
+  for (const invalid of [NaN, Infinity, -.1, 1.1]) {
+   assert.throws(() => single.quantile(invalid), RangeError);
+   assert.throws(() => single.quantile(new Float64Array([invalid])), RangeError);
+   assert.throws(() => batch.quantile(invalid), RangeError);
+  }
+ } finally {
+  single.free();
+  batch.free();
+ }
 });

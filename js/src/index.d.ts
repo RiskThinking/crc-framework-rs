@@ -1,7 +1,19 @@
-export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
-/** Import is safe before initialization, including server rendering. */
-export default function init(input?: {module_or_path: InitInput | Promise<InitInput>}): Promise<void>;
-export function initSync(input: {module: BufferSource | WebAssembly.Module}): void;
+// Browser objects are usable when declared by the consumer's TypeScript environment.
+type InstanceIfAvailable<Scope, Name extends PropertyKey> =
+  Name extends keyof Scope
+    ? Scope[Name] extends new (...args: never[]) => infer Instance ? Instance : never
+    : never;
+type WasmModule = typeof globalThis extends { WebAssembly: infer WebAssemblyAPI }
+  ? InstanceIfAvailable<WebAssemblyAPI, 'Module'>
+  : never;
+export type InitInput =
+  | string
+  | ArrayBuffer
+  | ArrayBufferView
+  | InstanceIfAvailable<typeof globalThis, 'URL' | 'Request' | 'Response'>
+  | WasmModule;
+/** Initialize the bundled module, or supply your own WebAssembly module, bytes, or URL. */
+export default function init(input?: InitInput | Promise<InitInput>): Promise<void>;
 export interface PreparedNumerical {
   quantile(probability: number): number;
   quantile(probabilities: readonly number[] | Float64Array): Float64Array;
@@ -11,7 +23,7 @@ export interface PreparedNumericals {
   quantile(probability: number): Float64Array;
   free(): void;
 }
-/** Numerical JSON1.0; no-data failures belong to dataset rows, not fictional laws. */
+/** Prepare a numerical document for repeated queries. */
 export function prepareNumerical(text: string): PreparedNumerical;
 export function prepareNumericals(text: string): PreparedNumericals;
 export function quantile(text: string, probability: number): number;

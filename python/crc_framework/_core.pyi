@@ -130,55 +130,17 @@ class ImpactError(Exception):
     path: str
 
 class NativeImpactExpression:
-    definition_hash: str
-    model_kind: str
-    monotonicity: str
     @staticmethod
     def from_json(text: str) -> NativeImpactExpression: ...
     def canonical_json(self) -> str: ...
     def evaluate_value(self, value: float) -> float: ...
     def evaluate_values(self, values: Sequence[float]) -> list[float]: ...
-    def expected_value(
-        self,
-        source: NativeImpactSource,
-        requested: str,
-        absolute_tolerance: float | None = ...,
-        relative_tolerance: float | None = ...,
-        max_evaluations: int | None = ...,
-    ) -> NativeExpectation: ...
+    def expected_value(self, source: NativeImpactSource) -> float: ...
     def transform_distribution(
         self, source: NativeImpactSource
     ) -> NativeImpactDistribution: ...
-    def point_record(
-        self,
-        shape: Sequence[int],
-        values: Sequence[float],
-        snapshot_uri: str | None = ...,
-        snapshot_revision: str | None = ...,
-        snapshot_sha256: str | None = ...,
-        snapshot_retention: str | None = ...,
-    ) -> NativeImpactEvaluationRecord: ...
-    def expectation_record(
-        self,
-        source: NativeImpactSource,
-        expectation: NativeExpectation,
-        snapshot_uri: str | None = ...,
-        snapshot_revision: str | None = ...,
-        snapshot_sha256: str | None = ...,
-        snapshot_retention: str | None = ...,
-    ) -> NativeImpactEvaluationRecord: ...
-    def transform_record(
-        self,
-        source: NativeImpactSource,
-        snapshot_uri: str | None = ...,
-        snapshot_revision: str | None = ...,
-        snapshot_sha256: str | None = ...,
-        snapshot_retention: str | None = ...,
-    ) -> NativeImpactEvaluationRecord: ...
 
 class NativeImpactSource:
-    original_mass_sum: float | None
-    normalization_factor: float | None
     @staticmethod
     def histogram(
         edges: Sequence[float], weights: Sequence[float]
@@ -192,8 +154,6 @@ class NativeImpactSource:
         support: Sequence[float], probabilities: Sequence[float]
     ) -> NativeImpactSource: ...
     @staticmethod
-    def empirical(samples: Sequence[float]) -> NativeImpactSource: ...
-    @staticmethod
     def curve(
         curve_kind: str,
         curve_type: str,
@@ -206,24 +166,7 @@ class NativeImpactSource:
         curve_values: Sequence[float] | None = ...,
     ) -> NativeImpactSource: ...
 
-class NativeExpectation:
-    value: float
-    requested: str
-    method: str
-    method_version: str
-    absolute_tolerance: float | None
-    relative_tolerance: float | None
-    max_evaluations: int | None
-    evaluations: int
-    error_estimate: float
-    exact_component: float
-    numerical_component: float
-    original_mass_sum: float | None
-    normalization_factor: float | None
-
 class NativeImpactDistribution:
-    definition_hash: str
-    algorithm: str
     def atoms(self) -> list[tuple[float, float]]: ...
     def integral(self, lo: float, hi: float, center: float, square: bool) -> float: ...
     def quantile(self, probability: float) -> float: ...
@@ -232,18 +175,10 @@ class NativeImpactDistribution:
         self, lo: float, hi: float, center: float, square: bool
     ) -> float: ...
     def quantiles(self, probabilities: Sequence[float]) -> list[float]: ...
-    def tabulate(
-        self, probabilities: Sequence[float], interpolation: str
-    ) -> list[float]: ...
-
-class NativeImpactEvaluationRecord:
-    def canonical_json(self) -> str: ...
 
 class NativeImpactReference:
-    reference_hash: str
     @staticmethod
     def from_json(text: str) -> NativeImpactReference: ...
-    def canonical_json(self) -> str: ...
     def resolve(
         self,
         cell: str | None = ...,
@@ -255,5 +190,3 @@ class NativeImpactReference:
 
 def impact_registry_identity() -> tuple[str, str, str, str]: ...
 def impact_registry_manifest_json() -> str: ...
-def impact_engine() -> tuple[str, str]: ...
-def impact_array_digest(shape: Sequence[int], values: Sequence[float]) -> str: ...

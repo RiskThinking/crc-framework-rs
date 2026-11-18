@@ -85,7 +85,7 @@ from ._risk import (
     compute_risk,
     rank_scenarios,
 )
-from .impacts import (
+from ._impacts import (
     BuiltinImpact,
     ContextField,
     Impact,

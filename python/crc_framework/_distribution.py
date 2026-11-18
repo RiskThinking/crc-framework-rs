@@ -17,7 +17,7 @@ from . import _core
 from ._diagnostics import Diagnostic, DiagnosticSeverity
 
 if TYPE_CHECKING:
-    from .impacts import Impact
+    from ._impacts import Impact
 
 FloatArray: TypeAlias = numpy.typing.NDArray[numpy.float64]
 ArrayLike: TypeAlias = Sequence[float] | FloatArray
@@ -544,7 +544,7 @@ class Distribution:
         return self._transformed.integral(lo, hi, center, square)
 
     def _impact_source(self) -> tuple[Impact, Distribution]:
-        from .impacts import Impact
+        from ._impacts import Impact
 
         return Impact.from_json(_dump(self._data["impact"])), Distribution.from_json(
             _dump(self._data["source"])
@@ -646,7 +646,7 @@ class Distribution:
     def _threshold_probability(
         self, x: float, inclusive: bool, *, exceedance: bool
     ) -> float | None:
-        from .impacts import Impact
+        from ._impacts import Impact
 
         impact = Impact.from_json(_dump(self._data["impact"]))
         source = Distribution.from_json(_dump(self._data["source"]))
@@ -812,7 +812,7 @@ class Distribution:
                 )
             return result
         if self.kind is DistributionKind.TRANSFORMED:
-            from .impacts import Impact
+            from ._impacts import Impact
 
             impact = Impact.from_json(_dump(data["impact"]))
             source = Distribution.from_json(_dump(data["source"]))
@@ -838,7 +838,7 @@ class Distribution:
         record = data.pop("evidence", None)
         if data.get("kind") == "transformed":
             _fields(data, {"kind", "source", "impact"})
-            from .impacts import Impact
+            from ._impacts import Impact
 
             result = Impact.from_json(_dump(data["impact"])).pushforward(
                 cls.from_json(_dump(data["source"]))

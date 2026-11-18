@@ -390,7 +390,6 @@ def validate_contract(contract: Mapping[str, Any], release: Mapping[str, Any]) -
             "modules",
             "methods",
             "schema_fields",
-            "replacement_tests",
             "wire_formats",
         },
         {
@@ -398,7 +397,6 @@ def validate_contract(contract: Mapping[str, Any], release: Mapping[str, Any]) -
             "modules",
             "methods",
             "schema_fields",
-            "replacement_tests",
             "wire_formats",
         },
         "/removals",
@@ -432,14 +430,6 @@ def validate_contract(contract: Mapping[str, Any], release: Mapping[str, Any]) -
             owner == "*" or not set(methods) & set(exports[owner].get("methods", {})),
             f"/removals/methods/{owner}: method is both declared and removed",
         )
-    _require(
-        isinstance(removals["replacement_tests"], dict)
-        and all(
-            isinstance(k, str) and isinstance(v, str) and bool(v)
-            for k, v in removals["replacement_tests"].items()
-        ),
-        "/removals/replacement_tests: expected test paths and replacement behavior",
-    )
     validate_release(release)
 
 
@@ -454,27 +444,31 @@ def validate_release(release: Mapping[str, Any]) -> None:
         release["schema_version"] == "1.0",
         "/release/schema_version: unsupported format",
     )
-    expected_packages = {
-        "framework": "1.0.0",
-        "sdk": "1.0.0",
-        "framework_requirement": "crc-framework>=1.0.0,<2",
+    packages = {"framework", "sdk", "framework_requirement"}
+    formats = {
+        "dataset",
+        "evaluation",
+        "collection",
+        "taxonomy",
+        "numerical",
+        "impact",
+        "evidence",
     }
-    expected_formats = {
-        "dataset": "2.0",
-        "evaluation": "2.0",
-        "collection": "1.0",
-        "taxonomy": "1.0",
-        "numerical": "1.0",
-        "impact": "2.0",
-        "evidence": "1.0",
-    }
+    _keys(release["packages"], packages, packages, "/release/packages")
+    _keys(release["formats"], formats, formats, "/release/formats")
     _require(
-        release["packages"] == expected_packages,
-        "/release/packages: package versions contradict the single release ledger",
+        all(
+            isinstance(version, str) and version
+            for version in release["packages"].values()
+        ),
+        "/release/packages: expected package version declarations",
     )
     _require(
-        release["formats"] == expected_formats,
-        "/release/formats: format versions contradict the single release ledger",
+        all(
+            isinstance(version, str) and re.fullmatch(r"[0-9]+\.[0-9]+", version)
+            for version in release["formats"].values()
+        ),
+        "/release/formats: expected major.minor format versions",
     )
 
 
@@ -500,6 +494,22 @@ def validate_source_versions(root: Path, release: Mapping[str, Any]) -> None:
         javascript.get("private") is True and "version" not in javascript,
         "JavaScript development manifest must remain private and derive its public version from Cargo",
     )
+    resources = root / "python" / "crc_framework" / "contracts"
+    for name, directory in (
+        ("dataset", "dataset"),
+        ("taxonomy", "taxonomy"),
+        ("numerical", "numerical"),
+        ("impact", "scientific"),
+    ):
+        version = release["formats"][name]
+        schemas = {
+            path.name
+            for path in (resources / directory).glob(f"{name}-[0-9]*.schema.json")
+        }
+        _require(
+            schemas == {f"{name}-{version}.schema.json"},
+            f"{name} schema does not match release ledger version {version}: {sorted(schemas)}",
+        )
 
 
 def _render_annotation(value: Any) -> str:
@@ -685,8 +695,6 @@ def runtime_errors(contract: Mapping[str, Any], module: ModuleType) -> list[str]
     for qualified in contract["removals"]["symbols"]:
         name = qualified.rsplit(".", 1)[-1]
         if hasattr(module, name):
-            if name == "impacts" and isinstance(getattr(module, name), ModuleType):
-                continue
             errors.append(f"crc_framework.{name}: removed name remains importable")
     for owner, methods in contract["removals"]["methods"].items():
         owners = list(exports) if owner == "*" else [owner]
@@ -727,6 +735,31 @@ def validate_installed_contract(
     return contract, release
 
 
+def packaged_errors(installed: Path, declared: Path = PACKAGE) -> list[str]:
+    def inventory(package: Path) -> set[Path]:
+        return {
+            path.relative_to(package)
+            for path in package.rglob("*")
+            if path.is_file()
+            and (path.suffix in {".py", ".pyi", ".json"} or path.name == "py.typed")
+        }
+
+    expected = inventory(declared)
+    actual = inventory(installed)
+    errors = [
+        f"{path}: missing from installed package" for path in sorted(expected - actual)
+    ]
+    errors.extend(
+        f"{path}: unexpected file in installed package"
+        for path in sorted(actual - expected)
+    )
+    for path in sorted(expected & actual):
+        source = (declared / path).read_text(encoding="utf-8")
+        if (installed / path).read_text(encoding="utf-8") != source:
+            errors.append(f"{path}: installed resource differs from release checkout")
+    return errors
+
+
 def check_runtime(package_root: Path | None = None) -> None:
     if package_root is not None:
         sys.path.insert(0, str(package_root.resolve()))
@@ -740,7 +773,8 @@ def check_runtime(package_root: Path | None = None) -> None:
             f"imported {installed}, expected a package inside {package_root.resolve()}",
         )
     contract, release = validate_installed_contract(installed)
-    errors = runtime_errors(contract, module)
+    errors = packaged_errors(installed)
+    errors.extend(runtime_errors(contract, module))
     for name in contract["removals"]["modules"]:
         try:
             importlib.import_module(name)
