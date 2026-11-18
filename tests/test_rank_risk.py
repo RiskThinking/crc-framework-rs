@@ -1,6 +1,7 @@
 """Rank labels, independent risk, and reference geography through the public API."""
 
 import math
+import sys
 from dataclasses import FrozenInstanceError
 
 import numpy as np
@@ -140,6 +141,37 @@ def test_contributions_sum_without_implicit_averaging() -> None:
     assert sum(
         item.conditional_value_at_risk for item in level.attribution
     ) == pytest.approx(level.conditional_value_at_risk)
+
+
+def test_attribution_of_maximum_deterministic_impact_is_finite() -> None:
+    impact = sys.float_info.max
+    a = BinaryOutcome(
+        "maximum",
+        lower_rank_mass=0.13482902283230247,
+        upper_rank_mass=1 - 0.13482902283230247,
+        lower_impact=impact,
+        upper_impact=impact,
+    )
+    b = outcome("zero", 1 - 0.6195387090957183, 0)
+    level = compute_risk([a, b], levels=[0.5]).at(0.5)
+    assert level.value_at_risk == level.attribution[0].value_at_risk == impact
+    assert level.conditional_value_at_risk == impact
+    assert level.attribution[0].conditional_value_at_risk == impact
+
+
+def test_tail_attribution_preserves_exact_cancellation() -> None:
+    a = BinaryOutcome(
+        "symmetric tail",
+        lower_rank_mass=0.75,
+        upper_rank_mass=0.25,
+        lower_impact=-1e308,
+        upper_impact=1e308,
+    )
+    b = outcome("zero", 1 - 0.6229016948897019, 0)
+    for factors in ([a], [a, b]):
+        level = compute_risk(factors, levels=[0.5]).at(0.5)
+        assert level.conditional_value_at_risk == 0
+        assert level.attribution[0].conditional_value_at_risk == 0
 
 
 def test_tied_attribution_is_independent_of_input_order() -> None:

@@ -2806,6 +2806,120 @@
           "value": 0.9933071490757153
         }
       ]
+    },
+    {
+      "name": "parametric-location-cancellation-genextreme",
+      "document": {
+        "family": "genextreme",
+        "kind": "parametric",
+        "location": -1e+308,
+        "object": "distribution",
+        "scale": 1e+308,
+        "schema_version": "1.0",
+        "shape": 0.0
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.1,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.5,
+          "value": -6.334870794183356e+307
+        },
+        {
+          "probability": 0.9,
+          "value": 1.2503673273124453e+308
+        },
+        {
+          "probability": 0.99,
+          "outcome": "positive_infinity"
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "parametric-location-cancellation-genpareto",
+      "document": {
+        "family": "genpareto",
+        "kind": "parametric",
+        "location": -1e+308,
+        "object": "distribution",
+        "scale": 1e+308,
+        "schema_version": "1.0",
+        "shape": 0.0
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -1e+308
+        },
+        {
+          "probability": 0.1,
+          "value": -8.946394843421737e+307
+        },
+        {
+          "probability": 0.5,
+          "value": -3.0685281944005477e+307
+        },
+        {
+          "probability": 0.9,
+          "value": 1.302585092994046e+308
+        },
+        {
+          "probability": 0.99,
+          "outcome": "positive_infinity"
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "parametric-location-cancellation-weibull_min",
+      "document": {
+        "family": "weibull_min",
+        "kind": "parametric",
+        "location": -1e+308,
+        "object": "distribution",
+        "scale": 1e+308,
+        "schema_version": "1.0",
+        "shape": 1.0
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -1e+308
+        },
+        {
+          "probability": 0.1,
+          "value": -8.946394843421737e+307
+        },
+        {
+          "probability": 0.5,
+          "value": -3.0685281944005477e+307
+        },
+        {
+          "probability": 0.9,
+          "value": 1.302585092994046e+308
+        },
+        {
+          "probability": 0.99,
+          "outcome": "positive_infinity"
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
     }
   ],
   "rejected": [

@@ -631,6 +631,47 @@ def test_gumbel_location_scale_cancellation_preserves_ranks(
     assert law.exceedance(expected) == pytest.approx(1 - probability, rel=1e-14)
 
 
+@pytest.mark.parametrize(
+    "family,shape,orientation",
+    [
+        (DistributionFamily.GENERALIZED_EXTREME_VALUE, 0, 1),
+        (DistributionFamily.GENERALIZED_PARETO, 0, 1),
+        (DistributionFamily.WEIBULL_MINIMUM, 1, 1),
+        (DistributionFamily.WEIBULL_MAXIMUM, 1, -1),
+    ],
+)
+def test_parametric_inverse_rescales_before_location_cancellation(
+    family: DistributionFamily, shape: int, orientation: int
+) -> None:
+    scale = 1e308
+    law = Distribution.parametric(
+        family, location=-orientation * scale, scale=scale, shape=shape
+    )
+    rank = 0.9 if orientation > 0 else 0.1
+    standardized = (
+        -math.log(-math.log(rank))
+        if family is DistributionFamily.GENERALIZED_EXTREME_VALUE
+        else -math.log(0.1)
+    )
+    expected = orientation * (standardized - 1) * scale
+    assert law.quantile(rank) == pytest.approx(expected, rel=1e-14)
+    assert law._inverse_survival(1 - rank) == pytest.approx(expected, rel=1e-14)
+    assert law.cdf(expected) == pytest.approx(rank, rel=1e-14)
+
+
+@pytest.mark.parametrize("scale", [1.0, 1e-308])
+def test_pareto_probability_takes_the_log_before_products_overflow(
+    scale: float,
+) -> None:
+    shape = 1e308
+    law = Distribution.parametric(
+        DistributionFamily.GENERALIZED_PARETO, location=0, scale=scale, shape=shape
+    )
+    log_survival = -(math.log(shape) + math.log(10) - math.log(scale)) / shape
+    assert law.cdf(10) == pytest.approx(-math.expm1(log_survival), rel=1e-14, abs=0)
+    assert law.exceedance(10) == math.exp(log_survival)
+
+
 def test_gev_applies_scale_before_exponentiating_large_moments() -> None:
     scale, shape = 1e-300, 250
     law = Distribution.parametric(
@@ -803,3 +844,25 @@ def test_gev_upper_tail_matches_independent_closed_erf_integral() -> None:
     expected = -2 + 2 * math.sqrt(math.pi) * math.erf(math.sqrt(-math.log(0.95))) / 0.05
     result = law.statistics(metrics=[Statistic.CVAR])
     assert result.values[Statistic.CVAR].value == pytest.approx(expected, rel=1e-12)
+
+
+@pytest.mark.parametrize("level", [1e-20, math.ulp(0.0)])
+@pytest.mark.parametrize("tail,sign", [(Tail.UPPER, 1), (Tail.LOWER, -1)])
+def test_distribution_cvar_keeps_tiny_excluded_mass(
+    level: float, tail: Tail, sign: int
+) -> None:
+    measurement = Measurement(quantity="x", unit="u")
+    identity = Impact.linear(slope=1, input=measurement, output=measurement)
+    discrete = Distribution.discrete([-1e308, 1e308], [0.5, 0.5])
+    histogram = Distribution.histogram([-1e308, 1e308], [1.0])
+    for law in (discrete, histogram, identity.pushforward(histogram)):
+        value = law.statistics(metrics=[Statistic.CVAR], level=level, tail=tail)
+        assert value.values[Statistic.CVAR].value == pytest.approx(
+            sign * 1e308 * level, rel=1e-15, abs=0.0
+        )
+
+
+def test_distribution_cvar_skips_fully_excluded_rare_atom() -> None:
+    law = Distribution.discrete([-1e308, 1], [1e-20, 1.0])
+    value = law.statistics(metrics=[Statistic.CVAR], level=1e-20)
+    assert value.values[Statistic.CVAR].value == 1

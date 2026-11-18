@@ -287,6 +287,17 @@ def build():
             ),
         ]
     )
+    objects.extend(
+        (
+            f"parametric-location-cancellation-{family.value}",
+            Distribution.parametric(family, location=-1e308, scale=1e308, shape=shape),
+        )
+        for family, shape in (
+            (DistributionFamily.GENERALIZED_EXTREME_VALUE, 0),
+            (DistributionFamily.GENERALIZED_PARETO, 0),
+            (DistributionFamily.WEIBULL_MINIMUM, 1),
+        )
+    )
     for name, value in objects:
         queries = []
         coordinates = [0, 0.1, 0.5, 0.9, 0.99, 1]

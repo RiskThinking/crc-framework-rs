@@ -9,8 +9,8 @@ use crate::impact::{
 };
 use crate::numerical::{
     IntegralMoment, NumericalLaw, ProbabilitySegment, compensated, condition_segments,
-    linear_interpolate, segment_integral, segment_inverse_survival, segment_probability,
-    segment_quantile,
+    linear_interpolate, segment_cvar, segment_integral, segment_inverse_survival,
+    segment_probability, segment_quantile,
 };
 use crate::{
     DiscreteDistribution, HistogramExposure, HurdleDistribution, ImpactDefinition,
@@ -987,6 +987,13 @@ impl Numerical {
             }
             Compiled::Curve { .. } => unreachable!(),
         }
+    }
+
+    /// Compute a trimmed mean for a law with finite probability-linear segments.
+    pub fn finite_cvar(&self, level: f64, upper: bool) -> Result<Option<f64>> {
+        Ok(self
+            .finite_segments()?
+            .and_then(|segments| segment_cvar(&segments, level, upper)))
     }
 
     fn finite_segments(&self) -> Result<Option<Vec<ProbabilitySegment>>> {

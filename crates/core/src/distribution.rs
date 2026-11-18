@@ -554,6 +554,61 @@ impl FittedDistribution {
         }
     }
 
+    fn unstandardize_power(&self, base: f64, shape: f64, sign: f64) -> f64 {
+        let power = base.powf(1.0 / shape);
+        if power.is_finite() && power != 0.0 || base == 0.0 {
+            self.unstandardize(power.copysign(sign))
+        } else {
+            self.location + (self.scale.ln() + base.ln() / shape).exp().copysign(sign)
+        }
+    }
+
+    fn unstandardize_exp_m1(&self, exponent: f64, divisor: f64) -> f64 {
+        let numerator = exponent.exp_m1();
+        let standardized = numerator / divisor;
+        if standardized.is_finite() && standardized != 0.0 || exponent == 0.0 {
+            self.unstandardize(standardized)
+        } else {
+            let log_numerator = if numerator.is_infinite() {
+                exponent
+            } else {
+                numerator.abs().ln()
+            };
+            let offset = (self.scale.ln() + log_numerator - divisor.abs().ln()).exp();
+            self.location + offset.copysign(exponent.signum() * divisor.signum())
+        }
+    }
+
+    fn pareto_log_survival(&self, x: f64, z: f64, shape: f64) -> f64 {
+        if z < 0.0 {
+            return 0.0;
+        }
+        if shape.abs() < EPS {
+            return -z;
+        }
+        let product = shape * z;
+        if product <= -1.0 {
+            return f64::NEG_INFINITY;
+        }
+        let logarithm = if product == f64::INFINITY && x.is_finite() {
+            let log_z = if z.is_finite() {
+                z.ln()
+            } else {
+                let centered = x - self.location;
+                let log_centered = if centered.is_finite() {
+                    centered.ln()
+                } else {
+                    (x * 0.5 - self.location * 0.5).ln() + std::f64::consts::LN_2
+                };
+                log_centered - self.scale.ln()
+            };
+            shape.ln() + log_z
+        } else {
+            product.ln_1p()
+        };
+        -logarithm / shape
+    }
+
     /// Upper-tail probability `P(X > x)`.
     ///
     /// Evaluated directly rather than as `1 - cdf(x)`, so it keeps full
@@ -577,21 +632,9 @@ impl FittedDistribution {
                     -(-(-z).powf(self.shape.expect("validated"))).exp_m1()
                 }
             }
-            DistributionFamily::GenPareto => {
-                let c = self.shape.expect("validated");
-                if z < 0.0 {
-                    1.0
-                } else if c.abs() < EPS {
-                    (-z).exp()
-                } else {
-                    let support = 1.0 + c * z;
-                    if support <= 0.0 {
-                        0.0
-                    } else {
-                        support.powf(-1.0 / c)
-                    }
-                }
-            }
+            DistributionFamily::GenPareto => self
+                .pareto_log_survival(x, z, self.shape.expect("validated"))
+                .exp(),
             DistributionFamily::GenExtreme => {
                 let c = self.shape.expect("validated");
                 if c.abs() < EPS {
@@ -623,10 +666,7 @@ impl FittedDistribution {
                 log_exponential_complement(shape * (-z).ln())
             }
             DistributionFamily::WeibullMax => f64::NEG_INFINITY,
-            DistributionFamily::GenPareto if z < 0.0 => 0.0,
-            DistributionFamily::GenPareto if shape.abs() < EPS => -z,
-            DistributionFamily::GenPareto if shape * z <= -1.0 => f64::NEG_INFINITY,
-            DistributionFamily::GenPareto => (shape * z).ln_1p() / -shape,
+            DistributionFamily::GenPareto => self.pareto_log_survival(x, z, shape),
             DistributionFamily::GenExtreme if shape.abs() < EPS => log_exponential_complement(-z),
             DistributionFamily::GenExtreme if 1.0 - shape * z <= 0.0 => {
                 if shape > 0.0 {
@@ -651,16 +691,9 @@ impl FittedDistribution {
             DistributionFamily::WeibullMin if z > 0.0 => log_exponential_complement(shape * z.ln()),
             DistributionFamily::WeibullMin => f64::NEG_INFINITY,
             DistributionFamily::WeibullMax => -(-z).max(0.0).powf(shape),
-            DistributionFamily::GenPareto if z <= 0.0 => f64::NEG_INFINITY,
-            DistributionFamily::GenPareto if shape * z <= -1.0 => 0.0,
-            DistributionFamily::GenPareto => log_exponential_complement(
-                if shape.abs() < EPS {
-                    z
-                } else {
-                    (shape * z).ln_1p() / shape
-                }
-                .ln(),
-            ),
+            DistributionFamily::GenPareto => {
+                log_exponential_complement((-self.pareto_log_survival(x, z, shape)).ln())
+            }
             DistributionFamily::GenExtreme if shape.abs() < EPS => -(-z).exp(),
             DistributionFamily::GenExtreme if 1.0 - shape * z <= 0.0 => {
                 if shape > 0.0 {
@@ -685,12 +718,16 @@ impl FittedDistribution {
             DistributionFamily::WeibullMin => {
                 return Ok(self.location + (self.scale.ln() + logarithm / shape).exp());
             }
-            DistributionFamily::WeibullMax => -(-logarithm).powf(1.0 / shape),
+            DistributionFamily::WeibullMax => {
+                return Ok(self.unstandardize_power(-logarithm, shape, -1.0));
+            }
             DistributionFamily::GenPareto => {
                 return Ok(self.location + (self.scale.ln() + logarithm).exp());
             }
             DistributionFamily::GenExtreme if shape.abs() < EPS => -(-logarithm).ln(),
-            DistributionFamily::GenExtreme => -(shape * (-logarithm).ln()).exp_m1() / shape,
+            DistributionFamily::GenExtreme => {
+                return Ok(self.unstandardize_exp_m1(shape * (-logarithm).ln(), -shape));
+            }
             DistributionFamily::SkewNormal => {
                 inverse_by_bisection(|z| skew_normal_log_cdf(z, shape), logarithm)
             }
@@ -708,13 +745,25 @@ impl FittedDistribution {
         let standardized = match self.family {
             DistributionFamily::GumbelRight => -logarithm,
             DistributionFamily::GumbelLeft => (-logarithm).ln(),
-            DistributionFamily::WeibullMin => (-logarithm).powf(1.0 / shape),
-            DistributionFamily::WeibullMax => -(logarithm / shape).exp(),
+            DistributionFamily::WeibullMin => {
+                return Ok(self.unstandardize_power(-logarithm, shape, 1.0));
+            }
+            DistributionFamily::WeibullMax => {
+                let power = (logarithm / shape).exp();
+                if power == 0.0 {
+                    return Ok(self.location - (self.scale.ln() + logarithm / shape).exp());
+                }
+                -power
+            }
             DistributionFamily::GenPareto | DistributionFamily::GenExtreme if shape.abs() < EPS => {
                 -logarithm
             }
-            DistributionFamily::GenPareto => (-shape * logarithm).exp_m1() / shape,
-            DistributionFamily::GenExtreme => -(shape * logarithm).exp_m1() / shape,
+            DistributionFamily::GenPareto => {
+                return Ok(self.unstandardize_exp_m1(-shape * logarithm, shape));
+            }
+            DistributionFamily::GenExtreme => {
+                return Ok(self.unstandardize_exp_m1(shape * logarithm, -shape));
+            }
             DistributionFamily::SkewNormal => {
                 -inverse_by_bisection(|z| skew_normal_log_cdf(z, -shape), logarithm)
             }
@@ -765,19 +814,17 @@ impl FittedDistribution {
             DistributionFamily::GumbelRight => self.unstandardize(-(-(-survival).ln_1p()).ln()),
             DistributionFamily::GumbelLeft => self.unstandardize((-survival.ln()).ln()),
             DistributionFamily::WeibullMin => {
-                self.location
-                    + self.scale * (-survival.ln()).powf(1.0 / self.shape.expect("validated"))
+                self.unstandardize_power(-survival.ln(), self.shape.expect("validated"), 1.0)
             }
             DistributionFamily::WeibullMax => {
-                self.location
-                    - self.scale * (-(-survival).ln_1p()).powf(1.0 / self.shape.expect("validated"))
+                self.unstandardize_power(-(-survival).ln_1p(), self.shape.expect("validated"), -1.0)
             }
             DistributionFamily::GenPareto => {
                 let c = self.shape.expect("validated");
                 if c.abs() < EPS {
-                    self.location - self.scale * survival.ln()
+                    self.unstandardize(-survival.ln())
                 } else {
-                    self.location + self.scale * ((-c * survival.ln()).exp_m1() / c)
+                    self.unstandardize_exp_m1(-c * survival.ln(), c)
                 }
             }
             DistributionFamily::GenExtreme => {
@@ -786,9 +833,9 @@ impl FittedDistribution {
                 // the cdf to one first.
                 let neg_log_cdf = -(-survival).ln_1p();
                 if c.abs() < EPS {
-                    self.location - self.scale * neg_log_cdf.ln()
+                    self.unstandardize(-neg_log_cdf.ln())
                 } else {
-                    self.location - self.scale * ((c * neg_log_cdf.ln()).exp_m1() / c)
+                    self.unstandardize_exp_m1(c * neg_log_cdf.ln(), -c)
                 }
             }
             DistributionFamily::SkewNormal => {
@@ -911,22 +958,9 @@ impl Distribution for FittedDistribution {
                     (-(-z).powf(self.shape.expect("validated"))).exp()
                 }
             }
-            DistributionFamily::GenPareto => {
-                let c = self.shape.expect("validated");
-                if z < 0.0 {
-                    0.0
-                } else if c.abs() < EPS {
-                    -(-z).exp_m1()
-                } else {
-                    let support = 1.0 + c * z;
-                    if support <= 0.0 {
-                        1.0
-                    } else {
-                        // 1 - (1 + c z)^(-1/c), without cancellation for small z.
-                        -(-(c * z).ln_1p() / c).exp_m1()
-                    }
-                }
-            }
+            DistributionFamily::GenPareto => -self
+                .pareto_log_survival(x, z, self.shape.expect("validated"))
+                .exp_m1(),
             DistributionFamily::GenExtreme => {
                 let c = self.shape.expect("validated");
                 if c.abs() < EPS {
@@ -970,26 +1004,25 @@ impl Distribution for FittedDistribution {
             DistributionFamily::GumbelRight => self.unstandardize(-(-q.ln()).ln()),
             DistributionFamily::GumbelLeft => self.unstandardize((-(-q).ln_1p()).ln()),
             DistributionFamily::WeibullMin => {
-                self.location
-                    + self.scale * (-(-q).ln_1p()).powf(1.0 / self.shape.expect("validated"))
+                self.unstandardize_power(-(-q).ln_1p(), self.shape.expect("validated"), 1.0)
             }
             DistributionFamily::WeibullMax => {
-                self.location - self.scale * (-q.ln()).powf(1.0 / self.shape.expect("validated"))
+                self.unstandardize_power(-q.ln(), self.shape.expect("validated"), -1.0)
             }
             DistributionFamily::GenPareto => {
                 let c = self.shape.expect("validated");
                 if c.abs() < EPS {
-                    self.location - self.scale * (-q).ln_1p()
+                    self.unstandardize(-(-q).ln_1p())
                 } else {
-                    self.location + self.scale * ((-c * (-q).ln_1p()).exp_m1() / c)
+                    self.unstandardize_exp_m1(-c * (-q).ln_1p(), c)
                 }
             }
             DistributionFamily::GenExtreme => {
                 let c = self.shape.expect("validated");
                 if c.abs() < EPS {
-                    self.location - self.scale * (-q.ln()).ln()
+                    self.unstandardize(-(-q.ln()).ln())
                 } else {
-                    self.location - self.scale * ((c * (-q.ln()).ln()).exp_m1() / c)
+                    self.unstandardize_exp_m1(c * (-q.ln()).ln(), -c)
                 }
             }
             DistributionFamily::SkewNormal => inverse_by_bisection(|x| self.cdf(x), q),

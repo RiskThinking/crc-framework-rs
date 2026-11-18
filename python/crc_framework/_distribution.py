@@ -489,13 +489,48 @@ class Distribution:
             elif metric is Statistic.MAXIMUM:
                 value = self.support[1]
             else:
-                lo, hi = (level, 1.0) if tail is Tail.UPPER else (0.0, 1.0 - level)
-                value = self._integral(lo, hi) / (hi - lo)
+                value = self._cvar(level, tail)
             values[metric] = _statistic_value(metric, value)
         has_cvar = Statistic.CVAR in metrics
         return StatisticalSummary(
             values, level if has_cvar else None, tail if has_cvar else None
         )
+
+    def _cvar(self, level: float, tail: Tail) -> float:
+        upper = tail is Tail.UPPER
+        width = 1.0 - level
+        if level >= 64 * math.ulp(1.0):
+            lo, hi = (level, 1.0) if upper else (0.0, width)
+            return self._integral(lo, hi) / width
+
+        from ._impacts import ImpactError
+
+        try:
+            if self._native is not None:
+                exact = self._native.finite_cvar(level, upper)
+            else:
+                document = self._compound or _core.NativeNumericalDocument(
+                    self.to_json()
+                )
+                exact = document.finite_cvar(level, upper)
+            if exact is not None:
+                return exact
+            whole = self._integral(0.0, 1.0)
+            if math.isfinite(whole):
+                excluded = self._integral(0.0, level, survival=not upper)
+                retained = whole - excluded
+                # A tiny excluded probability can still account for most of
+                # the moment. Direct integration avoids that cancellation.
+                if math.isfinite(retained) and (
+                    excluded == 0.0
+                    or abs(retained) > 1e-6 * max(abs(whole), abs(excluded))
+                ):
+                    return retained / width
+        except (ValueError, ImpactError):
+            # The excluded tail can be harder to integrate than the tail the
+            # caller actually requested.
+            pass
+        return self._integral(level, 1.0, survival=not upper) / width
 
     def _mean_deviation(self) -> tuple[float, float]:
         if self._native is not None:
