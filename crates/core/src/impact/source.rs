@@ -6,8 +6,8 @@
 use std::borrow::Cow;
 
 use crate::numerical::{
-    ProbabilitySegment, affine_fitted_mean_deviation, interval_fraction, linear_interpolate,
-    segment_inverse_survival, segment_probability, segment_quantile,
+    CompensatedSum, ProbabilitySegment, affine_fitted_mean_deviation, interval_fraction,
+    linear_interpolate, segment_inverse_survival, segment_probability, segment_quantile,
 };
 use crate::{
     Distribution, EmpiricalDistribution, FittedDistribution, HurdleDistribution,
@@ -39,8 +39,7 @@ pub struct HistogramExposure {
     edges: Vec<f64>,
     weights: Vec<f64>,
     normalized: Vec<f64>,
-    /// `cumulative[i]` is the left-to-right running sum of the first `i`
-    /// normalized weights, without forcing the final entry to one.
+    /// Compensated prefixes of the normalized weights, including zero.
     cumulative: Vec<f64>,
     original_mass_sum: f64,
     normalization_factor: f64,
@@ -91,11 +90,11 @@ impl HistogramExposure {
             .map(|weight| weight / original_mass_sum)
             .collect();
         let mut cumulative = Vec::with_capacity(normalized.len() + 1);
-        let mut running = 0.0;
-        cumulative.push(running);
+        let mut running = CompensatedSum::default();
+        cumulative.push(0.0);
         for weight in &normalized {
-            running += weight;
-            cumulative.push(running);
+            running.add(*weight);
+            cumulative.push(running.total());
         }
         Ok(Self {
             edges,
@@ -177,7 +176,9 @@ impl HistogramExposure {
         if bin >= self.normalized.len() {
             return *self.edges.last().expect("histogram has edges");
         }
-        let weight = (probability - self.cumulative[bin]) / self.normalized[bin];
+        let left = self.cumulative[bin];
+        let right = self.cumulative[bin + 1];
+        let weight = (probability - left) / (right - left);
         linear_interpolate(self.edges[bin], self.edges[bin + 1], weight)
     }
 
@@ -188,13 +189,21 @@ impl HistogramExposure {
     }
 
     fn inverse_survival(&self, survival: f64, upper: bool) -> f64 {
-        let mut consumed = 0.0;
+        let mut suffix = CompensatedSum::default();
         for (edges, &mass) in self.edges.windows(2).zip(&self.normalized).rev() {
-            let next = consumed + mass;
-            if mass > 0.0 && (survival < next || (upper && survival == next)) {
-                return linear_interpolate(edges[1], edges[0], (survival - consumed) / mass);
+            if mass == 0.0 {
+                continue;
             }
-            consumed = next;
+            let right = suffix.total();
+            suffix.add(mass);
+            let left = suffix.total();
+            if upper && survival == left {
+                return edges[0];
+            }
+            if survival < left || survival == 0.0 {
+                let weight = ((survival - right) / mass).clamp(0.0, 1.0);
+                return linear_interpolate(edges[1], edges[0], weight);
+            }
         }
         self.edges[self.normalized.iter().position(|&p| p > 0.0).unwrap()]
     }
@@ -204,10 +213,8 @@ impl HistogramExposure {
 #[derive(Clone, Debug)]
 pub struct DiscreteDistribution {
     pairs: Vec<(f64, f64)>,
-    /// Plain running sums of the masses, as used by the quantile.
+    /// Compensated prefixes of the masses, including zero.
     cumulative: Vec<f64>,
-    /// Compensated (Neumaier) sums of the first `i` masses, as used by the cdf.
-    compensated: Vec<f64>,
 }
 
 impl DiscreteDistribution {
@@ -259,30 +266,16 @@ impl DiscreteDistribution {
                 merged.push((location, probability));
             }
         }
-        let mut cumulative = Vec::with_capacity(merged.len());
-        let mut running = 0.0;
+        let mut cumulative = Vec::with_capacity(merged.len() + 1);
+        let mut running = CompensatedSum::default();
+        cumulative.push(0.0);
         for (_, mass) in &merged {
-            running += mass;
-            cumulative.push(running);
-        }
-        let mut compensated = Vec::with_capacity(merged.len() + 1);
-        let mut total = 0.0_f64;
-        let mut compensation = 0.0;
-        compensated.push(total + compensation);
-        for (_, mass) in &merged {
-            let candidate = total + mass;
-            if total.abs() >= mass.abs() {
-                compensation += (total - candidate) + mass;
-            } else {
-                compensation += (mass - candidate) + total;
-            }
-            total = candidate;
-            compensated.push(total + compensation);
+            running.add(*mass);
+            cumulative.push(running.total());
         }
         Ok(Self {
             pairs: merged,
             cumulative,
-            compensated,
         })
     }
 
@@ -295,9 +288,7 @@ impl DiscreteDistribution {
     }
 
     fn quantile(&self, probability: f64) -> f64 {
-        let index = self
-            .cumulative
-            .partition_point(|cumulative| *cumulative < probability);
+        let index = self.cumulative[1..].partition_point(|cumulative| *cumulative < probability);
         self.pairs
             .get(index)
             .unwrap_or_else(|| self.pairs.last().expect("discrete support is non-empty"))
@@ -306,18 +297,16 @@ impl DiscreteDistribution {
 
     /// `P(X <= x)`.
     fn cdf(&self, x: f64) -> f64 {
-        self.compensated[self.pairs.partition_point(|(location, _)| *location <= x)]
+        self.cumulative[self.pairs.partition_point(|(location, _)| *location <= x)]
     }
 
     /// `P(X < x)`.
     fn cdf_below(&self, x: f64) -> f64 {
-        self.compensated[self.pairs.partition_point(|(location, _)| *location < x)]
+        self.cumulative[self.pairs.partition_point(|(location, _)| *location < x)]
     }
 
     fn knots(&self) -> Vec<f64> {
-        let mut knots = Vec::with_capacity(self.cumulative.len() + 1);
-        knots.push(0.0);
-        knots.extend_from_slice(&self.cumulative);
+        let mut knots = self.cumulative.clone();
         *knots.last_mut().expect("knots exist") = 1.0;
         knots
     }
@@ -567,12 +556,12 @@ impl ImpactSource {
             Self::Segments(segments) => Ok(segment_inverse_survival(&segments.0, survival, false)),
             Self::Discrete(_) | Self::Empirical(_) => {
                 let atoms = self.point_atoms();
-                let mut consumed = 0.0;
+                let mut suffix = CompensatedSum::default();
                 for &(value, mass) in atoms.iter().rev() {
-                    if survival < consumed + mass || survival == 0.0 {
+                    suffix.add(mass);
+                    if mass > 0.0 && (survival < suffix.total() || survival == 0.0) {
                         return Ok(value);
                     }
-                    consumed += mass;
                 }
                 Ok(atoms[0].0)
             }
@@ -888,40 +877,13 @@ fn distribution_error(error: crate::CrcError) -> super::error::ImpactContractErr
 }
 
 fn fitted_support(distribution: &FittedDistribution) -> (Tail, Tail) {
-    use crate::DistributionFamily::{
-        GenExtreme, GenPareto, GumbelLeft, GumbelRight, SkewNormal, WeibullMax, WeibullMin,
+    let (lower, upper) = distribution.support();
+    let tail = |value| match value {
+        f64::NEG_INFINITY => Tail::NegativeInfinity,
+        f64::INFINITY => Tail::PositiveInfinity,
+        _ => Tail::Finite(value),
     };
-    let location = distribution.location;
-    let scale = distribution.scale;
-    let shape = distribution.shape.unwrap_or(0.0);
-    match distribution.family {
-        GumbelRight | GumbelLeft | SkewNormal => (Tail::NegativeInfinity, Tail::PositiveInfinity),
-        WeibullMin => (Tail::Finite(location), Tail::PositiveInfinity),
-        WeibullMax => (Tail::NegativeInfinity, Tail::Finite(location)),
-        GenPareto => {
-            let upper = if shape < 0.0 {
-                Tail::Finite(location - scale / shape)
-            } else {
-                Tail::PositiveInfinity
-            };
-            (Tail::Finite(location), upper)
-        }
-        GenExtreme => {
-            if shape.abs() < 1e-12 {
-                (Tail::NegativeInfinity, Tail::PositiveInfinity)
-            } else if shape > 0.0 {
-                (
-                    Tail::NegativeInfinity,
-                    Tail::Finite(location + scale / shape),
-                )
-            } else {
-                (
-                    Tail::Finite(location + scale / shape),
-                    Tail::PositiveInfinity,
-                )
-            }
-        }
-    }
+    (tail(lower), tail(upper))
 }
 
 fn fitted_mean_is_finite(distribution: &FittedDistribution) -> bool {

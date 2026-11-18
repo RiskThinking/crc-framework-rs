@@ -280,10 +280,10 @@ fn indexed_histogram_and_discrete_laws_match_direct_scans() {
             }
         }
         if probability > 0.0 && probability < 1.0 {
-            assert_eq!(
-                pushforward.quantile(probability).unwrap(),
-                expected,
-                "{probability}"
+            let actual = pushforward.quantile(probability).unwrap();
+            assert!(
+                (actual - expected).abs() <= 4.0 * f64::EPSILON * expected.abs().max(1.0),
+                "{probability}: {actual} vs {expected}"
             );
         }
         let discrete_expected = if probability <= 0.1 {

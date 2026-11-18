@@ -188,6 +188,39 @@ def test_tied_attribution_is_independent_of_input_order() -> None:
         } == {"a": 0.75, "b": 0.75}
 
 
+@pytest.mark.parametrize("increment", [1.0, -1.0, math.ulp(0.0)])
+def test_branch_order_distinguishes_impacts_that_round_to_the_same_total(
+    increment: float,
+) -> None:
+    baseline = outcome("baseline", 1.0, 1e16)
+    variable = outcome("increment", 0.5, increment)
+    for factors in ([baseline, variable], [variable, baseline]):
+        level = compute_risk(factors, levels=[0.5]).at(0.5)
+        assert level.value_at_risk == level.conditional_value_at_risk == 1e16
+        parts = {part.id: part for part in level.attribution}
+        assert parts["increment"].value_at_risk == min(0.0, increment)
+        assert parts["increment"].conditional_value_at_risk == max(0.0, increment)
+
+
+@pytest.mark.parametrize("include_rounded_mass", [False, True])
+def test_partial_exact_tie_uses_weighted_attribution_despite_common_baseline(
+    include_rounded_mass: bool,
+) -> None:
+    baseline = outcome("baseline", 1.0, 1e16)
+    a, b = outcome("a", 0.5, 0.5), outcome("b", 0.5, 0.5)
+    factors = [baseline, a, b]
+    if include_rounded_mass:
+        factors.append(outcome("zero", math.ulp(0.0), 0.0))
+    level = compute_risk(factors, levels=[0.5]).at(0.5)
+    assert level.value_at_risk == level.conditional_value_at_risk == 1e16
+    assert [part.value_at_risk for part in level.attribution[:3]] == [1e16, 0.25, 0.25]
+    assert [part.conditional_value_at_risk for part in level.attribution[:3]] == [
+        1e16,
+        0.375,
+        0.375,
+    ]
+
+
 def test_impossible_branches_do_not_overflow() -> None:
     result = compute_risk(
         [outcome("a", 0, 1e308), outcome("b", 0, 1e308)], levels=[0.5]

@@ -554,6 +554,36 @@ impl FittedDistribution {
         }
     }
 
+    fn shifted_ratio(&self, divisor: f64) -> f64 {
+        let offset = self.scale / divisor;
+        if offset.is_infinite() && offset.is_sign_negative() != self.location.is_sign_negative() {
+            // Halve both terms before dividing so cancellation can recover a
+            // representable endpoint even when the full offset overflows.
+            2.0 * (self.location * 0.5 + (self.scale * 0.5) / divisor)
+        } else {
+            self.location + offset
+        }
+    }
+
+    pub(crate) fn support(&self) -> (f64, f64) {
+        let shape = self.shape.unwrap_or(0.0);
+        match self.family {
+            DistributionFamily::WeibullMin => (self.location, f64::INFINITY),
+            DistributionFamily::WeibullMax => (f64::NEG_INFINITY, self.location),
+            DistributionFamily::GenPareto if shape < 0.0 => {
+                (self.location, self.shifted_ratio(-shape))
+            }
+            DistributionFamily::GenPareto => (self.location, f64::INFINITY),
+            DistributionFamily::GenExtreme if shape > 0.0 => {
+                (f64::NEG_INFINITY, self.shifted_ratio(shape))
+            }
+            DistributionFamily::GenExtreme if shape < 0.0 => {
+                (self.shifted_ratio(shape), f64::INFINITY)
+            }
+            _ => (f64::NEG_INFINITY, f64::INFINITY),
+        }
+    }
+
     fn unstandardize_power(&self, base: f64, shape: f64, sign: f64) -> f64 {
         let power = base.powf(1.0 / shape);
         if power.is_finite() && power != 0.0 || base == 0.0 {
@@ -982,23 +1012,8 @@ impl Distribution for FittedDistribution {
     fn ppf(&self, q: f64) -> Result<f64> {
         validate_probability(q)?;
         if q == 0.0 || q == 1.0 {
-            return Ok(match (self.family, q == 0.0) {
-                (DistributionFamily::WeibullMin | DistributionFamily::GenPareto, true) => {
-                    self.location
-                }
-                (DistributionFamily::WeibullMax, false) => self.location,
-                (DistributionFamily::GenPareto, false) if self.shape.expect("validated") < 0.0 => {
-                    self.location - self.scale / self.shape.expect("validated")
-                }
-                (DistributionFamily::GenExtreme, true) if self.shape.expect("validated") < 0.0 => {
-                    self.location + self.scale / self.shape.expect("validated")
-                }
-                (DistributionFamily::GenExtreme, false) if self.shape.expect("validated") > 0.0 => {
-                    self.location + self.scale / self.shape.expect("validated")
-                }
-                (_, true) => f64::NEG_INFINITY,
-                (_, false) => f64::INFINITY,
-            });
+            let (lower, upper) = self.support();
+            return Ok(if q == 0.0 { lower } else { upper });
         }
         let value = match self.family {
             DistributionFamily::GumbelRight => self.unstandardize(-(-q.ln()).ln()),

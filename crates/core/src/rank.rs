@@ -5,6 +5,8 @@ use crate::numerical::{CompensatedSum, compensated, linear_interpolate};
 use num_bigint::{BigInt, BigUint};
 use num_rational::BigRational;
 use num_traits::ToPrimitive;
+use std::cell::OnceCell;
+use std::cmp::Ordering;
 use std::collections::HashSet;
 
 #[derive(Clone, Debug)]
@@ -93,6 +95,114 @@ fn dyadic(value: f64) -> (u64, i32) {
     };
     let zeroes = coefficient.trailing_zeros().min(63);
     (coefficient >> zeroes, exponent + zeroes as i32)
+}
+
+struct ImpactOrder<'a> {
+    factors: &'a Factors<'a>,
+    rounding_margin: f64,
+    varying_mask: usize,
+    exact: OnceCell<ExactImpactSums>,
+}
+
+impl<'a> ImpactOrder<'a> {
+    fn new(factors: &'a Factors<'a>) -> Self {
+        let mut maximum = 0.0_f64;
+        let mut varying_mask = 0;
+        for (i, (_, outcome)) in factors.iter().enumerate() {
+            maximum = maximum.max(outcome.lower_impact.abs().max(outcome.upper_impact.abs()));
+            if outcome.lower_impact != outcome.upper_impact {
+                varying_mask |= 1 << i;
+            }
+        }
+        // Bound the combined rounding errors of two sums of at most 26
+        // impacts, including the scaled overflow fallback and subnormals.
+        let rounding_margin = (1024.0 * f64::EPSILON) * maximum + 1024.0 * f64::from_bits(1);
+        Self {
+            factors,
+            rounding_margin,
+            varying_mask,
+            exact: OnceCell::new(),
+        }
+    }
+
+    fn compare(&self, a: &Branch, b: &Branch) -> Ordering {
+        if (a.mask ^ b.mask) & self.varying_mask == 0 {
+            Ordering::Equal
+        } else if (a.value - b.value).abs() > self.rounding_margin {
+            a.value.total_cmp(&b.value)
+        } else {
+            self.exact
+                .get_or_init(|| ExactImpactSums::new(self.factors))
+                .compare(a.mask, b.mask)
+        }
+    }
+}
+
+/// Exact branch ordering from each upper state's increment over the common
+/// all-lower baseline. Two half tables keep storage below the branch count.
+struct ExactImpactSums {
+    low: Vec<BigInt>,
+    high: Vec<BigInt>,
+    split: usize,
+}
+
+impl ExactImpactSums {
+    fn new(factors: &Factors<'_>) -> Self {
+        let states = factors
+            .iter()
+            .flat_map(|(_, outcome)| [outcome.lower_impact, outcome.upper_impact]);
+        let exponent = states
+            .clone()
+            .filter(|value| *value != 0.0)
+            .map(|value| dyadic(value).1)
+            .min()
+            .unwrap_or(0);
+        let integer = |value: f64| {
+            let (mantissa, power) = dyadic(value);
+            let magnitude = BigInt::from(mantissa) << (power - exponent).max(0) as usize;
+            if value.is_sign_negative() {
+                -magnitude
+            } else {
+                magnitude
+            }
+        };
+        let increments: Vec<_> = factors
+            .iter()
+            .map(|(_, outcome)| integer(outcome.upper_impact) - integer(outcome.lower_impact))
+            .collect();
+        let split = factors.len() / 2;
+        Self {
+            low: Self::half_sums(&increments[..split]),
+            high: Self::half_sums(&increments[split..]),
+            split,
+        }
+    }
+
+    fn half_sums(increments: &[BigInt]) -> Vec<BigInt> {
+        let mut sums = Vec::with_capacity(1 << increments.len());
+        sums.push(BigInt::ZERO);
+        for increment in increments {
+            for i in 0..sums.len() {
+                sums.push(&sums[i] + increment);
+            }
+        }
+        sums
+    }
+
+    fn compare(&self, a: usize, b: usize) -> Ordering {
+        let low_mask = self.low.len() - 1;
+        let (a_low, b_low) = (&self.low[a & low_mask], &self.low[b & low_mask]);
+        let (a_high, b_high) = (&self.high[a >> self.split], &self.high[b >> self.split]);
+        let low = a_low.cmp(b_low);
+        let high = a_high.cmp(b_high);
+        if low == high || high.is_eq() {
+            low
+        } else if low.is_eq() {
+            high
+        } else {
+            (a_low - b_low).cmp(&(b_high - a_high))
+        }
+    }
 }
 
 struct ExactMasses {
@@ -275,7 +385,7 @@ fn var_attribution(
 // mass and avoids cancellation from rounding large impact contributions.
 fn exact_tail(
     branches: &[Branch],
-    quantile: f64,
+    below_count: usize,
     q: f64,
     factors: &Factors<'_>,
     masses: &ExactMasses,
@@ -285,9 +395,9 @@ fn exact_tail(
     let mut tied_mass = BigUint::ZERO;
     let mut below_upper_mass = vec![BigUint::ZERO; factors.len()];
     let mut tied_upper_mass = vec![BigUint::ZERO; factors.len()];
-    for branch in branches.iter().take_while(|b| b.value <= quantile) {
+    for (i, branch) in branches.iter().enumerate() {
         let weight = masses.at(branch.mask);
-        let (total, by_factor) = if branch.value < quantile {
+        let (total, by_factor) = if i < below_count {
             (&mut below_mass, &mut below_upper_mass)
         } else {
             (&mut tied_mass, &mut tied_upper_mass)
@@ -417,7 +527,8 @@ pub fn compute_risk(
         }
         branches.push(Branch { mask, mass, value });
     }
-    branches.sort_unstable_by(|a, b| a.value.total_cmp(&b.value).then(a.mask.cmp(&b.mask)));
+    let order = ImpactOrder::new(&factors);
+    branches.sort_unstable_by(|a, b| order.compare(a, b).then(a.mask.cmp(&b.mask)));
     let total = compensated(branches.iter().map(|b| b.mass));
     let rounded_mass = branches.iter().any(|b| b.mass < f64::MIN_POSITIVE);
     let mut exact = None;
@@ -426,17 +537,18 @@ pub fn compute_risk(
         let index = quantile_index(&branches, total, q, &factors, &mut exact);
         let quantile = branches[index].value;
         // Tied VaR states have probability-weighted attribution, independent of order.
-        let lo = branches.partition_point(|branch| branch.value < quantile);
-        let hi = branches.partition_point(|branch| branch.value <= quantile);
+        let lo = branches[..index].partition_point(|b| order.compare(b, &branches[index]).is_lt());
+        let hi = index
+            + branches[index..].partition_point(|b| order.compare(b, &branches[index]).is_eq());
         let var_parts = var_attribution(&branches[lo..hi], &factors, &mut exact);
         let approximate = if q < 64.0 * f64::EPSILON || rounded_mass {
             None
         } else {
-            upper_tail(&branches, (1.0 - q) * total, &factors)
+            upper_tail(&branches, (1.0 - q) * total, &order)
         };
         let (cvar, cvar_parts) = approximate.unwrap_or_else(|| {
             let exact = exact.get_or_insert_with(|| ExactMasses::new(&factors));
-            exact_tail(&branches, quantile, q, &factors, exact)
+            exact_tail(&branches[..hi], lo, q, &factors, exact)
         });
         result.push(RiskLevel {
             probability: q,
@@ -462,14 +574,15 @@ pub fn compute_risk(
 fn upper_tail(
     branches: &[Branch],
     tail_mass: f64,
-    factors: &Factors<'_>,
+    order: &ImpactOrder<'_>,
 ) -> Option<(f64, Vec<f64>)> {
+    let factors = order.factors;
     let mut remaining = tail_mass;
     let mut cvar = CompensatedSum::default();
     let mut largest_positive = 0.0_f64;
     let mut largest_negative = 0.0_f64;
     let mut states = Vec::from_iter((0..factors.len()).map(|_| Default::default()));
-    for tied in branches.chunk_by(|a, b| a.value == b.value).rev() {
+    for tied in branches.chunk_by(|a, b| order.compare(a, b).is_eq()).rev() {
         let group_mass = compensated(tied.iter().map(|branch| branch.mass));
         let used = group_mass.min(remaining);
         let weight = used / tail_mass;
