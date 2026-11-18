@@ -154,28 +154,12 @@ def fitting_schema():
         },
     }
 
-    def outcome(kind, severity, fields):
-        return array(
-            obj(
-                {
-                    "code": {"const": f"fit.{kind}"},
-                    "message": {"type": "string", "minLength": 1},
-                    "severity": {"const": severity},
-                    "path": {"type": "string"},
-                    "details": obj(fields),
-                }
-            ),
-            minItems=1,
-            maxItems=1,
-        )
-
     attempts = [
         obj(
             {
                 "specification": {"$ref": f"#/$defs/{kind}_fit_specification"},
                 "status": {"const": "converged"},
-                "reason": {"type": "null"},
-                "diagnostics": outcome(kind, "info", {**fields, **optimizer}),
+                "diagnostic": obj({**fields, **optimizer}),
             }
         )
         for kind, fields in details.items()
@@ -185,8 +169,7 @@ def fitting_schema():
             {
                 "specification": {"$ref": "#/$defs/concrete_specification"},
                 "status": {"enum": ["rejected", "failed"]},
-                "reason": {"type": "string", "minLength": 1},
-                "diagnostics": outcome("failed", "error", {}),
+                "diagnostic": obj({"message": {"type": "string", "minLength": 1}}),
             }
         )
     )

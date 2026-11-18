@@ -1,4 +1,4 @@
-use crc_framework_core::impact::KernelCurveParameters;
+use crc_framework_core::impact::{KernelCurveParameters, registry_country_choices};
 // Frozen native mathematical kernel bindings.
 
 use crc_framework_core::{
@@ -73,20 +73,20 @@ impl PyExpression {
         .map_err(|error| impact_error(py, error))
     }
 
-    fn expected_value(&self, py: Python<'_>, source: PyRef<'_, PyImpactSource>) -> PyResult<f64> {
+    fn expectation(&self, py: Python<'_>, source: PyRef<'_, PyImpactSource>) -> PyResult<f64> {
         let (definition, exposure) = (&self.inner, &source.inner);
-        py.detach(|| definition.expected_value(exposure, MethodRequest::Exact))
+        py.detach(|| definition.expectation(exposure, MethodRequest::Exact))
             .map(|result| result.value)
             .map_err(|error| impact_error(py, error))
     }
 
-    fn transform_distribution(
+    fn pushforward(
         &self,
         py: Python<'_>,
         source: PyRef<'_, PyImpactSource>,
     ) -> PyResult<PyImpactDistribution> {
         let (definition, exposure) = (&self.inner, &source.inner);
-        py.detach(|| definition.transform_distribution(exposure))
+        py.detach(|| definition.pushforward(exposure))
             .map(|inner| PyImpactDistribution { inner })
             .map_err(|error| impact_error(py, error))
     }
@@ -299,6 +299,12 @@ fn impact_registry_manifest_json() -> &'static str {
     manifest_json()
 }
 
+#[pyfunction]
+#[pyo3(signature = (factor, building_type=None))]
+fn impact_registry_country_choices(factor: &str, building_type: Option<&str>) -> Vec<&'static str> {
+    registry_country_choices(factor, building_type)
+}
+
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     let py = module.py();
     module.add("ImpactError", py.get_type::<ImpactError>())?;
@@ -308,5 +314,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyReference>()?;
     module.add_function(wrap_pyfunction!(impact_registry_identity, module)?)?;
     module.add_function(wrap_pyfunction!(impact_registry_manifest_json, module)?)?;
+    module.add_function(wrap_pyfunction!(impact_registry_country_choices, module)?)?;
     Ok(())
 }

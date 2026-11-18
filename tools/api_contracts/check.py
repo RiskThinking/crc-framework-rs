@@ -346,12 +346,29 @@ def validate_contract(contract: Mapping[str, Any], release: Mapping[str, Any]) -
         else:
             _keys(
                 definition,
-                {"kind", "constructor", "methods", "properties"},
+                {"kind", "constructor", "methods", "properties", "generic_parameters"},
                 {"kind"},
                 path,
             )
+            parameters = definition.get("generic_parameters", [])
+            _require(
+                isinstance(parameters, list)
+                and all(
+                    isinstance(parameter, str) and _IDENTIFIER.fullmatch(parameter)
+                    for parameter in parameters
+                )
+                and len(parameters) == len(set(parameters))
+                and not set(parameters) & names,
+                f"{path}: invalid type parameters",
+            )
+            class_names = names | set(parameters)
             if "constructor" in definition:
-                _call(definition["constructor"], names, exports, f"{path}/constructor")
+                _call(
+                    definition["constructor"],
+                    class_names,
+                    exports,
+                    f"{path}/constructor",
+                )
                 _require(
                     definition["constructor"]["returns"] == name,
                     f"{path}: constructor must return its own type",
@@ -369,12 +386,12 @@ def validate_contract(contract: Mapping[str, Any], release: Mapping[str, Any]) -
                 _require(
                     bool(_IDENTIFIER.fullmatch(method)), f"{path}: invalid method name"
                 )
-                _call(signature, names, exports, f"{path}/methods/{method}")
+                _call(signature, class_names, exports, f"{path}/methods/{method}")
             for field, annotation in properties.items():
                 _require(
                     bool(_IDENTIFIER.fullmatch(field)), f"{path}: invalid property name"
                 )
-                _annotation(annotation, names, f"{path}/properties/{field}")
+                _annotation(annotation, class_names, f"{path}/properties/{field}")
     _require(
         isinstance(contract["semantics"], dict)
         and bool(contract["semantics"])
@@ -662,7 +679,16 @@ def runtime_errors(contract: Mapping[str, Any], module: ModuleType) -> list[str]
                         errors.append(
                             f"crc_framework.{name}.{method}: method binding differs"
                         )
-            annotations = getattr(value, "__annotations__", {})
+            actual_parameters = [
+                parameter.__name__ for parameter in getattr(value, "__parameters__", ())
+            ]
+            if actual_parameters != definition.get("generic_parameters", []):
+                errors.append(f"crc_framework.{name}: type parameters differ")
+            annotations = {
+                field: annotation
+                for base in reversed(value.__mro__)
+                for field, annotation in vars(base).get("__annotations__", {}).items()
+            }
             for field, expected_annotation in definition.get("properties", {}).items():
                 member = inspect.getattr_static(value, field, None)
                 if isinstance(member, property) and member.fget is not None:

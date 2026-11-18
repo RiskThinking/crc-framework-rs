@@ -7,10 +7,17 @@ import math
 from importlib.resources import files
 
 import pytest
-from crc_framework import Distribution, QuantileCurve, _core
+from crc_framework import (
+    ClimateIndexKind,
+    Distribution,
+    Measurement,
+    QuantileCurve,
+    _core,
+)
 from jsonschema import Draft202012Validator, FormatChecker
 from referencing import Registry, Resource
 from referencing.exceptions import NoSuchResource
+
 from tools.numerical_contracts.fixtures import build as numerical_fixtures
 from tools.numerical_contracts.generate import build as numerical_schemas
 
@@ -18,6 +25,21 @@ CONTRACTS = files("crc_framework").joinpath("contracts")
 NUMERICAL_URI = "https://climateriskcommons.org/schemas/numerical/1.0"
 DATASET_URI = "https://climateriskcommons.org/schemas/dataset/2.0"
 TAXONOMY_URI = "https://climateriskcommons.org/schemas/taxonomy/1.0"
+MEASUREMENT_URI = "https://climateriskcommons.org/schemas/measurement-1.0.schema.json"
+
+
+def test_reference_period_order_uses_exact_integer_years():
+    measurement = {
+        "kind": "climate_index",
+        "index": ClimateIndexKind.STANDARDIZED_PRECIPITATION_EVAPOTRANSPIRATION_INDEX.value,
+        "reference_period": {"start": 2**53 + 1, "end": 2**53},
+    }
+    document = json.dumps(measurement)
+    assert Draft202012Validator(SCHEMAS[MEASUREMENT_URI]).is_valid(measurement)
+    with pytest.raises(ValueError, match="ordered"):
+        Measurement.from_json(document)
+    with pytest.raises(ValueError, match="ordered"):
+        _core.validate_document(MEASUREMENT_URI, document)
 
 
 def _load(path):

@@ -36,7 +36,6 @@ ORIGIN_KINDS = ("user_defined", "published", "imported", "derived", "registry")
 SOURCE_KINDS = ("publication", "dataset", "code", "definition")
 CROPS = ("maize", "rice", "wheat")
 CONTEXT_FIELDS = ("cell", "country", "continent", "building_type", "historic_mean")
-FALLBACK_POLICIES = ("error", "legacy_defaults")
 MONOTONICITY_CLASSES = (
     "non_decreasing",
     "non_increasing",
@@ -551,14 +550,12 @@ def _lookup_key(value: Any, path: str) -> Any:
 
 
 def _lookup(value: Any, path: str) -> Dict[str, Any]:
-    names = ("table_id", "table_sha256", "requested_key", "resolved_key", "status")
+    names = ("table_id", "table_sha256", "key")
     fields = _fields(value, path, names)
     return {
         "table_id": identifier(fields["table_id"], pointer(path, "table_id")),
         "table_sha256": _sha256(fields["table_sha256"], pointer(path, "table_sha256")),
-        "requested_key": _lookup_key(fields["requested_key"], pointer(path, "requested_key")),
-        "resolved_key": _lookup_key(fields["resolved_key"], pointer(path, "resolved_key")),
-        "status": _choice(fields["status"], pointer(path, "status"), ("exact", "fallback")),
+        "key": _lookup_key(fields["key"], pointer(path, "key")),
     }
 
 
@@ -633,30 +630,19 @@ def _origin(
         "factor",
         "context",
         "overrides",
-        "fallback_policy",
         "lookups",
     )
     fields = _fields(value, path, names)
     result: Dict[str, Any] = {"kind": kind, **_registry_identity(fields, path)}
     factor = _factor(fields["factor"], pointer(path, "factor"))
-    policy = _choice(fields["fallback_policy"], pointer(path, "fallback_policy"), FALLBACK_POLICIES)
     lookups = [
         _lookup(item, pointer(pointer(path, "lookups"), index))
         for index, item in enumerate(_array(fields["lookups"], pointer(path, "lookups")))
     ]
-    if policy == "error":
-        for index, lookup in enumerate(lookups):
-            if lookup["status"] == "fallback":
-                _fail(
-                    "invalid_value",
-                    pointer(pointer(pointer(path, "lookups"), index), "status"),
-                    "fallback lookups require fallback_policy legacy_defaults",
-                )
     result.update(
         factor=factor,
         context=normalize_context(fields["context"], pointer(path, "context")),
         overrides=_overrides(fields["overrides"], pointer(path, "overrides"), factor),
-        fallback_policy=policy,
         lookups=lookups,
     )
     return result
@@ -738,7 +724,7 @@ def normalize_reference(value: Any, path: str = "") -> Dict[str, Any]:
             "resolver_semantics_version",
             "factor",
         ),
-        ("overrides", "context_defaults", "fallback_policy"),
+        ("overrides",),
     )
     result: Dict[str, Any] = {"schema_version": REFERENCE_SCHEMA_VERSION}
     result.update(_registry_identity(fields, path))
@@ -746,12 +732,6 @@ def normalize_reference(value: Any, path: str = "") -> Dict[str, Any]:
     result.update(
         factor=factor,
         overrides=_overrides(fields.get("overrides", {}), pointer(path, "overrides"), factor),
-        context_defaults=normalize_context(
-            fields.get("context_defaults", {}), pointer(path, "context_defaults")
-        ),
-        fallback_policy=_choice(
-            fields.get("fallback_policy", "error"), pointer(path, "fallback_policy"), FALLBACK_POLICIES
-        ),
     )
     return result
 
@@ -974,7 +954,7 @@ def _integration_method(value: Any, path: str) -> Dict[str, Any]:
 
 
 def _operation(value: Any, path: str) -> Dict[str, Any]:
-    kind = _kind(value, path, ("point", "expected_value", "transform_distribution", "tabulate"))
+    kind = _kind(value, path, ("point", "expectation", "pushforward", "tabulate"))
     fields = _fields(value, path, ("kind", "settings"))
     settings_path = pointer(path, "settings")
     raw = fields["settings"]
@@ -984,7 +964,7 @@ def _operation(value: Any, path: str) -> Dict[str, Any]:
             "alignment": _choice(settings["alignment"], pointer(settings_path, "alignment"), ("event_aligned",)),
             "shape": _choice(settings["shape"], pointer(settings_path, "shape"), ("preserve",)),
         }
-    elif kind == "expected_value":
+    elif kind == "expectation":
         settings = _fields(raw, settings_path, ("requested_method", "method"))
         result = {
             "requested_method": _choice(
@@ -996,7 +976,7 @@ def _operation(value: Any, path: str) -> Dict[str, Any]:
         }
         if result["requested_method"] not in ("auto", result["method"]["kind"]):
             _fail("invalid_value", pointer(settings_path, "method"), "resolved method contradicts the request")
-    elif kind == "transform_distribution":
+    elif kind == "pushforward":
         settings = _fields(raw, settings_path, ("algorithm",))
         result = {"algorithm": identifier(settings["algorithm"], pointer(settings_path, "algorithm"))}
     else:

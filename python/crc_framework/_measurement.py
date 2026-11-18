@@ -1249,7 +1249,6 @@ _CONTEXT_DEFINITIONS: dict[str, dict[str, object]] = {
                     AssetType.RESIDENTIAL,
                     AssetType.COMMERCIAL,
                     AssetType.INDUSTRIAL,
-                    AssetType.AGRICULTURAL_BUILDING,
                 )
             ]
         },
@@ -1373,7 +1372,6 @@ class CoolingCostContext(_ContextRecord):
     def __post_init__(self) -> None:
         _binding_or(self.country, str, "country")
         _binding_or(self.asset_type, AssetType, "asset_type")
-        self._validate()
         _binding_or(self.historic_mean, float, "historic_mean")
         self._validate()
 

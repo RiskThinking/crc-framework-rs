@@ -5,15 +5,15 @@ from __future__ import annotations
 import json
 import math
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, fields
 from enum import Enum
-from typing import TypedDict, cast
+from typing import Generic, TypeAlias, TypedDict, TypeVar, cast, overload
 
 import numpy as np
 import numpy.typing as npt
 
 from . import _core
-from ._diagnostics import Diagnostic, DiagnosticSeverity, ScientificValue
 from ._distribution import ArrayLike, Distribution, DistributionFamily, QuantileCurve
 
 
@@ -318,12 +318,81 @@ class ModelSelection(FitSpec):
         return _json(self)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
+class _FitConvergence:
+    iterations: int
+    evaluations: int
+
+    def __post_init__(self) -> None:
+        for field in fields(self):
+            value = getattr(self, field.name)
+            if not math.isfinite(value):
+                raise ValueError(f"fitting diagnostic {field.name} must be finite")
+
+
+@dataclass(frozen=True, slots=True)
+class SampleFitDiagnostic(_FitConvergence):
+    ks_statistic: float
+    ks_pvalue: float
+    rmse: float
+    r_squared: float
+
+
+@dataclass(frozen=True, slots=True)
+class _QuantileComparison(_FitConvergence):
+    normalized_rmse: float
+    normalization_scale: float
+
+
+@dataclass(frozen=True, slots=True)
+class _QuantileResiduals(_QuantileComparison):
+    rmse: float
+    weighted_r_squared: float
+    maximum_absolute_residual: float
+
+
+@dataclass(frozen=True, slots=True)
+class QuantileFitDiagnostic(_QuantileResiduals):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class CensoredQuantileFitDiagnostic(_QuantileResiduals):
+    negative_log_likelihood: float
+    residual_scale: float
+    residual_scale_floor: float
+    censored_count: int
+    uncensored_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class HurdleQuantileFitDiagnostic(_QuantileComparison):
+    tail_rmse: float
+    tail_weighted_r_squared: float
+    tail_maximum_absolute_residual: float
+    atom_count: int
+    tail_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class FitFailureDiagnostic:
+    message: str
+
+
+ConvergedFitDiagnostic: TypeAlias = (
+    SampleFitDiagnostic
+    | QuantileFitDiagnostic
+    | CensoredQuantileFitDiagnostic
+    | HurdleQuantileFitDiagnostic
+)
+DiagnosticT_co = TypeVar("DiagnosticT_co", bound=ConvergedFitDiagnostic, covariant=True)
+
+
+@dataclass(frozen=True, slots=True)
 class FitAttempt:
     specification: FitSpec
     status: FitStatus
-    reason: str | None
-    diagnostics: tuple[Diagnostic, ...]
+    diagnostic: ConvergedFitDiagnostic | FitFailureDiagnostic
 
 
 @dataclass(frozen=True)
@@ -358,45 +427,31 @@ class FitRecord:
 
 
 @dataclass(frozen=True)
-class FitResult:
+class FitResult(Generic[DiagnosticT_co]):
     distribution: Distribution
-    diagnostics: tuple[Diagnostic, ...]
     record: FitRecord
+
+    @property
+    def diagnostic(self) -> DiagnosticT_co:
+        selected = self.record.selected_attempt
+        assert selected is not None
+        diagnostic = self.record.attempts[selected].diagnostic
+        assert not isinstance(diagnostic, FitFailureDiagnostic)
+        return cast(DiagnosticT_co, diagnostic)
 
 
 class FitError(ValueError):
     """A requested fit failed, retaining its execution record."""
 
     record: FitRecord
-    diagnostics: tuple[Diagnostic, ...]
     code: str
     message: str
 
-    def __init__(
-        self, message: str, *, record: FitRecord, diagnostics: tuple[Diagnostic, ...]
-    ) -> None:
+    def __init__(self, message: str, *, record: FitRecord) -> None:
         super().__init__(message)
         self.record = record
-        self.diagnostics = diagnostics
         self.code = "fit.no_converged_candidate"
         self.message = message
-
-
-def _diagnostic(
-    code: str, message: str, details: dict[str, ScientificValue], *, error: bool = False
-) -> Diagnostic:
-    if any(
-        isinstance(value, float) and not math.isfinite(value)
-        for value in details.values()
-    ):
-        raise ValueError("fitting diagnostics must be finite")
-    return Diagnostic(
-        code=code,
-        message=message,
-        severity=DiagnosticSeverity.ERROR if error else DiagnosticSeverity.INFO,
-        path="",
-        details=details,
-    )
 
 
 class _NativeBounds(TypedDict):
@@ -460,13 +515,10 @@ def _failure(
     weights: tuple[float, ...] | None,
     support: tuple[float, float] | None,
 ) -> FitError:
-    diagnostics = tuple(
-        diagnostic for attempt in attempts for diagnostic in attempt.diagnostics
-    )
     failures = "; ".join(
-        f"{_label(attempt.specification)}: {attempt.reason}"
+        f"{_label(attempt.specification)}: {attempt.diagnostic.message}"
         for attempt in attempts
-        if attempt.reason is not None
+        if isinstance(attempt.diagnostic, FitFailureDiagnostic)
     )
     message = f"{specification.kind.value} fitting failed: {failures or 'no requested candidate converged'}"
     return FitError(
@@ -474,13 +526,12 @@ def _failure(
         record=_record(
             specification, attempts, None, count, used, weights, support, False
         ),
-        diagnostics=diagnostics,
     )
 
 
 def fit_samples(
     samples: ArrayLike, specification: SampleFit | ModelSelection
-) -> FitResult:
+) -> FitResult[SampleFitDiagnostic]:
     if not isinstance(specification, (SampleFit, ModelSelection)):
         raise TypeError("sample evidence requires SampleFit or ModelSelection")
     values = np.asarray(samples, dtype=np.float64)
@@ -498,15 +549,13 @@ def fit_samples(
     if any(not isinstance(candidate, SampleFit) for candidate in candidates):
         raise TypeError("sample model selection requires SampleFit candidates")
     attempts: list[FitAttempt] = []
-    successes: list[
-        tuple[float, Distribution, tuple[Diagnostic, ...], SampleFit, int]
-    ] = []
+    successes: list[tuple[float, Distribution, SampleFit, int]] = []
     support = (float(np.min(values)), float(np.max(values))) if values.size else None
     used_count = 0
 
     def run(
         candidate: SampleFit,
-    ) -> tuple[float, Distribution, tuple[Diagnostic, ...], SampleFit, int] | None:
+    ) -> tuple[float, Distribution, SampleFit, int] | None:
         nonlocal used_count
         try:
             if len(values) < candidate.minimum_samples:
@@ -525,37 +574,30 @@ def fit_samples(
                 require_sample_support=bounds.require_sample_support,
             )
             distribution = Distribution._from_native(native.distribution)
-            diagnostic = _diagnostic(
-                "fit.samples",
-                "Requested sample estimator converged",
-                {
-                    "ks_statistic": native.ks_statistic,
-                    "ks_pvalue": native.ks_pvalue,
-                    "rmse": native.rmse,
-                    "r_squared": native.r_squared,
-                    "iterations": native.iterations,
-                    "evaluations": native.evaluations,
-                },
+            diagnostic = SampleFitDiagnostic(
+                iterations=native.iterations,
+                evaluations=native.evaluations,
+                ks_statistic=native.ks_statistic,
+                ks_pvalue=native.ks_pvalue,
+                rmse=native.rmse,
+                r_squared=native.r_squared,
             )
-            diagnostics: tuple[Diagnostic, ...] = (diagnostic,)
-            attempts.append(
-                FitAttempt(candidate, FitStatus.CONVERGED, None, diagnostics)
-            )
+            attempts.append(FitAttempt(candidate, FitStatus.CONVERGED, diagnostic))
             return (
                 native.ks_statistic,
                 distribution,
-                diagnostics,
                 candidate,
                 len(attempts) - 1,
             )
         except ValueError as error:
-            diagnostic = _diagnostic("fit.failed", str(error), {}, error=True)
             status = (
                 FitStatus.REJECTED
                 if "does not satisfy constraints" in str(error)
                 else FitStatus.FAILED
             )
-            attempts.append(FitAttempt(candidate, status, str(error), (diagnostic,)))
+            attempts.append(
+                FitAttempt(candidate, status, FitFailureDiagnostic(str(error)))
+            )
             for fallback in candidate.fallbacks:
                 result = run(fallback)
                 if result is not None:
@@ -569,12 +611,9 @@ def fit_samples(
             successes.append(result)
     if not successes:
         raise _failure(specification, attempts, len(values), used_count, None, support)
-    _, distribution, diagnostics, chosen, selected = min(
-        successes, key=lambda result: result[0]
-    )
+    _, distribution, chosen, selected = min(successes, key=lambda result: result[0])
     return FitResult(
         distribution,
-        diagnostics,
         _record(
             specification,
             attempts,
@@ -589,13 +628,88 @@ def fit_samples(
     )
 
 
+def _quantile_diagnostic(
+    native: _core.NativeQuantileFitResult
+    | _core.NativeCensoredQuantileFitResult
+    | _core.NativeHurdleQuantileFitResult,
+    score: float,
+    span: float,
+) -> (
+    QuantileFitDiagnostic | CensoredQuantileFitDiagnostic | HurdleQuantileFitDiagnostic
+):
+    if isinstance(native, _core.NativeHurdleQuantileFitResult):
+        return HurdleQuantileFitDiagnostic(
+            iterations=native.iterations,
+            evaluations=native.evaluations,
+            normalized_rmse=score,
+            normalization_scale=span,
+            tail_rmse=native.tail_rmse,
+            tail_weighted_r_squared=native.tail_weighted_r_squared,
+            tail_maximum_absolute_residual=native.tail_maximum_absolute_residual,
+            atom_count=native.atom_point_count,
+            tail_count=native.tail_point_count,
+        )
+    if isinstance(native, _core.NativeCensoredQuantileFitResult):
+        return CensoredQuantileFitDiagnostic(
+            iterations=native.iterations,
+            evaluations=native.evaluations,
+            normalized_rmse=score,
+            normalization_scale=span,
+            rmse=native.rmse,
+            weighted_r_squared=native.weighted_r_squared,
+            maximum_absolute_residual=native.maximum_absolute_residual,
+            negative_log_likelihood=native.negative_log_likelihood,
+            residual_scale=native.residual_scale,
+            residual_scale_floor=native.residual_scale_floor,
+            censored_count=native.censored_point_count,
+            uncensored_count=native.uncensored_point_count,
+        )
+    return QuantileFitDiagnostic(
+        iterations=native.iterations,
+        evaluations=native.evaluations,
+        normalized_rmse=score,
+        normalization_scale=span,
+        rmse=native.rmse,
+        weighted_r_squared=native.weighted_r_squared,
+        maximum_absolute_residual=native.maximum_absolute_residual,
+    )
+
+
+@overload
+def fit_quantiles(
+    curve: QuantileCurve, specification: QuantileFit
+) -> FitResult[QuantileFitDiagnostic]: ...
+
+
+@overload
+def fit_quantiles(
+    curve: QuantileCurve, specification: CensoredQuantileFit
+) -> FitResult[CensoredQuantileFitDiagnostic]: ...
+
+
+@overload
+def fit_quantiles(
+    curve: QuantileCurve, specification: HurdleQuantileFit
+) -> FitResult[HurdleQuantileFitDiagnostic]: ...
+
+
+@overload
+def fit_quantiles(
+    curve: QuantileCurve, specification: ModelSelection
+) -> FitResult[
+    QuantileFitDiagnostic | CensoredQuantileFitDiagnostic | HurdleQuantileFitDiagnostic
+]: ...
+
+
 def fit_quantiles(
     curve: QuantileCurve,
     specification: QuantileFit
     | CensoredQuantileFit
     | HurdleQuantileFit
     | ModelSelection,
-) -> FitResult:
+) -> FitResult[
+    QuantileFitDiagnostic | CensoredQuantileFitDiagnostic | HurdleQuantileFitDiagnostic
+]:
     if not isinstance(curve, QuantileCurve):
         raise TypeError("curve must be QuantileCurve; observations use fit_samples")
     if not isinstance(
@@ -617,9 +731,7 @@ def fit_quantiles(
     count = len(values)
     support = curve.probability_interval
     attempts: list[FitAttempt] = []
-    successes: list[
-        tuple[float, Distribution, tuple[Diagnostic, ...], tuple[float, ...], int, int]
-    ] = []
+    successes: list[tuple[float, Distribution, tuple[float, ...], int, int]] = []
     last_used = 0
     last_weights: tuple[float, ...] | None = None
     for candidate in candidates:
@@ -656,9 +768,13 @@ def fit_quantiles(
                 "probability": bounds.probability,
                 "require_sample_support": bounds.require_sample_support,
             }
-            diagnostic_details: dict[str, ScientificValue]
+            native: (
+                _core.NativeQuantileFitResult
+                | _core.NativeCensoredQuantileFitResult
+                | _core.NativeHurdleQuantileFitResult
+            )
             if isinstance(candidate, CensoredQuantileFit):
-                censored = _core.fit_censored_quantiles(
+                native = _core.fit_censored_quantiles(
                     fit_probabilities.tolist(),
                     fit_values.tolist(),
                     candidate.family.value,
@@ -667,21 +783,9 @@ def fit_quantiles(
                     weights=fit_weights.tolist(),
                     **options,
                 )
-                distribution = Distribution._from_native(censored.distribution)
-                diagnostic_details = {
-                    "rmse": censored.rmse,
-                    "weighted_r_squared": censored.weighted_r_squared,
-                    "maximum_absolute_residual": censored.maximum_absolute_residual,
-                    "negative_log_likelihood": censored.negative_log_likelihood,
-                    "residual_scale": censored.residual_scale,
-                    "residual_scale_floor": censored.residual_scale_floor,
-                    "censored_count": censored.censored_point_count,
-                    "uncensored_count": censored.uncensored_point_count,
-                    "iterations": censored.iterations,
-                    "evaluations": censored.evaluations,
-                }
+                distribution = Distribution._from_native(native.distribution)
             elif isinstance(candidate, HurdleQuantileFit):
-                hurdle = _core.fit_hurdle_quantiles(
+                native = _core.fit_hurdle_quantiles(
                     fit_probabilities.tolist(),
                     fit_values.tolist(),
                     candidate.family.value,
@@ -691,35 +795,19 @@ def fit_quantiles(
                     **options,
                 )
                 distribution = Distribution.hurdle(
-                    Distribution._from_native(hurdle.base_distribution),
+                    Distribution._from_native(native.base_distribution),
                     atom_probability=candidate.atom_probability,
                     atom_location=candidate.atom_location,
                 )
-                diagnostic_details = {
-                    "tail_rmse": hurdle.tail_rmse,
-                    "tail_weighted_r_squared": hurdle.tail_weighted_r_squared,
-                    "tail_maximum_absolute_residual": hurdle.tail_maximum_absolute_residual,
-                    "atom_count": hurdle.atom_point_count,
-                    "tail_count": hurdle.tail_point_count,
-                    "iterations": hurdle.iterations,
-                    "evaluations": hurdle.evaluations,
-                }
             else:
-                quantile = _core.fit_quantiles(
+                native = _core.fit_quantiles(
                     fit_probabilities.tolist(),
                     fit_values.tolist(),
                     candidate.family.value,
                     weights=fit_weights.tolist(),
                     **options,
                 )
-                distribution = Distribution._from_native(quantile.distribution)
-                diagnostic_details = {
-                    "rmse": quantile.rmse,
-                    "weighted_r_squared": quantile.weighted_r_squared,
-                    "maximum_absolute_residual": quantile.maximum_absolute_residual,
-                    "iterations": quantile.iterations,
-                    "evaluations": quantile.evaluations,
-                }
+                distribution = Distribution._from_native(native.distribution)
             predicted = np.asarray(
                 distribution.quantile(fit_probabilities), dtype=np.float64
             )
@@ -736,34 +824,22 @@ def fit_quantiles(
                 )
             normalized_residuals = (predicted - observed) / value_span
             score = float(np.sqrt(np.sum(effective * normalized_residuals**2)))
-            diagnostic_details["normalized_rmse"] = score
-            diagnostic_details["normalization_scale"] = value_span
-            diagnostics: tuple[Diagnostic, ...] = (
-                _diagnostic(
-                    f"fit.{candidate.kind.value}",
-                    "Requested quantile fit converged",
-                    diagnostic_details,
-                ),
-            )
-            attempts.append(
-                FitAttempt(candidate, FitStatus.CONVERGED, None, diagnostics)
-            )
-            successes.append(
-                (score, distribution, diagnostics, normalized, used, len(attempts) - 1)
-            )
+            diagnostic = _quantile_diagnostic(native, score, value_span)
+            attempts.append(FitAttempt(candidate, FitStatus.CONVERGED, diagnostic))
+            successes.append((score, distribution, normalized, used, len(attempts) - 1))
         except ValueError as error:
-            diagnostic = _diagnostic("fit.failed", str(error), {}, error=True)
             attempts.append(
-                FitAttempt(candidate, FitStatus.FAILED, str(error), (diagnostic,))
+                FitAttempt(
+                    candidate, FitStatus.FAILED, FitFailureDiagnostic(str(error))
+                )
             )
     if not successes:
         raise _failure(specification, attempts, count, last_used, last_weights, support)
-    _, distribution, diagnostics, normalized, used, selected = min(
+    _, distribution, normalized, used, selected = min(
         successes, key=lambda result: result[0]
     )
     return FitResult(
         distribution,
-        diagnostics,
         _record(
             specification,
             attempts,
@@ -933,41 +1009,35 @@ def _decode_spec(value: object) -> FitSpec:
     )
 
 
-def _diagnostic_document(value: Diagnostic) -> dict[str, object]:
-    def plain(v: ScientificValue) -> object:
-        from collections.abc import Mapping, Sequence
-
-        if isinstance(v, Mapping):
-            return {key: plain(item) for key, item in v.items()}
-        if isinstance(v, Sequence) and not isinstance(v, str):
-            return [plain(item) for item in v]
-        return v
-
-    return {
-        "code": value.code,
-        "message": value.message,
-        "severity": value.severity.value,
-        "path": value.path,
-        "details": plain(value.details),
-    }
+_METRICS = {
+    FitKind.SAMPLES: SampleFitDiagnostic,
+    FitKind.QUANTILES: QuantileFitDiagnostic,
+    FitKind.CENSORED_QUANTILES: CensoredQuantileFitDiagnostic,
+    FitKind.HURDLE_QUANTILES: HurdleQuantileFitDiagnostic,
+}
 
 
-def _decode_diagnostic(value: object) -> Diagnostic:
-    fields = {"code", "message", "severity", "path", "details"}
-    data = _document(value, fields, fields)
-    if (
-        not isinstance(data["details"], dict)
-        or not isinstance(data["path"], str)
-        or not isinstance(data["message"], str)
-    ):
-        raise TypeError("invalid diagnostic details, path, or message")
-    return Diagnostic(
-        _text(data["code"]),
-        data["message"],
-        DiagnosticSeverity(_text(data["severity"])),
-        data["path"],
-        cast(dict[str, ScientificValue], data["details"]),
-    )
+def _decode_attempt(value: object) -> FitAttempt:
+    # FitRecord.from_json has already validated the attempt's wire variant.
+    data = cast(dict[str, object], value)
+    specification = _decode_spec(data["specification"])
+    status = FitStatus(_text(data["status"]))
+    outcome = cast(dict[str, object], data["diagnostic"])
+    diagnostic: ConvergedFitDiagnostic | FitFailureDiagnostic
+    if status is FitStatus.CONVERGED:
+        metric_type = _METRICS[specification.kind]
+        build: Callable[..., ConvergedFitDiagnostic] = metric_type
+        diagnostic = build(
+            **{
+                field.name: _count(outcome[field.name])
+                if field.type == "int"
+                else float(cast(float, outcome[field.name]))
+                for field in fields(metric_type)
+            }
+        )
+    else:
+        diagnostic = FitFailureDiagnostic(cast(str, outcome["message"]))
+    return FitAttempt(specification, status, diagnostic)
 
 
 def _record_document(record: FitRecord) -> dict[str, object]:
@@ -977,8 +1047,10 @@ def _record_document(record: FitRecord) -> dict[str, object]:
             {
                 "specification": _serialize(a.specification),
                 "status": a.status.value,
-                "reason": a.reason,
-                "diagnostics": [_diagnostic_document(d) for d in a.diagnostics],
+                "diagnostic": {
+                    field.name: getattr(a.diagnostic, field.name)
+                    for field in fields(a.diagnostic)
+                },
             }
             for a in record.attempts
         ],
@@ -1012,20 +1084,9 @@ def _decode_record(value: object) -> FitRecord:
     }
     data = _document(value, fields, fields)
     support = cast(list[float] | None, data["evidence_support"])
-    attempts = []
-    for raw in _items(data["attempts"]):
-        a = cast(dict[str, object], raw)
-        attempts.append(
-            FitAttempt(
-                _decode_spec(a["specification"]),
-                FitStatus(_text(a["status"])),
-                cast(str | None, a["reason"]),
-                tuple(_decode_diagnostic(d) for d in _items(a["diagnostics"])),
-            )
-        )
     return FitRecord(
         specification=_decode_spec(data["specification"]),
-        attempts=tuple(attempts),
+        attempts=tuple(_decode_attempt(item) for item in _items(data["attempts"])),
         selected_attempt=None
         if data["selected_attempt"] is None
         else _count(data["selected_attempt"]),

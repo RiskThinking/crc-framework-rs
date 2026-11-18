@@ -37,7 +37,7 @@ fn text(value: &Value) -> Result<&str> {
     Ok(value)
 }
 
-fn integer(value: &Value) -> Result<Value> {
+pub(crate) fn integer(value: &Value) -> Result<Value> {
     let number = value
         .as_number()
         .ok_or_else(|| invalid("expected an integer JSON number"))?;
@@ -67,7 +67,7 @@ fn unsigned(value: &Value) -> Result<u64> {
     natural(value)?.parse().map_err(invalid)
 }
 
-fn greater(a: &Value, b: &Value) -> bool {
+pub(crate) fn greater(a: &Value, b: &Value) -> bool {
     let a = a.to_string();
     let b = b.to_string();
     let negative_a = a.starts_with('-');
@@ -419,7 +419,7 @@ fn validate_selected_weights(weights: &[f64], specification: &Value) -> Result<(
 
 fn converged_score(attempt: &Value, evidence_count: &Value, used_count: &Value) -> Result<f64> {
     let spec = fit_specification(&attempt["specification"])?;
-    let details = &attempt["diagnostics"][0]["details"];
+    let details = &attempt["diagnostic"];
     let samples = spec["kind"] == "samples";
     let effective_count = match spec["weights"].as_array() {
         Some(weights) => {

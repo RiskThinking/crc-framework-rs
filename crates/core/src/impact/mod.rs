@@ -13,7 +13,8 @@ mod registry;
 mod source;
 
 pub use registry::{
-    RegistryImpactReference, ResolutionContext, manifest_json, manifest_sha256, registry_identity,
+    RegistryImpactReference, ResolutionContext, manifest_json, manifest_sha256,
+    registry_country_choices, registry_identity,
 };
 
 pub use error::ImpactContractError;
@@ -67,15 +68,15 @@ impl ImpactDefinition {
         kernel::monotonicity(&self.model, &self.clamp)
     }
 
-    pub fn expected_value(
+    pub fn expectation(
         &self,
         source: &ImpactSource,
         method: MethodRequest,
     ) -> Result<Expectation, ImpactContractError> {
-        expectation::expected_value(&self.model, &self.clamp, source, method)
+        expectation::expectation(&self.model, &self.clamp, source, method)
     }
 
-    pub fn transform_distribution(
+    pub fn pushforward(
         &self,
         source: &ImpactSource,
     ) -> Result<ImpactDistribution, ImpactContractError> {

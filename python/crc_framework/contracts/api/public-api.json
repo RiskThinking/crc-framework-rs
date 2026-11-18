@@ -8,7 +8,8 @@
     "ValueResult": "float | FloatArray",
     "FloatArray": "numpy.typing.NDArray[numpy.float64]",
     "Unit": "LengthUnit | TimeUnit | RatioUnit | TemperatureUnit | SpeedUnit | PrecipitationRateUnit | DegreeDayUnit",
-    "ScientificValue": "None | bool | int | float | str | Sequence[ScientificValue] | Mapping[str, ScientificValue]"
+    "ScientificValue": "None | bool | int | float | str | Sequence[ScientificValue] | Mapping[str, ScientificValue]",
+    "ConvergedFitDiagnostic": "SampleFitDiagnostic | QuantileFitDiagnostic | CensoredQuantileFitDiagnostic | HurdleQuantileFitDiagnostic"
   },
   "exports": {
     "Aggregation": {
@@ -88,6 +89,7 @@
         "INUNDATION": "crc:inundation",
         "STANDARDIZED_PRECIPITATION_EVAPOTRANSPIRATION_INDEX": "crc:standardized_precipitation_evapotranspiration_index",
         "COOLING_DEGREE_DAYS": "crc:cooling_degree_days",
+        "COOLING_DEGREE_DAYS_CROP_YIELD": "crc:cooling_degree_days_crop_yield",
         "CONSECUTIVE_DRY_DAYS": "crc:consecutive_dry_days"
       }
     },
@@ -188,6 +190,23 @@
         "constraints": "FitConstraints | None"
       }
     },
+    "CensoredQuantileFitDiagnostic": {
+      "kind": "class",
+      "properties": {
+        "iterations": "int",
+        "evaluations": "int",
+        "normalized_rmse": "float",
+        "normalization_scale": "float",
+        "rmse": "float",
+        "weighted_r_squared": "float",
+        "maximum_absolute_residual": "float",
+        "negative_log_likelihood": "float",
+        "residual_scale": "float",
+        "residual_scale_floor": "float",
+        "censored_count": "int",
+        "uncensored_count": "int"
+      }
+    },
     "ClimateIndex": {
       "kind": "class",
       "constructor": {
@@ -253,7 +272,8 @@
         "name": "str",
         "annotation": "str",
         "required": "bool",
-        "choices": "tuple[str, ...]"
+        "choices": "tuple[str, ...]",
+        "choices_by_asset_type": "Mapping[AssetType, tuple[str, ...]]"
       }
     },
     "ContextValue": {
@@ -875,8 +895,7 @@
       "properties": {
         "specification": "FitSpec",
         "status": "FitStatus",
-        "reason": "str | None",
-        "diagnostics": "tuple[Diagnostic, ...]"
+        "diagnostic": "ConvergedFitDiagnostic | FitFailureDiagnostic"
       }
     },
     "FitConstraints": {
@@ -922,8 +941,13 @@
       "properties": {
         "code": "str",
         "message": "str",
-        "record": "FitRecord",
-        "diagnostics": "tuple[Diagnostic, ...]"
+        "record": "FitRecord"
+      }
+    },
+    "FitFailureDiagnostic": {
+      "kind": "class",
+      "properties": {
+        "message": "str"
       }
     },
     "FitKind": {
@@ -974,9 +998,12 @@
       "kind": "class",
       "properties": {
         "distribution": "Distribution",
-        "diagnostics": "tuple[Diagnostic, ...]",
-        "record": "FitRecord"
-      }
+        "record": "FitRecord",
+        "diagnostic": "DiagnosticT_co"
+      },
+      "generic_parameters": [
+        "DiagnosticT_co"
+      ]
     },
     "FitSpec": {
       "kind": "class",
@@ -1089,6 +1116,20 @@
         "atom_location": "float",
         "minimum_knots": "int",
         "constraints": "FitConstraints | None"
+      }
+    },
+    "HurdleQuantileFitDiagnostic": {
+      "kind": "class",
+      "properties": {
+        "iterations": "int",
+        "evaluations": "int",
+        "normalized_rmse": "float",
+        "normalization_scale": "float",
+        "tail_rmse": "float",
+        "tail_weighted_r_squared": "float",
+        "tail_maximum_absolute_residual": "float",
+        "atom_count": "int",
+        "tail_count": "int"
       }
     },
     "Impact": {
@@ -1777,6 +1818,18 @@
         "constraints": "FitConstraints | None"
       }
     },
+    "QuantileFitDiagnostic": {
+      "kind": "class",
+      "properties": {
+        "iterations": "int",
+        "evaluations": "int",
+        "normalized_rmse": "float",
+        "normalization_scale": "float",
+        "rmse": "float",
+        "weighted_r_squared": "float",
+        "maximum_absolute_residual": "float"
+      }
+    },
     "RankScenario": {
       "kind": "class",
       "properties": {
@@ -1971,6 +2024,17 @@
         "minimum_samples": "int",
         "constraints": "FitConstraints | None",
         "fallbacks": "tuple[SampleFit, ...]"
+      }
+    },
+    "SampleFitDiagnostic": {
+      "kind": "class",
+      "properties": {
+        "iterations": "int",
+        "evaluations": "int",
+        "ks_statistic": "float",
+        "ks_pvalue": "float",
+        "rmse": "float",
+        "r_squared": "float"
       }
     },
     "SelectionCriterion": {
@@ -2352,7 +2416,7 @@
           "annotation": "QuantileFit | CensoredQuantileFit | HurdleQuantileFit | ModelSelection"
         }
       ],
-      "returns": "FitResult"
+      "returns": "FitResult[QuantileFitDiagnostic | CensoredQuantileFitDiagnostic | HurdleQuantileFitDiagnostic]"
     },
     "fit_samples": {
       "kind": "function",
@@ -2368,7 +2432,7 @@
           "annotation": "SampleFit | ModelSelection"
         }
       ],
-      "returns": "FitResult"
+      "returns": "FitResult[SampleFitDiagnostic]"
     },
     "lookup_continent": {
       "kind": "function",

@@ -48,6 +48,10 @@ The following fields and units are generated from the same definitions used by J
 
 A reference exposes its concrete `measurement_type`, complete `measurement_schema`, expected `input`, accepted units, actual typed `context_type`, and allowed context choices. Inspect `model.requirements` or `help(model.requirements.context_type)` to discover the constructor. No anonymous context factory or lowercase registry singleton is required.
 
+For country-based models, the country field in `model.requirements.context_fields` lists accepted table codes in `choices`. Cooling costs depend on the asset category. Index that field's `choices_by_asset_type` by an `AssetType` member to get the codes for a particular category.
+
+Use `BuiltinImpact.COOLING_DEGREE_DAYS_CROP_YIELD` with `CropContext` for agricultural buildings. `BuiltinImpact.COOLING_DEGREE_DAYS` uses `CoolingCostContext` for residential, commercial, and industrial cooling costs.
+
 Some source calibrations do not establish a threshold, averaging interval, accumulation timescale or reference period. `unestablished_facts` exposes these gaps. Scientific data binding rejects them instead of guessing; supplying a plausible value on the data does not establish the published model calibration. Pure numerical `resolve` remains available for explicitly numerical work.
 
 Maximum daily precipitation uses ETCCDI Rx1day: the maximum daily precipitation amount in millimetres accumulated over one day ([Climdex definition](https://www.climdex.org/learn/indices/)). Its numerical response consumes that amount directly; it does not integrate a precipitation rate. The reduction is recorded in data provenance.
@@ -66,6 +70,7 @@ Maximum daily precipitation uses ETCCDI Rx1day: the maximum daily precipitation 
 | `crc:inundation` | `DepthAboveGround` | `InundationContext` |  |
 | `crc:standardized_precipitation_evapotranspiration_index` | `ClimateIndex` | `WaterCostContext` | index accumulation duration, index reference period |
 | `crc:cooling_degree_days` | `DegreeDays` | `CoolingCostContext` | temperature threshold, accumulation duration, calibration reference period |
+| `crc:cooling_degree_days_crop_yield` | `DegreeDays` | `CropContext` | temperature threshold, accumulation duration, calibration reference period |
 | `crc:consecutive_dry_days` | `EventCount` | `CropContext` | dry-day precipitation threshold, consecutive-event reduction, calibration reference period |
 
 Flood regions and asset categories are closed typed choices. `FloodRegion.GLOBAL` selects the published global calibration explicitly. Agricultural land and agricultural buildings are distinct asset meanings. `CropContext` omits an asset-type choice because that model already fixes agricultural-building applicability.

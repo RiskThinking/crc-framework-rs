@@ -20,12 +20,6 @@ pub struct NationalCropWeights {
     pub wheat: f32,
 }
 
-const DEFAULT_CROP_WEIGHTS: NationalCropWeights = NationalCropWeights {
-    maize: 0.333,
-    rice: 0.333,
-    wheat: 0.333,
-};
-
 pub const CDD_YEARLY_CROP_ESTIMATES: NationalCropWeights = NationalCropWeights {
     maize: CDD_YEARLY_MAIZE_ESTIMATE,
     rice: CDD_YEARLY_RICE_ESTIMATE,
@@ -45,12 +39,6 @@ pub const CDD_INDEX_CROP_ESTIMATES: NationalCropWeights = NationalCropWeights {
 };
 
 pub const CXDD_INDEX_CROP_ESTIMATES: NationalCropWeights = NationalCropWeights {
-    maize: 0.0,
-    rice: 0.0,
-    wheat: 0.0,
-};
-
-const DEFAULT_CDD_CROP_VALUES: NationalCropWeights = NationalCropWeights {
     maize: 0.0,
     rice: 0.0,
     wheat: 0.0,
@@ -139,18 +127,6 @@ pub const CDD_CROP_VALUES: phf::Map<&'static str, NationalCropWeights> = phf_map
     },
 };
 
-pub fn get_cdd_crop_values(country: &str) -> &NationalCropWeights {
-    CDD_CROP_VALUES
-        .get(country)
-        .unwrap_or(&DEFAULT_CDD_CROP_VALUES)
-}
-
-const DEFAULT_CXDD_CROP_VALUES: NationalCropWeights = NationalCropWeights {
-    maize: 0.0,
-    rice: 0.0,
-    wheat: 0.0,
-};
-
 pub const CXDD_CROP_VALUES: phf::Map<&'static str, NationalCropWeights> = phf_map! {
     "ARG"=> NationalCropWeights {
       maize: -39.8608384791876,
@@ -211,12 +187,6 @@ pub const CXDD_CROP_VALUES: phf::Map<&'static str, NationalCropWeights> = phf_ma
       rice: 0.0,
     },
 };
-
-pub fn get_cxdd_crop_values(country: &str) -> &NationalCropWeights {
-    CXDD_CROP_VALUES
-        .get(country)
-        .unwrap_or(&DEFAULT_CXDD_CROP_VALUES)
-}
 
 pub const NATIONAL_CROP_WEIGHTS: phf::Map<&'static str, NationalCropWeights> = phf_map! {
     "ALB" => NationalCropWeights {
@@ -743,9 +713,3 @@ pub const NATIONAL_CROP_WEIGHTS: phf::Map<&'static str, NationalCropWeights> = p
     },
     "KOR"=> NationalCropWeights { rice: 1.0, wheat: 0.0, maize: 0.0 }
 };
-
-pub fn get_national_crop_weights(country: &str) -> &NationalCropWeights {
-    NATIONAL_CROP_WEIGHTS
-        .get(country)
-        .unwrap_or(&DEFAULT_CROP_WEIGHTS)
-}

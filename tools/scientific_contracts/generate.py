@@ -125,13 +125,23 @@ def build():
                     u.value if hasattr(u, "value") else u for u in r.accepted_units
                 ],
                 "context_type": r.context_type.__name__,
-                "context_schema": science._context_schema(r.context_type._kind),
+                "context_schema": impacts._model_context_schema(r),
                 "context_fields": [
                     {
                         "name": f.name,
                         "annotation": f.annotation,
                         "required": f.required,
                         "choices": list(f.choices),
+                        **(
+                            {
+                                "choices_by_asset_type": {
+                                    asset_type.value: list(choices)
+                                    for asset_type, choices in f.choices_by_asset_type.items()
+                                }
+                            }
+                            if f.choices_by_asset_type
+                            else {}
+                        ),
                     }
                     for f in r.context_fields
                 ],
@@ -266,6 +276,12 @@ def build():
                 "historic_mean": 20,
                 "asset_type": "agricultural_building",
             },
+            {
+                "kind": "cooling_cost_context",
+                "country": "USA",
+                "historic_mean": 20,
+                "asset_type": "agricultural_building",
+            },
         ]
     ):
         fixtures.append(
@@ -380,6 +396,33 @@ def build():
                 "document": json.loads(function.to_json()),
             }
         )
+    crop = impacts.Impact.builtin(
+        impacts.BuiltinImpact.COOLING_DEGREE_DAYS_CROP_YIELD
+    ).resolve(science.CropContext(country="USA", historic_mean=25))
+    fixtures.extend(
+        [
+            {
+                "name": "impact-cooling-degree-days-crop-yield",
+                "schema": impact_uri,
+                "valid": True,
+                "document": json.loads(crop.to_json()),
+            },
+            {
+                "name": "impact-crop-yield-labelled-cooling-cost",
+                "schema": impact_uri,
+                "schema_valid": True,
+                "valid": False,
+                "document": {
+                    **json.loads(crop.to_json()),
+                    "output": json.loads(
+                        impacts.Impact.builtin(
+                            impacts.BuiltinImpact.COOLING_DEGREE_DAYS
+                        ).requirements.output.to_json()
+                    ),
+                },
+            },
+        ]
+    )
     raw_reference = json.loads(
         impacts.Impact.builtin(impacts.BuiltinImpact.INUNDATION).to_json()
     )
@@ -467,9 +510,8 @@ def build():
                 region.value: value for region, value in impacts._REGION_NAMES.items()
             },
             "fixed_context": {
-                impacts.BuiltinImpact.CONSECUTIVE_DRY_DAYS.value: {
-                    "asset_type": science.AssetType.AGRICULTURAL_BUILDING.value
-                }
+                model.value: {"asset_type": asset_type.value}
+                for model, asset_type in impacts._FIXED_ASSET_TYPES.items()
             },
         },
         "fixtures-1.0.json": {"schema_version": "1.0", "cases": fixtures},
@@ -543,6 +585,10 @@ def reference():
         "## Published models",
         "",
         "A reference exposes its concrete `measurement_type`, complete `measurement_schema`, expected `input`, accepted units, actual typed `context_type`, and allowed context choices. Inspect `model.requirements` or `help(model.requirements.context_type)` to discover the constructor. No anonymous context factory or lowercase registry singleton is required.",
+        "",
+        "For country-based models, the country field in `model.requirements.context_fields` lists accepted table codes in `choices`. Cooling costs depend on the asset category. Index that field's `choices_by_asset_type` by an `AssetType` member to get the codes for a particular category.",
+        "",
+        "Use `BuiltinImpact.COOLING_DEGREE_DAYS_CROP_YIELD` with `CropContext` for agricultural buildings. `BuiltinImpact.COOLING_DEGREE_DAYS` uses `CoolingCostContext` for residential, commercial, and industrial cooling costs.",
         "",
         "Some source calibrations do not establish a threshold, averaging interval, accumulation timescale or reference period. `unestablished_facts` exposes these gaps. Scientific data binding rejects them instead of guessing; supplying a plausible value on the data does not establish the published model calibration. Pure numerical `resolve` remains available for explicitly numerical work.",
         "",

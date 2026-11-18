@@ -7,8 +7,11 @@ import json
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from enum import Enum
+from functools import cache
 from itertools import pairwise
+from types import MappingProxyType
 from typing import cast
 
 import numpy as np
@@ -23,6 +26,7 @@ from ._distribution import (
     _snapshot,
 )
 from ._measurement import (
+    _BINDING_SCHEMA,
     _CONTEXT_DEFINITIONS,
     Aggregation,
     AssetType,
@@ -53,6 +57,7 @@ from ._measurement import (
     WaterCostContext,
     WindSpeed,
     _canonical_value,
+    _context_schema,
     _freeze,
     _measurement,
     _measurement_schema,
@@ -690,7 +695,7 @@ class Impact:
         except (TypeError, ValueError) as error:
             raise ImpactError("exact_method_unavailable", "", str(error)) from error
         try:
-            return native.expected_value(source)
+            return native.expectation(source)
         except Exception as error:
             raise _error(error) from error
 
@@ -700,7 +705,7 @@ class Impact:
         data = distribution._data
         try:
             expression, source = self._operation(distribution)
-            native = expression.transform_distribution(source)
+            native = expression.pushforward(source)
         except TypeError as error:
             raise ImpactError("exact_method_unavailable", "", str(error)) from error
         except Exception as error:
@@ -784,6 +789,7 @@ class BuiltinImpact(Enum):
         "crc:standardized_precipitation_evapotranspiration_index"
     )
     COOLING_DEGREE_DAYS = "crc:cooling_degree_days"
+    COOLING_DEGREE_DAYS_CROP_YIELD = "crc:cooling_degree_days_crop_yield"
     CONSECUTIVE_DRY_DAYS = "crc:consecutive_dry_days"
 
 
@@ -800,7 +806,12 @@ _FACTORS = {
     BuiltinImpact.INUNDATION: "inundation",
     BuiltinImpact.STANDARDIZED_PRECIPITATION_EVAPOTRANSPIRATION_INDEX: "spei",
     BuiltinImpact.COOLING_DEGREE_DAYS: "cooling_degree_days",
+    BuiltinImpact.COOLING_DEGREE_DAYS_CROP_YIELD: "cooling_degree_days",
     BuiltinImpact.CONSECUTIVE_DRY_DAYS: "maximum_consecutive_dry_days",
+}
+_FIXED_ASSET_TYPES = {
+    BuiltinImpact.COOLING_DEGREE_DAYS_CROP_YIELD: AssetType.AGRICULTURAL_BUILDING,
+    BuiltinImpact.CONSECUTIVE_DRY_DAYS: AssetType.AGRICULTURAL_BUILDING,
 }
 _ASSET_NAMES = {
     AssetType.RESIDENTIAL: "Residential buildings",
@@ -824,10 +835,22 @@ _REGION_NAMES = {
 
 @dataclass(frozen=True)
 class ContextField:
+    """A named context requirement and its accepted constant values."""
+
     name: str
     annotation: str
     required: bool
     choices: tuple[str, ...]
+    choices_by_asset_type: Mapping[AssetType, tuple[str, ...]] = dataclass_field(
+        default_factory=dict, kw_only=True, hash=False
+    )
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "choices_by_asset_type",
+            MappingProxyType(dict(self.choices_by_asset_type)),
+        )
 
 
 @dataclass(frozen=True)
@@ -945,11 +968,16 @@ def _model_science(model: BuiltinImpact) -> _ModelScience:
             WaterCostContext,
             ("index accumulation duration", "index reference period"),
         )
-    if model is BuiltinImpact.COOLING_DEGREE_DAYS:
+    if model in (
+        BuiltinImpact.COOLING_DEGREE_DAYS,
+        BuiltinImpact.COOLING_DEGREE_DAYS_CROP_YIELD,
+    ):
         return _ModelScience(
             Measurement(quantity="degree_days", unit=DegreeDayUnit.KELVIN_DAYS),
             DegreeDays,
-            CoolingCostContext,
+            CoolingCostContext
+            if model is BuiltinImpact.COOLING_DEGREE_DAYS
+            else CropContext,
             (
                 "temperature threshold",
                 "accumulation duration",
@@ -968,12 +996,14 @@ def _model_science(model: BuiltinImpact) -> _ModelScience:
     )
 
 
-def _context_fields(context_type: type[ImpactContext]) -> tuple[ContextField, ...]:
+@cache
+def _context_fields(
+    model: BuiltinImpact, context_type: type[ImpactContext]
+) -> tuple[ContextField, ...]:
     kind = context_type._kind
     fields = _CONTEXT_DEFINITIONS[kind]
     result: list[ContextField] = []
     for name in fields:
-        choices: tuple[str, ...] = ()
         annotation = "ContextValue | " + (
             "int"
             if name == "cell"
@@ -988,8 +1018,62 @@ def _context_fields(context_type: type[ImpactContext]) -> tuple[ContextField, ..
         choices = tuple(
             cast(list[str], cast(dict[str, object], fields[name]).get("enum", []))
         )
-        result.append(ContextField(name, annotation, True, choices))
+        by_asset_type: dict[AssetType, tuple[str, ...]] = {}
+        if name == "country":
+            factor = _FACTORS[model]
+            if context_type is CoolingCostContext:
+                asset_types = cast(dict[str, list[str]], fields["asset_type"])["enum"]
+                by_asset_type = {
+                    asset: tuple(
+                        _core.impact_registry_country_choices(
+                            factor, _ASSET_NAMES[asset]
+                        )
+                    )
+                    for asset in map(AssetType, asset_types)
+                }
+                choices = tuple(
+                    sorted({code for codes in by_asset_type.values() for code in codes})
+                )
+            else:
+                fixed_asset_type = _FIXED_ASSET_TYPES.get(model)
+                choices = tuple(
+                    _core.impact_registry_country_choices(
+                        factor,
+                        _ASSET_NAMES[fixed_asset_type]
+                        if fixed_asset_type is not None
+                        else None,
+                    )
+                )
+        result.append(
+            ContextField(
+                name, annotation, True, choices, choices_by_asset_type=by_asset_type
+            )
+        )
     return tuple(result)
+
+
+def _model_context_schema(requirements: ImpactRequirements) -> dict[str, object]:
+    schema = _context_schema(requirements.context_type._kind)
+    country = next(
+        (f for f in requirements.context_fields if f.name == "country"), None
+    )
+    if country is None:
+        return schema
+
+    def country_property(choices: tuple[str, ...]) -> dict[str, object]:
+        return {"oneOf": [{"enum": list(choices)}, _BINDING_SCHEMA]}
+
+    properties = cast(dict[str, object], schema["properties"])
+    properties["country"] = country_property(country.choices)
+    if country.choices_by_asset_type:
+        schema["allOf"] = [
+            {
+                "if": {"properties": {"asset_type": {"const": asset_type.value}}},
+                "then": {"properties": {"country": country_property(choices)}},
+            }
+            for asset_type, choices in country.choices_by_asset_type.items()
+        ]
+    return schema
 
 
 class ImpactReference:
@@ -1052,6 +1136,12 @@ class ImpactReference:
     @property
     def requirements(self) -> ImpactRequirements:
         science = _model_science(self._model)
+        metadata = self._metadata()
+        calibration = metadata["calibration"]
+        if self._model is BuiltinImpact.COOLING_DEGREE_DAYS_CROP_YIELD:
+            calibration = cast(dict[str, object], metadata["branch_calibrations"])[
+                "agricultural"
+            ]
         schema_kind = {
             DepthAboveGround: "depth_above_ground",
             EventCount: "event_count",
@@ -1069,9 +1159,9 @@ class ImpactReference:
             ),
             (cast(Unit | str, science.input.unit),),
             science.context_type,
-            _context_fields(science.context_type),
+            _context_fields(self._model, science.context_type),
             science.unestablished,
-            self._output(cast(dict[str, str], self._metadata()["calibration"])),
+            self._output(cast(dict[str, str], calibration)),
         )
 
     def _input(self) -> Measurement:
@@ -1114,7 +1204,21 @@ class ImpactReference:
                     "/context/" + field.name,
                     "resolve asset-column bindings before numerical use",
                 )
-            if field.choices and value not in field.choices:
+            if field.name == "country":
+                asset_type = values.get("asset_type")
+                choices = field.choices
+                if field.choices_by_asset_type and isinstance(asset_type, str):
+                    choices = field.choices_by_asset_type[AssetType(asset_type)]
+                if value not in choices:
+                    hint = "Use the country field in model.requirements.context_fields to inspect accepted codes"
+                    if field.choices_by_asset_type:
+                        hint += " for each AssetType in choices_by_asset_type"
+                    raise ImpactError(
+                        "missing_table_key",
+                        "/context/country",
+                        f"{value!r} has no country entry for {self.id}. {hint}.",
+                    )
+            elif field.choices and value not in field.choices:
                 raise ImpactError(
                     "unsupported_context",
                     "/context/" + field.name,
@@ -1131,8 +1235,8 @@ class ImpactReference:
             private["continent"] = _REGION_NAMES[FloodRegion(values["region"])]
         if "asset_type" in values:
             private["building_type"] = _ASSET_NAMES[AssetType(values["asset_type"])]
-        if self._model is BuiltinImpact.CONSECUTIVE_DRY_DAYS:
-            private["building_type"] = _ASSET_NAMES[AssetType.AGRICULTURAL_BUILDING]
+        if self._model in _FIXED_ASSET_TYPES:
+            private["building_type"] = _ASSET_NAMES[_FIXED_ASSET_TYPES[self._model]]
         registry, version, resolver, digest = _core.impact_registry_identity()
         if self._version != version or self._manifest != digest:
             raise ImpactError(
@@ -1147,7 +1251,6 @@ class ImpactReference:
             "registry_manifest_sha256": digest,
             "resolver_semantics_version": resolver,
             "factor": _FACTORS[self._model],
-            "fallback_policy": "error",
         }
         try:
             reference = _core.NativeImpactReference.from_json(_dumps(internal))

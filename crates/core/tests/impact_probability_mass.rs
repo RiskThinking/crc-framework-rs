@@ -20,7 +20,7 @@ fn finite_source_supports_non_monotone_image_exactly() {
     let source = ImpactSource::Discrete(
         DiscreteDistribution::new(vec![0.0, 1.0, 2.0], vec![0.2, 0.3, 0.5]).unwrap(),
     );
-    let image = function.transform_distribution(&source).unwrap();
+    let image = function.pushforward(&source).unwrap();
     assert_eq!(image.atoms().len(), 2);
     assert_eq!(image.atoms()[0].value, 0.0);
     assert_eq!(image.atoms()[0].probability, 0.7);
@@ -37,7 +37,7 @@ fn positive_sub_epsilon_atoms_are_retained() {
     let source = ImpactSource::Discrete(
         DiscreteDistribution::new(vec![0.0, 1e16], vec![1.0 - 1e-16, 1e-16]).unwrap(),
     );
-    let image = function.transform_distribution(&source).unwrap();
+    let image = function.pushforward(&source).unwrap();
     assert_eq!(image.atoms().len(), 2);
     assert_eq!(image.atoms()[1].probability, 1e-16);
     assert_eq!(image.quantile(1.0).unwrap(), 1e16);
@@ -52,7 +52,7 @@ fn almost_all_flat_mass_does_not_delete_the_remaining_continuous_tail() {
     );
     let source =
         ImpactSource::Histogram(HistogramExposure::new(vec![0.0, 1.0], vec![1.0]).unwrap());
-    let image = function.transform_distribution(&source).unwrap();
+    let image = function.pushforward(&source).unwrap();
     assert_eq!(image.atoms().len(), 1);
     assert_eq!(image.atoms()[0].probability, floor);
     assert_eq!(image.quantile(1.0).unwrap(), 1.0);
@@ -67,7 +67,7 @@ fn non_monotone_bins_have_an_exact_discrete_image() {
     );
     let source =
         ImpactSource::Histogram(HistogramExposure::new(vec![0.0, 3.0], vec![1.0]).unwrap());
-    let image = function.transform_distribution(&source).unwrap();
+    let image = function.pushforward(&source).unwrap();
     assert_eq!(image.atoms().len(), 3);
     assert_eq!(image.quantile(0.1).unwrap(), 1.0);
     assert_eq!(image.quantile(0.5).unwrap(), 3.0);
@@ -85,7 +85,7 @@ fn inverse_survival_preserves_deep_parametric_tail_coordinates() {
         FittedDistribution::from_parameters(DistributionFamily::GumbelRight, None, 0.0, 1.0)
             .unwrap(),
     );
-    let image = function.transform_distribution(&source).unwrap();
+    let image = function.pushforward(&source).unwrap();
     let survival = 1e-20_f64;
     assert!((image.inverse_survival(survival).unwrap() + survival.ln()).abs() < 1e-12);
     let tail_mean = image.tail_integral(0.0, survival, 0.0, false).unwrap() / survival;
@@ -101,7 +101,7 @@ fn inverse_survival_and_integral_keep_sub_ulp_atoms() {
     let source = ImpactSource::Discrete(
         DiscreteDistribution::new(vec![0.0, 1e20], vec![1.0, 1e-20]).unwrap(),
     );
-    let image = function.transform_distribution(&source).unwrap();
+    let image = function.pushforward(&source).unwrap();
     assert_eq!(image.inverse_survival(0.5e-20).unwrap(), 1e20);
     assert_eq!(image.tail_integral(0.0, 1e-20, 0.0, false).unwrap(), 1.0);
 }
@@ -115,7 +115,7 @@ fn zero_mass_histogram_end_bins_do_not_extend_support() {
     let source = ImpactSource::Histogram(
         HistogramExposure::new(vec![0.0, 1.0, 2.0, 3.0], vec![0.0, 1.0, 0.0]).unwrap(),
     );
-    let image = function.transform_distribution(&source).unwrap();
+    let image = function.pushforward(&source).unwrap();
     assert_eq!(image.quantile(0.0).unwrap(), 1.0);
     assert_eq!(image.quantile(1.0).unwrap(), 2.0);
     assert_eq!(image.inverse_survival(0.0).unwrap(), 2.0);
@@ -130,7 +130,7 @@ fn inverse_survival_respects_the_lower_edge_of_a_response_jump() {
     );
     let source =
         ImpactSource::Histogram(HistogramExposure::new(vec![0.0, 4.0], vec![1.0]).unwrap());
-    let image = function.transform_distribution(&source).unwrap();
+    let image = function.pushforward(&source).unwrap();
     assert_eq!(image.quantile(0.5).unwrap(), 0.0);
     assert_eq!(image.inverse_survival(0.5).unwrap(), 0.0);
     assert!(image.inverse_survival(0.5 - 1e-10).unwrap() > 0.0);

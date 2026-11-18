@@ -704,7 +704,7 @@
         "resolver_semantics_version": {
           "type": "string",
           "const": "crc-impact-registry/1",
-          "description": "Resolver semantics: override catalog, context precedence, fallbacks and key normalization.",
+          "description": "Resolver semantics: override catalog, explicit context and key normalization.",
           "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
           "x-crc-native": "RegistryOrigin::resolver_semantics_version: ResolverSemantics"
         },
@@ -741,16 +741,6 @@
           "x-crc-canonical": "object with sorted keys; absent keys omitted",
           "x-crc-native": "RegistryOrigin::overrides: RegistryOverrides"
         },
-        "fallback_policy": {
-          "type": "string",
-          "enum": [
-            "error",
-            "legacy_defaults"
-          ],
-          "description": "Fallback policy used during resolution.",
-          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
-          "x-crc-native": "RegistryOrigin::fallback_policy: FallbackPolicy"
-        },
         "lookups": {
           "type": "array",
           "items": {
@@ -770,11 +760,7 @@
         "factor",
         "context",
         "overrides",
-        "fallback_policy",
         "lookups"
-      ],
-      "x-crc-rules": [
-        "A fallback lookup requires fallback_policy legacy_defaults."
       ]
     },
     "context": {
@@ -969,7 +955,7 @@
           "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
           "x-crc-native": "RegistryLookup::table_sha256: [u8; 32]"
         },
-        "requested_key": {
+        "key": {
           "oneOf": [
             {
               "$ref": "#/$defs/identifier"
@@ -985,47 +971,15 @@
               }
             }
           ],
-          "description": "Key requested after manifest normalization; composite keys use named string fields.",
+          "description": "Exact key used after manifest normalization; composite keys use named string fields.",
           "x-crc-canonical": "string, or object with sorted keys",
-          "x-crc-native": "RegistryLookup::requested_key: LookupKey"
-        },
-        "resolved_key": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/identifier"
-            },
-            {
-              "type": "object",
-              "minProperties": 1,
-              "propertyNames": {
-                "$ref": "#/$defs/identifier"
-              },
-              "additionalProperties": {
-                "$ref": "#/$defs/identifier"
-              }
-            }
-          ],
-          "description": "Key actually used; differs from requested_key only for fallbacks.",
-          "x-crc-canonical": "string, or object with sorted keys",
-          "x-crc-native": "RegistryLookup::resolved_key: LookupKey"
-        },
-        "status": {
-          "type": "string",
-          "enum": [
-            "exact",
-            "fallback"
-          ],
-          "description": "Whether the requested key was found or a documented fallback applied.",
-          "x-crc-canonical": "string preserved exactly; JSON escapes per the canonical profile",
-          "x-crc-native": "RegistryLookup::status: LookupStatus"
+          "x-crc-native": "RegistryLookup::key: LookupKey"
         }
       },
       "required": [
         "table_id",
         "table_sha256",
-        "requested_key",
-        "resolved_key",
-        "status"
+        "key"
       ]
     },
     "calibration": {

@@ -1,6 +1,4 @@
-use super::definition::{
-    choice, context, factor, optional_number, overrides, read_fields, sha256_text, version,
-};
+use super::definition::{factor, overrides, read_fields, sha256_text, version};
 use super::error::ContractResult;
 use super::json::{Json, canonical_json, content_hash, parse_json};
 
@@ -13,17 +11,6 @@ pub(crate) struct CompiledReference {
     pub manifest_sha256: String,
     pub factor: String,
     pub overrides: Vec<(String, Option<f64>)>,
-    pub context: ContextValues,
-    pub fallback: String,
-}
-
-#[derive(Clone, Debug, Default)]
-pub(crate) struct ContextValues {
-    pub cell: Option<String>,
-    pub country: Option<String>,
-    pub continent: Option<String>,
-    pub building_type: Option<String>,
-    pub historic_mean: Option<f64>,
 }
 
 pub(crate) fn compile_reference(text: &str) -> ContractResult<CompiledReference> {
@@ -46,7 +33,7 @@ pub(crate) fn compile_reference(text: &str) -> ContractResult<CompiledReference>
             "resolver_semantics_version",
             "factor",
         ],
-        &["overrides", "context_defaults", "fallback_policy"],
+        &["overrides"],
     )?;
     let registry_id = identifier_owned(fields.require("registry_id")?, "/registry_id")?;
     let revision = identifier_owned(fields.require("registry_revision")?, "/registry_revision")?;
@@ -70,14 +57,6 @@ pub(crate) fn compile_reference(text: &str) -> ContractResult<CompiledReference>
         Some(value) => overrides(value, "/overrides", &factor_name)?,
         None => Json::Object(Vec::new()),
     };
-    let context_json = match fields.optional("context_defaults") {
-        Some(value) => context(value, "/context_defaults")?,
-        None => context(&Json::Object(Vec::new()), "/context_defaults")?,
-    };
-    let fallback = match fields.optional("fallback_policy") {
-        Some(value) => choice(value, "/fallback_policy", &["error", "legacy_defaults"])?,
-        None => "error".to_string(),
-    };
     let normalized = Json::object([
         ("schema_version", Json::String("1.0".to_string())),
         ("registry_id", Json::String(registry_id.clone())),
@@ -92,8 +71,6 @@ pub(crate) fn compile_reference(text: &str) -> ContractResult<CompiledReference>
         ),
         ("factor", Json::String(factor_name.clone())),
         ("overrides", override_json.clone()),
-        ("context_defaults", context_json.clone()),
-        ("fallback_policy", Json::String(fallback.clone())),
     ]);
     Ok(CompiledReference {
         canonical: canonical_json(&normalized),
@@ -103,8 +80,6 @@ pub(crate) fn compile_reference(text: &str) -> ContractResult<CompiledReference>
         manifest_sha256,
         factor: factor_name,
         overrides: override_pairs(&override_json),
-        context: context_values(&context_json),
-        fallback,
     })
 }
 
@@ -126,31 +101,4 @@ fn override_pairs(value: &Json) -> Vec<(String, Option<f64>)> {
             (key.clone(), number)
         })
         .collect()
-}
-
-fn context_values(value: &Json) -> ContextValues {
-    let Json::Object(entries) = value else {
-        return ContextValues::default();
-    };
-    let text = |name: &str| -> Option<String> {
-        entries
-            .iter()
-            .find_map(|(key, item)| match (key.as_str(), item) {
-                (key, Json::String(text)) if key == name => Some(text.clone()),
-                _ => None,
-            })
-    };
-    let historic = entries
-        .iter()
-        .find(|(key, _)| key == "historic_mean")
-        .map(|(_, item)| item);
-    ContextValues {
-        cell: text("cell"),
-        country: text("country"),
-        continent: text("continent"),
-        building_type: text("building_type"),
-        historic_mean: optional_number(historic, "/context_defaults/historic_mean")
-            .ok()
-            .flatten(),
-    }
 }

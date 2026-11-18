@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
 use h3o::{CellIndex, Resolution};
@@ -8,7 +8,7 @@ use super::ImpactDefinition;
 use super::definition::override_rule;
 use super::error::{ContractResult, fail};
 use super::json::{Json, canonical_json, content_hash};
-use super::reference::{CompiledReference, ContextValues, compile_reference};
+use super::reference::{CompiledReference, compile_reference};
 use crate::reference::climate::{
     ag_params, energy_params, flood_params, precipitation_thresholds, spei_params, wind_params,
 };
@@ -20,18 +20,7 @@ const FWI_MIDPOINT: f64 = 35.65;
 const FWI_STEEPNESS: f64 = 0.2051873853077659;
 const HOT_DAYS_SLOPE: f64 = 0.0813 / 365.0;
 const SPEI_WATER_UNIT_COST: f64 = 2.9809;
-const WIND_FALLBACK: (f64, f64, f64) = (74.7, 0.11457369750485913, 28.5);
 const AGRICULTURAL: &str = "Agricultural buildings";
-const SPEI_SOURCE: &str = include_str!("../reference/climate/spei_params.rs");
-
-const FLOOD_BUILDINGS: [&str; 6] = [
-    "Residential buildings",
-    "Commercial buildings",
-    "Industrial buildings",
-    "Transport",
-    "Infrastructure - roads",
-    "Agriculture",
-];
 
 struct FactorMeta {
     factor: &'static str,
@@ -140,19 +129,14 @@ struct Installed {
     manifest_sha256: String,
     manifest_json: String,
     tables: BTreeMap<String, String>,
-    spei_energy: BTreeSet<String>,
-    spei_water: BTreeSet<String>,
-    spei_assets: BTreeSet<String>,
 }
 
 struct Trace {
-    table_id: String,
-    requested: Value,
-    resolved: Value,
-    status: &'static str,
+    table_id: &'static str,
+    key: Value,
 }
 
-/// Caller context merged over a reference's defaults. Absent fields stay absent.
+/// Explicit caller context for resolving a pinned table reference.
 #[derive(Clone, Debug, Default)]
 pub struct ResolutionContext {
     pub cell: Option<String>,
@@ -216,9 +200,43 @@ pub fn registry_identity() -> (&'static str, &'static str, &'static str, &'stati
     )
 }
 
+/// Exact country keys for a built-in calibration and its selected building type.
+#[doc(hidden)]
+pub fn registry_country_choices(factor: &str, building: Option<&str>) -> Vec<&'static str> {
+    let mut countries: Vec<_> = match (factor, building) {
+        ("cyclone" | "wind_max_daily_max", None) => wind_table(factor).1.keys().copied().collect(),
+        ("spei", None) => spei_params::NATIONAL_WATER_CONSUMPTION
+            .keys()
+            .copied()
+            .filter(|country| spei_ratio(country).is_ok())
+            .collect(),
+        ("maximum_consecutive_dry_days" | "cooling_degree_days", Some(AGRICULTURAL)) => {
+            let cooling = factor == "cooling_degree_days";
+            ag_params::NATIONAL_CROP_WEIGHTS
+                .keys()
+                .copied()
+                .filter(|country| crop_country_parameters(country, cooling).is_some())
+                .collect()
+        }
+        ("cooling_degree_days", Some(building)) => {
+            let Ok(tables) = energy_tables(building) else {
+                return Vec::new();
+            };
+            energy_map(tables.0)
+                .keys()
+                .copied()
+                .filter(|country| cooling_cost(country, building, tables).is_ok_and(f64::is_finite))
+                .collect()
+        }
+        _ => Vec::new(),
+    };
+    countries.sort_unstable();
+    countries
+}
+
 fn resolve(
     reference: &CompiledReference,
-    call: &ResolutionContext,
+    context: &ResolutionContext,
 ) -> ContractResult<ImpactDefinition> {
     if reference.registry_id != REGISTRY_ID {
         return Err(fail(
@@ -241,10 +259,9 @@ fn resolve(
             "installed manifest digest differs from the pinned digest",
         ));
     }
-    let context = merged(&reference.context, call);
-    validate_context(&context)?;
+    validate_context(context)?;
     let meta = factor_meta(&reference.factor);
-    require_context(meta, &context)?;
+    require_context(meta, context)?;
     let agricultural = context.building_type.as_deref() == Some(AGRICULTURAL);
     if agricultural
         && reference
@@ -265,16 +282,15 @@ fn resolve(
             "maximum_consecutive_dry_days is available only for agricultural buildings",
         ));
     }
-    let legacy = reference.fallback == "legacy_defaults";
     let (model, clamp, lookups) = match reference.factor.as_str() {
-        "daily_freezethaw_cycles" | "frost_days" | "rx1day" => precipitation(reference, &context)?,
-        "cyclone" | "wind_max_daily_max" => wind(reference, &context, legacy)?,
+        "daily_freezethaw_cycles" | "frost_days" | "rx1day" => precipitation(reference, context)?,
+        "cyclone" | "wind_max_daily_max" => wind(reference, context)?,
         "fwi" => (fwi_model(reference)?, None, Vec::new()),
         "hot_days" => hot_days(reference)?,
-        "cflood" | "rflood" | "inundation" => flood(reference, &context, legacy)?,
-        "spei" => spei(reference, &context, legacy)?,
-        "cooling_degree_days" => cooling(reference, &context, agricultural, legacy)?,
-        "maximum_consecutive_dry_days" => crop(reference, &context, false, legacy)?,
+        "cflood" | "rflood" | "inundation" => flood(reference, context)?,
+        "spei" => spei(reference, context)?,
+        "cooling_degree_days" => cooling(reference, context, agricultural)?,
+        "maximum_consecutive_dry_days" => crop(context, false)?,
         _ => {
             return Err(fail(
                 "unsupported_value",
@@ -285,7 +301,7 @@ fn resolve(
     };
     freeze(
         reference,
-        &used_context(meta, &context),
+        &used_context(meta, context),
         meta,
         model,
         clamp,
@@ -293,9 +309,9 @@ fn resolve(
     )
 }
 
-fn used_context(meta: &FactorMeta, context: &ContextValues) -> ContextValues {
+fn used_context(meta: &FactorMeta, context: &ResolutionContext) -> ResolutionContext {
     let uses = |field: &str| meta.context.contains(&field);
-    ContextValues {
+    ResolutionContext {
         cell: uses("cell").then(|| context.cell.clone()).flatten(),
         country: uses("country").then(|| context.country.clone()).flatten(),
         continent: uses("continent")
@@ -312,7 +328,7 @@ fn used_context(meta: &FactorMeta, context: &ContextValues) -> ContextValues {
 
 fn precipitation(
     reference: &CompiledReference,
-    context: &ContextValues,
+    context: &ResolutionContext,
 ) -> ContractResult<(Value, Option<Value>, Vec<Trace>)> {
     let cell = context.cell.as_deref().expect("cell required");
     let index = cell.parse::<CellIndex>().map_err(|_| {
@@ -349,7 +365,7 @@ fn precipitation(
     };
     let Some(lower) = lower else {
         return Err(fail(
-            "fallback_required",
+            "missing_table_key",
             "/context/cell",
             "no geographic damage threshold exists for this cell",
         ));
@@ -365,12 +381,7 @@ fn precipitation(
     }
     let model = sigmoid_model(reference, midpoint, steepness, 0.0, maximum, None)?;
     let key = json!({"cell": parent_hex, "h3_resolution": "4"});
-    let lookup = Trace {
-        table_id: table_id.to_string(),
-        requested: key.clone(),
-        resolved: key,
-        status: "exact",
-    };
+    let lookup = Trace { table_id, key };
     Ok((model, None, vec![lookup]))
 }
 
@@ -385,55 +396,42 @@ fn precipitation_coefficients(factor: &str, lower: f32) -> (f64, f64, f64) {
 
 fn wind(
     reference: &CompiledReference,
-    context: &ContextValues,
-    legacy: bool,
+    context: &ResolutionContext,
 ) -> ContractResult<(Value, Option<Value>, Vec<Trace>)> {
     let country = context.country.as_deref().expect("country required");
-    let cyclone = reference.factor == "cyclone";
-    let table_id = if cyclone {
-        "wind.cyclone"
+    let (table_id, params) = wind_table(&reference.factor);
+    let params = params.get(country).ok_or_else(|| {
+        fail(
+            "missing_table_key",
+            "/context/country",
+            "no wind parameters exist for this country",
+        )
+    })?;
+    let model = sigmoid_model(
+        reference,
+        f64::from(params.x0),
+        f64::from(params.k),
+        0.0,
+        1.0,
+        Some(f64::from(params.t1)),
+    )?;
+    Ok((model, None, vec![trace(table_id, json!(country))]))
+}
+
+fn wind_table(
+    factor: &str,
+) -> (
+    &'static str,
+    &'static phf::Map<&'static str, wind_params::WindParams>,
+) {
+    if factor == "cyclone" {
+        ("wind.cyclone", &wind_params::CYCLONE_PARAMS)
     } else {
-        "wind.wind_max_daily_max"
-    };
-    let params = if cyclone {
-        wind_params::CYCLONE_PARAMS.get(country)
-    } else {
-        wind_params::WIND_MAX_DAILY_MAX_PARAMS.get(country)
-    };
-    let (midpoint, steepness, threshold, status, resolved) = match params {
-        Some(params) => (
-            f64::from(params.x0),
-            f64::from(params.k),
-            f64::from(params.t1),
-            "exact",
-            json!(country),
-        ),
-        None if legacy => (
-            WIND_FALLBACK.0,
-            WIND_FALLBACK.1,
-            WIND_FALLBACK.2,
-            "fallback",
-            json!("global_default"),
-        ),
-        None => {
-            return Err(fail(
-                "fallback_required",
-                "/context/country",
-                "no wind parameters exist for this country",
-            ));
-        }
-    };
-    let model = sigmoid_model(reference, midpoint, steepness, 0.0, 1.0, Some(threshold))?;
-    Ok((
-        model,
-        None,
-        vec![Trace {
-            table_id: table_id.to_string(),
-            requested: json!(country),
-            resolved,
-            status,
-        }],
-    ))
+        (
+            "wind.wind_max_daily_max",
+            &wind_params::WIND_MAX_DAILY_MAX_PARAMS,
+        )
+    }
 }
 
 fn fwi_model(reference: &CompiledReference) -> ContractResult<Value> {
@@ -459,35 +457,27 @@ fn hot_days(reference: &CompiledReference) -> ContractResult<(Value, Option<Valu
 
 fn flood(
     reference: &CompiledReference,
-    context: &ContextValues,
-    legacy: bool,
+    context: &ResolutionContext,
 ) -> ContractResult<(Value, Option<Value>, Vec<Trace>)> {
     let continent = context.continent.as_deref().expect("continent required");
     let building = context
         .building_type
         .as_deref()
         .expect("building type required");
-    let continent_known = flood_params::FLOOD_PARAMS.contains_key(continent);
-    let building_known = FLOOD_BUILDINGS.contains(&building);
-    if (!continent_known || !building_known) && !legacy {
-        let path = if continent_known {
-            "/context/building_type"
-        } else {
-            "/context/continent"
-        };
-        return Err(fail(
-            "fallback_required",
-            path,
-            "no flood damage curve exists for this context",
-        ));
-    }
-    let resolved_continent = if continent_known { continent } else { "Global" };
-    let params = flood_params::continent_to_flood_params(resolved_continent);
-    let curve = if building_known {
-        flood_params::building_type_to_damage(building, params)
-    } else {
-        [0.0; 9]
-    };
+    let params = flood_params::FLOOD_PARAMS.get(continent).ok_or_else(|| {
+        fail(
+            "missing_table_key",
+            "/context/continent",
+            "no flood damage curve exists for this region",
+        )
+    })?;
+    let curve = flood_params::building_type_to_damage(building, params).ok_or_else(|| {
+        fail(
+            "missing_table_key",
+            "/context/building_type",
+            "no flood damage curve exists for this building type",
+        )
+    })?;
     let scale = number_override(reference, "maximum_damage", 1.0);
     let mut points = Vec::new();
     for (threshold, damage) in flood_params::FLOOD_DAMAGE_THRESHOLDS.into_iter().zip(curve) {
@@ -501,19 +491,6 @@ fn flood(
             "y": response,
         }));
     }
-    let (status, resolved) = if continent_known && building_known {
-        (
-            "exact",
-            json!({"building_type": building, "continent": continent}),
-        )
-    } else if building_known {
-        (
-            "fallback",
-            json!({"building_type": building, "continent": "Global"}),
-        )
-    } else {
-        ("fallback", json!("global_default"))
-    };
     Ok((
         json!({
             "kind": "tabulated",
@@ -522,65 +499,34 @@ fn flood(
             "points": points,
         }),
         None,
-        vec![Trace {
-            table_id: "flood.damage".to_string(),
-            requested: json!({"building_type": building, "continent": continent}),
-            resolved,
-            status,
-        }],
+        vec![trace(
+            "flood.damage",
+            json!({"building_type": building, "continent": continent}),
+        )],
     ))
 }
 
 fn spei(
     reference: &CompiledReference,
-    context: &ContextValues,
-    legacy: bool,
+    context: &ResolutionContext,
 ) -> ContractResult<(Value, Option<Value>, Vec<Trace>)> {
     let country = context.country.as_deref().expect("country required");
     let building = context
         .building_type
         .as_deref()
         .expect("building type required");
-    let installed = installed();
-    let energy = keyed(
-        legacy,
-        installed.spei_energy.contains(country),
-        "/context/country",
-        "no national energy consumption exists for this country",
-        f64::from(spei_params::get_national_energy_consumption(country)),
-    )?;
-    let water = keyed(
-        legacy,
-        installed.spei_water.contains(country),
-        "/context/country",
-        "no national water consumption exists for this country",
-        f64::from(spei_params::get_national_water_consumption(country)),
-    )?;
-    let asset = keyed(
-        legacy,
-        installed.spei_assets.contains(building),
-        "/context/building_type",
-        "no asset energy consumption exists for this building type",
-        f64::from(spei_params::get_asset_type_energy_consumption(building)),
-    )?;
-    let ratio = energy.value / water.value;
-    if !ratio.is_finite() || ratio <= 0.0 {
-        return Err(fail(
-            "invalid_value",
-            "/context/country",
-            "energy/water ratio is unavailable for this country",
-        ));
-    }
+    let ratio = spei_ratio(country)?;
+    let asset = asset_energy(building)?;
     let consumption = finite(
-        asset.value / ratio,
+        asset / ratio,
         "/context/country",
         "water consumption is not finite",
     )?;
     let cost = number_override(reference, "water_unit_cost", SPEI_WATER_UNIT_COST);
     let lookups = vec![
-        trace("spei.national_energy", json!(country), &energy),
-        trace("spei.national_water", json!(country), &water),
-        trace("spei.asset_energy", json!(building), &asset),
+        trace("spei.national_energy", json!(country)),
+        trace("spei.national_water", json!(country)),
+        trace("spei.asset_energy", json!(building)),
     ];
     Ok((
         json!({
@@ -593,14 +539,37 @@ fn spei(
     ))
 }
 
+fn spei_ratio(country: &str) -> ContractResult<f64> {
+    let energy = parameter(
+        &spei_params::NATIONAL_ENERGY_CONSUMPTION,
+        country,
+        "/context/country",
+        "no national energy consumption exists for this country",
+    )?;
+    let water = parameter(
+        &spei_params::NATIONAL_WATER_CONSUMPTION,
+        country,
+        "/context/country",
+        "no national water consumption exists for this country",
+    )?;
+    let ratio = energy / water;
+    if !ratio.is_finite() || ratio <= 0.0 {
+        return Err(fail(
+            "invalid_value",
+            "/context/country",
+            "energy/water ratio is unavailable for this country",
+        ));
+    }
+    Ok(ratio)
+}
+
 fn cooling(
     reference: &CompiledReference,
-    context: &ContextValues,
+    context: &ResolutionContext,
     agricultural: bool,
-    legacy: bool,
 ) -> ContractResult<(Value, Option<Value>, Vec<Trace>)> {
     if agricultural {
-        let (model, lookups) = crop_model(reference, context, true, legacy)?;
+        let (model, lookups) = crop_model(context, true)?;
         return Ok((model, None, lookups));
     }
     let country = context.country.as_deref().expect("country required");
@@ -616,37 +585,18 @@ fn cooling(
             "historic mean must be positive",
         ));
     }
-    let (consumption_id, price_id, sector_id) = energy_tables(building);
-    let consumption = energy_lookup(legacy, consumption_id, country)?;
-    let price = energy_lookup(legacy, price_id, country)?;
-    let sector = energy_lookup(legacy, sector_id, country)?;
-    let asset_known = installed().spei_assets.contains(building);
-    let asset = keyed(
-        legacy,
-        asset_known,
-        "/context/building_type",
-        "no asset energy consumption exists for this building type",
-        f64::from(spei_params::get_asset_type_energy_consumption(building)),
-    )?;
-    if sector.value <= 0.0 {
-        return Err(fail(
-            "invalid_value",
-            "/context/country",
-            "cooling energy parameters are unavailable",
-        ));
-    }
-    let national_cost = consumption.value * 1.0e9 * price.value;
-    let computed = asset.value * national_cost / (sector.value * 1.0e9);
+    let (consumption_id, price_id, sector_id) = energy_tables(building)?;
+    let computed = cooling_cost(country, building, (consumption_id, price_id, sector_id))?;
     let cooling_cost = finite(
         number_override(reference, "cooling_cost", computed),
         "/overrides/cooling_cost",
         "cooling cost is not finite",
     )?;
     let lookups = vec![
-        trace(consumption_id, json!(country), &consumption),
-        trace(price_id, json!(country), &price),
-        trace(sector_id, json!(country), &sector),
-        trace("spei.asset_energy", json!(building), &asset),
+        trace(consumption_id, json!(country)),
+        trace(price_id, json!(country)),
+        trace(sector_id, json!(country)),
+        trace("spei.asset_energy", json!(building)),
     ];
     Ok((
         json!({"kind": "cooling", "cooling_cost": cooling_cost, "historic_mean": historic}),
@@ -655,21 +605,37 @@ fn cooling(
     ))
 }
 
+fn cooling_cost(
+    country: &str,
+    building: &str,
+    (consumption_id, price_id, sector_id): (&str, &str, &str),
+) -> ContractResult<f64> {
+    let consumption = energy_lookup(consumption_id, country)?;
+    let price = energy_lookup(price_id, country)?;
+    let sector = energy_lookup(sector_id, country)?;
+    let asset = asset_energy(building)?;
+    if sector <= 0.0 {
+        return Err(fail(
+            "invalid_value",
+            "/context/country",
+            "cooling energy parameters are unavailable",
+        ));
+    }
+    let national_cost = consumption * 1.0e9 * price;
+    Ok(asset * national_cost / (sector * 1.0e9))
+}
+
 fn crop(
-    reference: &CompiledReference,
-    context: &ContextValues,
+    context: &ResolutionContext,
     cooling_branch: bool,
-    legacy: bool,
 ) -> ContractResult<(Value, Option<Value>, Vec<Trace>)> {
-    let (model, lookups) = crop_model(reference, context, cooling_branch, legacy)?;
+    let (model, lookups) = crop_model(context, cooling_branch)?;
     Ok((model, None, lookups))
 }
 
 fn crop_model(
-    _reference: &CompiledReference,
-    context: &ContextValues,
+    context: &ResolutionContext,
     cooling_branch: bool,
-    legacy: bool,
 ) -> ContractResult<(Value, Vec<Trace>)> {
     let country = context.country.as_deref().expect("country required");
     let historic = context.historic_mean.expect("historic mean required");
@@ -688,24 +654,13 @@ fn crop_model(
     } else {
         "crop.cxdd_index"
     };
-    let values_known = if cooling_branch {
-        ag_params::CDD_CROP_VALUES.contains_key(country)
-    } else {
-        ag_params::CXDD_CROP_VALUES.contains_key(country)
-    };
-    let weights_known = ag_params::NATIONAL_CROP_WEIGHTS.contains_key(country);
-    if (!values_known || !weights_known) && !legacy {
-        return Err(fail(
-            "fallback_required",
+    let (values, weights) = crop_country_parameters(country, cooling_branch).ok_or_else(|| {
+        fail(
+            "missing_table_key",
             "/context/country",
             "no crop parameters exist for this country",
-        ));
-    }
-    let values = if cooling_branch {
-        ag_params::get_cdd_crop_values(country)
-    } else {
-        ag_params::get_cxdd_crop_values(country)
-    };
+        )
+    })?;
     let yearly = if cooling_branch {
         &ag_params::CDD_YEARLY_CROP_ESTIMATES
     } else {
@@ -716,42 +671,11 @@ fn crop_model(
     } else {
         &ag_params::CXDD_INDEX_CROP_ESTIMATES
     };
-    let weights = ag_params::get_national_crop_weights(country);
-    let values_status = if values_known { "exact" } else { "fallback" };
-    let weights_status = if weights_known { "exact" } else { "fallback" };
     let lookups = vec![
-        Trace {
-            table_id: values_id.to_string(),
-            requested: json!(country),
-            resolved: if values_known {
-                json!(country)
-            } else {
-                json!("global_default")
-            },
-            status: values_status,
-        },
-        Trace {
-            table_id: "crop.weights".to_string(),
-            requested: json!(country),
-            resolved: if weights_known {
-                json!(country)
-            } else {
-                json!("global_default")
-            },
-            status: weights_status,
-        },
-        Trace {
-            table_id: yearly_id.to_string(),
-            requested: json!("global"),
-            resolved: json!("global"),
-            status: "exact",
-        },
-        Trace {
-            table_id: index_id.to_string(),
-            requested: json!("global"),
-            resolved: json!("global"),
-            status: "exact",
-        },
+        trace(values_id, json!(country)),
+        trace("crop.weights", json!(country)),
+        trace(yearly_id, json!("global")),
+        trace(index_id, json!("global")),
     ];
     Ok((
         json!({
@@ -766,8 +690,26 @@ fn crop_model(
     ))
 }
 
-fn energy_tables(building: &str) -> (&'static str, &'static str, &'static str) {
-    match building {
+fn crop_country_parameters(
+    country: &str,
+    cooling_branch: bool,
+) -> Option<(
+    &'static ag_params::NationalCropWeights,
+    &'static ag_params::NationalCropWeights,
+)> {
+    let parameters = if cooling_branch {
+        &ag_params::CDD_CROP_VALUES
+    } else {
+        &ag_params::CXDD_CROP_VALUES
+    };
+    Some((
+        parameters.get(country)?,
+        ag_params::NATIONAL_CROP_WEIGHTS.get(country)?,
+    ))
+}
+
+fn energy_tables(building: &str) -> ContractResult<(&'static str, &'static str, &'static str)> {
+    Ok(match building {
         "Residential buildings" => (
             "energy.residential_cooling",
             "energy.residential_price",
@@ -783,71 +725,49 @@ fn energy_tables(building: &str) -> (&'static str, &'static str, &'static str) {
             "energy.industrial_price",
             "energy.industrial_sector",
         ),
-        _ => (
-            "energy.residential_commercial_cooling",
-            "energy.residential_price",
-            "energy.residential_commercial_sector",
-        ),
-    }
+        _ => {
+            return Err(fail(
+                "missing_table_key",
+                "/context/building_type",
+                "no cooling energy parameters exist for this building type",
+            ));
+        }
+    })
 }
 
-struct Keyed {
-    value: f64,
-    status: &'static str,
-}
-
-fn keyed(
-    legacy: bool,
-    found: bool,
+fn parameter(
+    table: &phf::Map<&'static str, f32>,
+    key: &str,
     path: &str,
     message: &str,
-    value: f64,
-) -> ContractResult<Keyed> {
-    if found {
-        Ok(Keyed {
-            value,
-            status: "exact",
-        })
-    } else if legacy {
-        Ok(Keyed {
-            value,
-            status: "fallback",
-        })
-    } else {
-        Err(fail("fallback_required", path, message))
-    }
+) -> ContractResult<f64> {
+    table
+        .get(key)
+        .copied()
+        .map(f64::from)
+        .ok_or_else(|| fail("missing_table_key", path, message))
 }
 
-fn energy_lookup(legacy: bool, table_id: &str, country: &str) -> ContractResult<Keyed> {
-    match energy_map(table_id).get(country) {
-        Some(value) => Ok(Keyed {
-            value: f64::from(*value),
-            status: "exact",
-        }),
-        None if legacy => Ok(Keyed {
-            value: 0.0,
-            status: "fallback",
-        }),
-        None => Err(fail(
-            "fallback_required",
-            "/context/country",
-            "no cooling energy parameter exists for this country",
-        )),
-    }
+fn asset_energy(building: &str) -> ContractResult<f64> {
+    parameter(
+        &spei_params::ASSET_ENERGY_CONSUMPTION,
+        building,
+        "/context/building_type",
+        "no asset energy consumption exists for this building type",
+    )
 }
 
-fn trace(table_id: &str, requested: Value, keyed: &Keyed) -> Trace {
-    let resolved = if keyed.status == "exact" {
-        requested.clone()
-    } else {
-        json!("global_default")
-    };
-    Trace {
-        table_id: table_id.to_string(),
-        requested,
-        resolved,
-        status: keyed.status,
-    }
+fn energy_lookup(table_id: &str, country: &str) -> ContractResult<f64> {
+    parameter(
+        energy_map(table_id),
+        country,
+        "/context/country",
+        "no cooling energy parameter exists for this country",
+    )
+}
+
+fn trace(table_id: &'static str, key: Value) -> Trace {
+    Trace { table_id, key }
 }
 
 fn sigmoid_model(
@@ -954,7 +874,7 @@ fn optional_override(
 
 fn freeze(
     reference: &CompiledReference,
-    context: &ContextValues,
+    context: &ResolutionContext,
     meta: &FactorMeta,
     model: Value,
     clamp: Option<Value>,
@@ -972,10 +892,8 @@ fn freeze(
         .map(|lookup| {
             json!({
                 "table_id": lookup.table_id,
-                "table_sha256": installed().tables[&lookup.table_id],
-                "requested_key": lookup.requested,
-                "resolved_key": lookup.resolved,
-                "status": lookup.status,
+                "table_sha256": installed().tables[lookup.table_id],
+                "key": lookup.key,
             })
         })
         .collect::<Vec<_>>();
@@ -1013,7 +931,6 @@ fn freeze(
                     "historic_mean": context.historic_mean,
                 },
                 "overrides": override_document(&reference.overrides),
-                "fallback_policy": reference.fallback,
                 "lookups": lookup_json,
             },
             "sources": [],
@@ -1045,23 +962,7 @@ fn crop_value(values: &ag_params::NationalCropWeights) -> Value {
     })
 }
 
-fn merged(defaults: &ContextValues, call: &ResolutionContext) -> ContextValues {
-    ContextValues {
-        cell: call.cell.clone().or_else(|| defaults.cell.clone()),
-        country: call.country.clone().or_else(|| defaults.country.clone()),
-        continent: call
-            .continent
-            .clone()
-            .or_else(|| defaults.continent.clone()),
-        building_type: call
-            .building_type
-            .clone()
-            .or_else(|| defaults.building_type.clone()),
-        historic_mean: call.historic_mean.or(defaults.historic_mean),
-    }
-}
-
-fn validate_context(context: &ContextValues) -> ContractResult<()> {
+fn validate_context(context: &ResolutionContext) -> ContractResult<()> {
     if let Some(cell) = &context.cell {
         if !is_h3_cell(cell) {
             return Err(fail(
@@ -1099,7 +1000,7 @@ fn validate_context(context: &ContextValues) -> ContractResult<()> {
     Ok(())
 }
 
-fn require_context(meta: &FactorMeta, context: &ContextValues) -> ContractResult<()> {
+fn require_context(meta: &FactorMeta, context: &ResolutionContext) -> ContractResult<()> {
     for field in meta.context {
         let present = match *field {
             "cell" => context.cell.is_some(),
@@ -1144,9 +1045,6 @@ fn installed() -> &'static Installed {
 }
 
 fn build_installed() -> Installed {
-    let spei_energy = match_keys("get_national_energy_consumption");
-    let spei_water = match_keys("get_national_water_consumption");
-    let spei_assets = match_keys("get_asset_type_energy_consumption");
     let mut tables = BTreeMap::new();
     tables.insert(
         "precipitation.daily_freezethaw_cycles".to_string(),
@@ -1171,21 +1069,15 @@ fn build_installed() -> Installed {
     tables.insert("flood.damage".to_string(), hash_flood());
     tables.insert(
         "spei.national_energy".to_string(),
-        hash_keyed(&spei_energy, |key| {
-            f64::from(spei_params::get_national_energy_consumption(key))
-        }),
+        hash_f32_map(&spei_params::NATIONAL_ENERGY_CONSUMPTION),
     );
     tables.insert(
         "spei.national_water".to_string(),
-        hash_keyed(&spei_water, |key| {
-            f64::from(spei_params::get_national_water_consumption(key))
-        }),
+        hash_f32_map(&spei_params::NATIONAL_WATER_CONSUMPTION),
     );
     tables.insert(
         "spei.asset_energy".to_string(),
-        hash_keyed(&spei_assets, |key| {
-            f64::from(spei_params::get_asset_type_energy_consumption(key))
-        }),
+        hash_f32_map(&spei_params::ASSET_ENERGY_CONSUMPTION),
     );
     for (id, map) in energy_maps() {
         tables.insert(id.to_string(), hash_f32_map(map));
@@ -1237,9 +1129,6 @@ fn build_installed() -> Installed {
         manifest_sha256,
         manifest_json,
         tables,
-        spei_energy,
-        spei_water,
-        spei_assets,
     }
 }
 
@@ -1297,7 +1186,6 @@ fn manifest_document(tables: &BTreeMap<String, String>) -> Json {
             Json::String(RESOLVER_VERSION.to_string()),
         ),
         ("factors", Json::Array(factors)),
-        ("legacy_defaults", legacy_defaults()),
         ("tables", Json::Array(table_json)),
     ])
 }
@@ -1411,65 +1299,8 @@ fn coefficients(factor: &str) -> Option<Json> {
     }
 }
 
-fn legacy_defaults() -> Json {
-    let absent = "\u{0}";
-    Json::object([
-        (
-            "cyclone_wind",
-            Json::object([
-                ("midpoint", Json::number(WIND_FALLBACK.0)),
-                ("steepness", Json::number(WIND_FALLBACK.1)),
-                ("zero_below", Json::number(WIND_FALLBACK.2)),
-            ]),
-        ),
-        ("energy_missing", Json::number(0.0)),
-        (
-            "flood_unknown_building",
-            Json::Array(vec![Json::number(0.0); 9]),
-        ),
-        (
-            "flood_unknown_continent",
-            Json::String("Global".to_string()),
-        ),
-        (
-            "crop_cdd",
-            crop_json(ag_params::get_cdd_crop_values(absent)),
-        ),
-        (
-            "crop_cxdd",
-            crop_json(ag_params::get_cxdd_crop_values(absent)),
-        ),
-        (
-            "crop_weights",
-            crop_json(ag_params::get_national_crop_weights(absent)),
-        ),
-        (
-            "spei_asset_energy",
-            Json::number(f64::from(spei_params::get_asset_type_energy_consumption(
-                absent,
-            ))),
-        ),
-        (
-            "spei_national_energy",
-            Json::number(f64::from(spei_params::get_national_energy_consumption(
-                absent,
-            ))),
-        ),
-        (
-            "spei_national_water",
-            Json::number(f64::from(spei_params::get_national_water_consumption(
-                absent,
-            ))),
-        ),
-    ])
-}
-
-fn energy_maps() -> [(&'static str, &'static phf::Map<&'static str, f32>); 8] {
+fn energy_maps() -> [(&'static str, &'static phf::Map<&'static str, f32>); 7] {
     [
-        (
-            "energy.residential_commercial_cooling",
-            &energy_params::RESIDENTIAL_COMMERCIAL_COOLING_ENERGY,
-        ),
         (
             "energy.residential_cooling",
             &energy_params::RESIDENTIAL_COOLING_ENERGY,
@@ -1596,14 +1427,6 @@ fn hash_precip(rows: &[(u64, u16)]) -> String {
     )
 }
 
-fn hash_keyed(keys: &BTreeSet<String>, value: impl Fn(&str) -> f64) -> String {
-    hash_rows(
-        keys.iter()
-            .map(|key| (key.clone(), Json::number(value(key))))
-            .collect(),
-    )
-}
-
 fn hash_rows(mut rows: Vec<(String, Json)>) -> String {
     rows.sort_by(|left, right| left.0.as_bytes().cmp(right.0.as_bytes()));
     let value = Json::Array(
@@ -1617,46 +1440,4 @@ fn hash_rows(mut rows: Vec<(String, Json)>) -> String {
             .collect(),
     );
     content_hash(&value)["sha256:".len()..].to_string()
-}
-
-fn match_keys(function: &str) -> BTreeSet<String> {
-    match_rows(function)
-        .into_iter()
-        .map(|(key, _)| key)
-        .collect()
-}
-
-fn match_rows(function: &str) -> Vec<(String, f64)> {
-    let body = function_body(function);
-    let mut rows = Vec::new();
-    for line in body.lines() {
-        let line = line.trim().trim_end_matches(',');
-        let Some(rest) = line.strip_prefix('"') else {
-            continue;
-        };
-        let Some((key, after)) = rest.split_once('"') else {
-            continue;
-        };
-        let value = after.trim().trim_start_matches("=>").trim();
-        if value.is_empty() || value.contains('{') {
-            continue;
-        }
-        let value = value.parse::<f64>().unwrap_or_else(|error| {
-            panic!("cannot parse {function} value for {key}: {error} ({value})")
-        });
-        rows.push((key.to_string(), value));
-    }
-    rows
-}
-
-fn function_body(function: &str) -> &'static str {
-    let marker = format!("pub fn {function}");
-    let start = SPEI_SOURCE
-        .find(&marker)
-        .unwrap_or_else(|| panic!("missing {function}"));
-    let rest = &SPEI_SOURCE[start..];
-    match rest[marker.len()..].find("\npub fn ") {
-        Some(end) => &rest[..end + marker.len()],
-        None => rest,
-    }
 }

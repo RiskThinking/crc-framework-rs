@@ -15,6 +15,8 @@ from crc_framework import (
     CellContext,
     ClimateIndex,
     ClimateIndexKind,
+    CoolingCostContext,
+    CropContext,
     DegreeDays,
     DegreeDayUnit,
     DepthAboveGround,
@@ -207,6 +209,83 @@ def test_context_factories_have_real_canonical_types_and_exact_asset_choices() -
         InundationContext(region="Europe", asset_type=AssetType.RESIDENTIAL)
     with pytest.raises(TypeError, match="H3 integer"):
         CellContext(cell="852b83b3fffffff")
+
+
+@pytest.mark.parametrize(
+    ("model", "asset_type", "context_values"),
+    [
+        (BuiltinImpact.CYCLONE, None, {}),
+        (BuiltinImpact.MAXIMUM_DAILY_WIND_SPEED, None, {}),
+        (
+            BuiltinImpact.STANDARDIZED_PRECIPITATION_EVAPOTRANSPIRATION_INDEX,
+            None,
+            {"asset_type": AssetType.COMMERCIAL},
+        ),
+        (BuiltinImpact.CONSECUTIVE_DRY_DAYS, None, {"historic_mean": 25}),
+        (BuiltinImpact.COOLING_DEGREE_DAYS_CROP_YIELD, None, {"historic_mean": 25}),
+        *[
+            (
+                BuiltinImpact.COOLING_DEGREE_DAYS,
+                asset_type,
+                {"asset_type": asset_type, "historic_mean": 25},
+            )
+            for asset_type in (
+                AssetType.RESIDENTIAL,
+                AssetType.COMMERCIAL,
+                AssetType.INDUSTRIAL,
+            )
+        ],
+    ],
+)
+def test_country_requirements_agree_with_table_resolution_and_model_schema(
+    model, asset_type, context_values
+) -> None:
+    reference = Impact.builtin(model)
+    requirements = reference.requirements
+    country = next(f for f in requirements.context_fields if f.name == "country")
+    choices = (
+        country.choices_by_asset_type[asset_type] if asset_type else country.choices
+    )
+    assert choices == tuple(sorted(set(choices)))
+    assert "USA" in choices
+    models = json.loads((RESOURCES / "models-1.0.json").read_text())["models"]
+    registered = next(v for v in models if v["id"] == reference.id)
+    validator = Draft202012Validator(registered["context_schema"])
+    for code in choices:
+        context = requirements.context_type(country=code, **context_values)
+        assert validator.is_valid(json.loads(context.to_json()))
+        assert isinstance(reference.resolve(context), Impact)
+
+    if asset_type:
+        different_branch = sorted(set(country.choices) - set(choices))
+    else:
+        different_branch = []
+    invalid_code = different_branch[0] if different_branch else "ZZZ"
+    context = requirements.context_type(country=invalid_code, **context_values)
+    assert not validator.is_valid(json.loads(context.to_json()))
+    with pytest.raises(
+        ImpactError, match="model.requirements.context_fields"
+    ) as caught:
+        reference.resolve(context)
+    assert caught.value.code == "missing_table_key"
+    assert caught.value.path == "/context/country"
+
+
+def test_cooling_degree_days_models_discover_their_own_context_and_output() -> None:
+    crop = Impact.builtin(BuiltinImpact.COOLING_DEGREE_DAYS_CROP_YIELD)
+    cooling = Impact.builtin(BuiltinImpact.COOLING_DEGREE_DAYS)
+
+    assert crop.requirements.context_type is CropContext
+    assert crop.requirements.output.quantity == "crop_yield_change"
+    result = crop.resolve(CropContext(country="USA", historic_mean=25))
+    assert Impact.from_json(result.to_json()).output == crop.requirements.output
+
+    assert cooling.requirements.context_type is CoolingCostContext
+    assert cooling.requirements.output.quantity == "normalized_cooling_cost"
+    with pytest.raises(ValueError, match="agricultural_building"):
+        CoolingCostContext(
+            country="USA", asset_type=AssetType.AGRICULTURAL_BUILDING, historic_mean=25
+        )
 
 
 def test_column_bindings_round_trip_but_are_not_resolved_by_numerical_models() -> None:
