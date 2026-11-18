@@ -18,6 +18,7 @@ from ._diagnostics import Diagnostic, DiagnosticSeverity
 
 if TYPE_CHECKING:
     from ._impacts import Impact
+    from ._measurement import Measurement
 
 FloatArray: TypeAlias = numpy.typing.NDArray[numpy.float64]
 ArrayLike: TypeAlias = Sequence[float] | FloatArray
@@ -115,13 +116,23 @@ def _finite(value: float, label: str) -> float:
     return result
 
 
-def _vector(values: ArrayLike, label: str) -> FloatArray:
-    if numpy.asarray(values).dtype.kind not in "iuf" or (
-        isinstance(values, Sequence)
-        and any(isinstance(value, (bool, numpy.bool_)) for value in values)
-    ):
+def _real_array(values: Values, label: str) -> FloatArray:
+    if isinstance(values, numpy.ndarray):
+        valid = values.dtype.kind in "iuf"
+    else:
+        # Inspect Python sequences before NumPy promotes bools or strings.
+        valid = all(
+            isinstance(item, (int, float, numpy.integer, numpy.floating))
+            and not isinstance(item, (bool, numpy.bool_))
+            for item in numpy.asarray(values, dtype=object).flat
+        )
+    if not valid:
         raise TypeError(f"{label} must contain real numbers")
-    array = numpy.asarray(values, dtype=numpy.float64)
+    return numpy.asarray(values, dtype=numpy.float64)
+
+
+def _vector(values: ArrayLike, label: str) -> FloatArray:
+    array = _real_array(values, label)
     if array.ndim != 1 or array.size == 0 or not numpy.isfinite(array).all():
         raise ValueError(f"{label} must be a nonempty finite one-dimensional array")
     return array
@@ -133,9 +144,7 @@ def _snapshot(array: FloatArray) -> FloatArray:
 
 
 def _input(values: Values, *, probabilities: bool = False) -> tuple[FloatArray, bool]:
-    if numpy.asarray(values).dtype.kind not in "iuf":
-        raise TypeError("queries must contain real numbers")
-    array = numpy.asarray(values, dtype=numpy.float64)
+    array = _real_array(values, "queries")
     if numpy.isnan(array).any():
         raise ValueError("queries must not contain NaN")
     if probabilities and (
@@ -481,6 +490,8 @@ class Distribution:
         if self._native is not None:
             return self._native.moments()
         if self._transformed is not None:
+            if (exact := self._transformed.affine_moments()) is not None:
+                return exact
             impact, source = self._impact_source()
             exact = impact._moments(source)
             if exact is not None:
@@ -512,6 +523,16 @@ class Distribution:
         return Impact.from_json(_dump(self._data["impact"])), Distribution.from_json(
             _dump(self._data["source"])
         )
+
+    def _output_measurement(self) -> Measurement | None:
+        from ._measurement import _measurement
+
+        data = self._data
+        while data["kind"] == "hurdle":
+            data = cast(dict[str, object], data["base"])
+        if data["kind"] == "transformed":
+            return _measurement(cast(dict[str, object], data["impact"])["output"])
+        return None
 
     def _inverse_survival(self, probability: float) -> float:
         if self._native is not None:
@@ -645,11 +666,14 @@ class Distribution:
         record = data.pop("evidence", None)
         if data.get("kind") == "transformed":
             _fields(data, {"kind", "source", "impact"})
-            from ._impacts import Impact
+            from ._impacts import Impact, ImpactError
 
-            result = Impact.from_json(_dump(data["impact"])).pushforward(
-                cls.from_json(_dump(data["source"]))
-            )
+            try:
+                result = Impact.from_json(_dump(data["impact"])).pushforward(
+                    cls.from_json(_dump(data["source"]))
+                )
+            except ImpactError as error:
+                raise ValueError(str(error)) from error
         else:
             if data.get("kind") == "parametric":
                 shapeless = data.get("family") in (

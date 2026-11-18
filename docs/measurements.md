@@ -36,7 +36,7 @@ The following fields and units are generated from the same definitions used by J
 | `TimeDuration` | `unit` |  | `s`, `h`, `d`, `month`, `yr` |
 | `Temperature` | `unit` |  | `degC`, `K`, `degF` |
 | `WindSpeed` | `unit` | `aggregation`, `averaging_duration` | `m/s`, `km/h` |
-| `PrecipitationRate` | `unit`, `accumulation_duration`, `aggregation` |  | `mm/day`, `mm/h` |
+| `PrecipitationRate` | `unit`, `accumulation_duration`, `aggregation` |  | `mm/day`, `mm/h`, `kg m-2 s-1` |
 | `PrecipitationAmount` | `unit`, `accumulation_duration` |  | `m`, `cm`, `mm`, `ft` |
 | `EventCount` | `event`, `aggregation` | `duration`, `threshold` |  |
 | `ClimateIndex` | `index` | `accumulation_duration`, `reference_period` |  |

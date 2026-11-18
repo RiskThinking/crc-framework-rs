@@ -6,7 +6,9 @@
 //! as atoms without replacing that quantile rule.
 
 use crate::Interpolation;
-use crate::numerical::{compensated, segment_moment};
+use crate::numerical::{
+    NumericalLaw, affine_fitted_moments, affine_segment_moments, compensated, segment_moment,
+};
 
 use super::definition::{
     Clamp, Interpolation as TableInterpolation, Model, OriginAdjustment, OutsideDomain,
@@ -68,6 +70,71 @@ impl ImpactDistribution {
 
     pub(crate) fn is_discrete(&self) -> bool {
         matches!(self.law, Law::Discrete)
+    }
+
+    /// Apply the affine scale before evaluating moments, so the variance can
+    /// be finite even when the unscaled variance exceeds binary64's range.
+    pub fn affine_moments(&self) -> ContractResult<Option<(f64, f64)>> {
+        let Model::Linear { slope, intercept } = self.model else {
+            return Ok(None);
+        };
+        if slope == 0.0 {
+            return Ok(Some((
+                kernel::evaluate(&self.model, &self.clamp, 0.0)?,
+                0.0,
+            )));
+        }
+        if self.clamp.minimum.is_some() || self.clamp.maximum.is_some() {
+            return Ok(None);
+        }
+        if self.is_discrete() {
+            let atoms: Vec<_> = self
+                .atoms
+                .iter()
+                .map(|atom| (atom.value, atom.value, atom.probability))
+                .collect();
+            return Ok(Some(affine_segment_moments(&atoms, 1.0, 0.0)));
+        }
+        if let Some(segments) = self.source.weighted_segments() {
+            return Ok(Some(affine_segment_moments(&segments, slope, intercept)));
+        }
+        match &self.source {
+            ImpactSource::Fitted(d) => Ok(Some(affine_fitted_moments(d, slope, intercept))),
+            ImpactSource::Tabulated(d) if d.uses_linear_probability() => {
+                let segments: Vec<_> = d
+                    .values()
+                    .windows(2)
+                    .zip(d.probabilities().windows(2))
+                    .map(|(x, q)| (x[0], x[1], q[1] - q[0]))
+                    .collect();
+                Ok(Some(affine_segment_moments(&segments, slope, intercept)))
+            }
+            ImpactSource::Hurdle(d) => {
+                let scale = slope.abs();
+                let mut base = d.base().clone();
+                base.location *= scale;
+                base.scale *= scale;
+                let atom_location = d.atom_location() * scale;
+                if !base.location.is_finite()
+                    || !base.scale.is_finite()
+                    || base.scale == 0.0
+                    || !atom_location.is_finite()
+                {
+                    return Ok(None);
+                }
+                let law = NumericalLaw::hurdle(
+                    NumericalLaw::Parametric(base),
+                    d.atom_probability(),
+                    atom_location,
+                )
+                .map_err(|error| fail("numerical_failure", "", error.to_string()))?;
+                let (mean, variance) = law
+                    .moments()
+                    .map_err(|error| fail("numerical_failure", "", error.to_string()))?;
+                Ok(Some((mean * slope.signum() + intercept, variance)))
+            }
+            _ => Ok(None),
+        }
     }
 
     pub fn quantile(&self, probability: f64) -> ContractResult<f64> {

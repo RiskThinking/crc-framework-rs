@@ -168,6 +168,11 @@ struct PyImpactDistribution {
 
 #[pymethods]
 impl PyImpactDistribution {
+    fn affine_moments(&self, py: Python<'_>) -> PyResult<Option<(f64, f64)>> {
+        py.detach(|| self.inner.affine_moments())
+            .map_err(|error| impact_error(py, error))
+    }
+
     fn atoms(&self) -> Vec<(f64, f64)> {
         self.inner
             .atoms()

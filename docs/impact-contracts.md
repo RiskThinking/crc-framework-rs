@@ -25,7 +25,10 @@ assert response.mass(3) == 0.9
 ```
 
 Point evaluation preserves scalar and array shape. Exact pushforwards preserve
-atoms and threshold conventions even when the function decreases. Unsupported
+atoms and threshold conventions even when the function decreases. A response
+law retains the producing impact's output measurement. Another impact can
+use that law only when its input measurement matches, including units and
+scientific qualifiers. Unsupported
 exact operations raise an explicit capability error. No implicit quantile grid
 or approximation policy substitutes for a probability law.
 

@@ -14,6 +14,7 @@ from crc_framework import (
     DepthAboveGround,
     Distribution,
     DistributionFamily,
+    DistributionKind,
     FloodRegion,
     Impact,
     ImpactError,
@@ -28,13 +29,15 @@ from crc_framework import (
     StatisticStatus,
     Tail,
     TailCompletion,
+    Temperature,
+    TemperatureUnit,
 )
 
 
 def linear(slope: float = 2.0, **kwargs: float | None) -> Impact:
     return Impact.linear(
         slope=slope,
-        input=Measurement(quantity="exposure", unit="1"),
+        input=Ratio(),
         output=Ratio(),
         **kwargs,
     )
@@ -45,6 +48,38 @@ def test_linear_does_not_hide_a_zero_clamp() -> None:
     assert response.evaluate(-2.0) == -4.0
     assert response.expectation(Distribution.discrete([-2, 1], [0.25, 0.75])) == 0.5
     assert not callable(response)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        Distribution.point_mass(5),
+        Distribution.discrete([1, 5], [0.25, 0.75]),
+        Distribution.histogram([0, 5, 10], [0.3, 0.7]),
+    ],
+)
+def test_chained_impacts_validate_the_previous_output_measurement(
+    source: Distribution,
+) -> None:
+    depth = DepthAboveGround(unit=LengthUnit.METRE)
+    temperature = Temperature(unit=TemperatureUnit.CELSIUS)
+    first = Impact.linear(slope=1, input=depth, output=temperature)
+    inconsistent = Impact.linear(slope=2, input=depth, output=Ratio())
+    consistent = Impact.linear(slope=2, input=temperature, output=Ratio())
+    image = first.pushforward(source)
+    restored = Distribution.from_json(image.to_json())
+    for law in (image, restored, Distribution.hurdle(restored, atom_probability=0.1)):
+        assert law.kind in (DistributionKind.TRANSFORMED, DistributionKind.HURDLE)
+        for operation in (inconsistent.pushforward, inconsistent.expectation):
+            with pytest.raises(ImpactError, match="source impact output") as failure:
+                operation(law)
+            assert failure.value.code == "measurement_mismatch"
+        assert consistent.pushforward(law).quantile(0.5) == pytest.approx(
+            2 * float(law.quantile(0.5))
+        )
+    assert json.loads(restored.to_json())["impact"]["output"] == json.loads(
+        temperature.to_json()
+    )
 
 
 @pytest.mark.parametrize("rank", [1e-16, 1e-18])
@@ -416,7 +451,12 @@ def test_measurement_extensions_require_mappings(field: str) -> None:
     with pytest.raises(TypeError, match="mapping"):
         Measurement(**{field: ["bad"]})  # type: ignore[arg-type]
     document = json.loads(linear().to_json())
-    document["input"][field] = ["bad"]
+    document["input"] = {
+        "kind": "measurement",
+        "quantity": "exposure",
+        "unit": "1",
+        field: ["bad"],
+    }
     with pytest.raises(ImpactError, match="mapping"):
         Impact.from_json(json.dumps(document))
 
@@ -556,4 +596,36 @@ def test_affine_variance_scaling_avoids_premature_overflow_and_underflow() -> No
     assert (
         image.statistics(metrics=[Statistic.VARIANCE]).values[Statistic.VARIANCE].status
         is StatisticStatus.POSITIVE_INFINITY
+    )
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        (Distribution.histogram([-1e200, 1e200], [1]), 1e200 / 3),
+        (
+            Distribution.parametric(
+                DistributionFamily.GUMBEL_RIGHT, location=0, scale=1e200
+            ),
+            math.pi**2 * 1e200 / 6,
+        ),
+    ],
+)
+@pytest.mark.parametrize("slope", [-1e-100, 1e-100])
+def test_affine_downscaling_keeps_finite_variance(
+    source: Distribution, expected: float, slope: float
+) -> None:
+    assert (
+        source.statistics(metrics=[Statistic.VARIANCE])
+        .values[Statistic.VARIANCE]
+        .status
+        is StatisticStatus.POSITIVE_INFINITY
+    )
+    image = linear(slope).pushforward(source)
+    summary = image.statistics(
+        metrics=[Statistic.VARIANCE, Statistic.STANDARD_DEVIATION]
+    )
+    assert summary.values[Statistic.VARIANCE].value == pytest.approx(expected)
+    assert summary.values[Statistic.STANDARD_DEVIATION].value == pytest.approx(
+        math.sqrt(expected)
     )

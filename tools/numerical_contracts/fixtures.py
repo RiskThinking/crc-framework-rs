@@ -8,12 +8,16 @@ import math
 from pathlib import Path
 
 from crc_framework import (
+    DepthAboveGround,
     Distribution,
     DistributionFamily,
     Impact,
+    LengthUnit,
     QuantileCurve,
     Ratio,
     TailCompletion,
+    Temperature,
+    TemperatureUnit,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -70,6 +74,11 @@ def build():
     )
     decreasing = Impact.linear(slope=-2, intercept=1, input=Ratio(), output=Ratio())
     identity = Impact.linear(slope=1, input=Ratio(), output=Ratio())
+    depth = DepthAboveGround(unit=LengthUnit.METRE)
+    temperature = Temperature(unit=TemperatureUnit.CELSIUS)
+    change_measurement = Impact.linear(slope=1, input=depth, output=temperature)
+    atomic_temperature = change_measurement.pushforward(Distribution.point_mass(5))
+    calibrated = Impact.linear(slope=2, input=temperature, output=Ratio())
     wide_histogram = Distribution.histogram([-1e308, 1e308], [1])
     sigmoid = Impact.sigmoid(midpoint=0, steepness=1, input=Ratio(), output=Ratio())
     clamped_affine = Impact.linear(
@@ -102,6 +111,7 @@ def build():
     tabulated = Impact.from_json(json.dumps(tabulated))
     objects.extend(
         [
+            ("chained-atomic-impacts", calibrated.pushforward(atomic_temperature)),
             ("completed", complete),
             ("conditioned", curve.condition(q_min=0.2, q_max=0.8)),
             ("conditioned-interpolated-endpoints", conditioned),
@@ -297,6 +307,24 @@ def build():
         document = json.loads(QuantileCurve([0.1, 0.9], [0, 1]).to_json())
         document[axis] = coordinates
         bad(f"boolean-curve-{axis}", document)
+
+    inconsistent = Impact.linear(slope=2, input=depth, output=Ratio())
+    for name, temperature_law in (
+        ("atomic", atomic_temperature),
+        (
+            "histogram",
+            change_measurement.pushforward(Distribution.histogram([0, 1], [1])),
+        ),
+        ("hurdle", Distribution.hurdle(atomic_temperature, atom_probability=0.1)),
+    ):
+        document = {
+            "schema_version": "1.0",
+            "object": "distribution",
+            "kind": "transformed",
+            "source": json.loads(temperature_law.to_json()),
+            "impact": json.loads(inconsistent.to_json()),
+        }
+        bad(f"incompatible-{name}-impact-chain", document, False)
 
     for name, cutoff in [("at-maximum", 1), ("above-maximum", 2)]:
         document = json.loads(deep_sigmoid_hurdle.to_json())

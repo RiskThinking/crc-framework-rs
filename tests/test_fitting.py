@@ -28,6 +28,14 @@ from crc_framework import (
 )
 
 
+def test_sample_fit_rejects_booleans_before_numeric_promotion() -> None:
+    spec = SampleFit(family=DistributionFamily.GUMBEL_RIGHT)
+    with pytest.raises(TypeError, match="samples must contain real numbers"):
+        fit_samples([False, 1, 2, 3], spec)
+    with pytest.raises(TypeError, match="samples must contain real numbers"):
+        fit_samples([0, 1, 2, np.bool_(True)], spec)  # type: ignore[list-item]
+
+
 @pytest.mark.parametrize(
     ("family", "shape"),
     [

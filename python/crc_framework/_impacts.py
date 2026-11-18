@@ -22,6 +22,7 @@ from ._distribution import (
     Distribution,
     ValueResult,
     Values,
+    _real_array,
     _snapshot,
 )
 from ._measurement import (
@@ -353,7 +354,7 @@ class Impact:
         return self._sha256
 
     def evaluate(self, values: Values) -> ValueResult:
-        array = np.asarray(values, dtype=np.float64)
+        array = _real_array(values, "exposure values")
         if np.any(~np.isfinite(array)):
             raise ImpactError(
                 "invalid_value", "/values", "exposure values must be finite"
@@ -488,6 +489,13 @@ class Impact:
     def _operation(
         self, distribution: Distribution
     ) -> tuple[_core.NativeImpactExpression, _core.NativeImpactSource]:
+        output = distribution._output_measurement()
+        if output is not None and output != self.input:
+            raise ImpactError(
+                "measurement_mismatch",
+                "/input",
+                f"source impact output {output!r} does not match {self.input!r}",
+            )
         try:
             return self._native, distribution._source()
         except TypeError:
@@ -543,7 +551,6 @@ class Impact:
     def pushforward(self, distribution: Distribution) -> Distribution:
         if not isinstance(distribution, Distribution):
             raise TypeError("distribution must be Distribution")
-        data = distribution._data
         try:
             expression, source = self._operation(distribution)
             native = expression.pushforward(source)
@@ -551,9 +558,6 @@ class Impact:
             raise ImpactError("exact_method_unavailable", "", str(error)) from error
         except Exception as error:
             raise _error(error) from error
-        if data["kind"] in ("discrete", "point_mass"):
-            atoms = native.atoms()
-            return Distribution.discrete([x for x, _ in atoms], [p for _, p in atoms])
         return Distribution._from_transformed(
             distribution, _load(self.to_json()), native
         )

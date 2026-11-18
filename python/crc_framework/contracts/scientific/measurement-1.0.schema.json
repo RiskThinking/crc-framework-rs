@@ -284,7 +284,8 @@
         "unit": {
           "enum": [
             "mm/day",
-            "mm/h"
+            "mm/h",
+            "kg m-2 s-1"
           ],
           "type": "string"
         }
