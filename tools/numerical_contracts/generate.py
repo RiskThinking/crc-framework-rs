@@ -54,14 +54,14 @@ def specification():
         [],
     )
     base = {"family": family, "constraints": nullable(bounds)}
-    result = []
+    result = {}
     for kind, extra, required in [
         (
             "samples",
             {
                 "estimator": {"enum": ["mle", "lmoments"]},
                 "minimum_samples": {"type": "integer", "minimum": 3},
-                "fallbacks": array({"$ref": "#/$defs/sample_specification"}),
+                "fallbacks": array({"$ref": "#/$defs/samples_fit_specification"}),
             },
             ["kind", "family"],
         ),
@@ -96,43 +96,104 @@ def specification():
             ["kind", "family", "atom_probability"],
         ),
     ]:
-        result.append(obj({"kind": {"const": kind}, **base, **extra}, required))
-    result.append(
-        obj(
-            {
-                "kind": {"const": "model_selection"},
-                "candidates": array({"oneOf": result.copy()}, minItems=1),
-                "criterion": {"enum": ["ks", "normalized_rmse"]},
-            },
-            ["kind", "candidates"],
+        result[f"{kind}_fit_specification"] = obj(
+            {"kind": {"const": kind}, **base, **extra}, required
         )
+    result["concrete_specification"] = {
+        "oneOf": [{"$ref": f"#/$defs/{name}"} for name in result]
+    }
+    concrete = {"$ref": "#/$defs/concrete_specification"}
+    result["model_selection"] = obj(
+        {
+            "kind": {"const": "model_selection"},
+            "candidates": array(concrete, minItems=1),
+            "criterion": {"enum": ["ks", "normalized_rmse"]},
+        },
+        ["kind", "candidates"],
     )
+    result["specification"] = {"oneOf": [concrete, {"$ref": "#/$defs/model_selection"}]}
     return result
 
 
 def fitting_schema():
     specs = specification()
-    diagnostic = obj(
-        {
-            "code": {"type": "string", "minLength": 1},
-            "message": {"type": "string", "minLength": 1},
-            "severity": {"enum": ["error", "warning", "info"]},
-            "path": {"type": "string"},
-            "details": {"type": "object"},
-        }
-    )
-    attempt = obj(
-        {
-            "specification": {"$ref": "#/$defs/specification"},
-            "status": {"enum": ["converged", "rejected", "failed"]},
-            "reason": nullable({"type": "string"}),
-            "diagnostics": array(diagnostic, minItems=1),
-        }
+    count = {"type": "integer", "minimum": 0}
+    nonnegative = {**NUMBER, "minimum": 0}
+    positive = {**NUMBER, "exclusiveMinimum": 0, "minimum": 0}
+    optimizer = {"iterations": count, "evaluations": count}
+    comparison = {"normalized_rmse": nonnegative, "normalization_scale": positive}
+    residuals = {
+        "rmse": nonnegative,
+        "weighted_r_squared": NUMBER,
+        "maximum_absolute_residual": nonnegative,
+    }
+    details = {
+        "samples": {
+            "ks_statistic": PROBABILITY,
+            "ks_pvalue": PROBABILITY,
+            "rmse": nonnegative,
+            "r_squared": NUMBER,
+        },
+        "quantiles": {**residuals, **comparison},
+        "censored_quantiles": {
+            **residuals,
+            **comparison,
+            "negative_log_likelihood": NUMBER,
+            "residual_scale": positive,
+            "residual_scale_floor": positive,
+            "censored_count": count,
+            "uncensored_count": count,
+        },
+        "hurdle_quantiles": {
+            **comparison,
+            "tail_rmse": nonnegative,
+            "tail_weighted_r_squared": NUMBER,
+            "tail_maximum_absolute_residual": nonnegative,
+            "atom_count": count,
+            "tail_count": count,
+        },
+    }
+
+    def outcome(kind, severity, fields):
+        return array(
+            obj(
+                {
+                    "code": {"const": f"fit.{kind}"},
+                    "message": {"type": "string", "minLength": 1},
+                    "severity": {"const": severity},
+                    "path": {"type": "string"},
+                    "details": obj(fields),
+                }
+            ),
+            minItems=1,
+            maxItems=1,
+        )
+
+    attempts = [
+        obj(
+            {
+                "specification": {"$ref": f"#/$defs/{kind}_fit_specification"},
+                "status": {"const": "converged"},
+                "reason": {"type": "null"},
+                "diagnostics": outcome(kind, "info", {**fields, **optimizer}),
+            }
+        )
+        for kind, fields in details.items()
+    ]
+    attempts.append(
+        obj(
+            {
+                "specification": {"$ref": "#/$defs/concrete_specification"},
+                "status": {"enum": ["rejected", "failed"]},
+                "reason": {"type": "string", "minLength": 1},
+                "diagnostics": outcome("failed", "error", {}),
+            }
+        )
     )
     record = obj(
         {
             "specification": {"$ref": "#/$defs/specification"},
-            "attempts": array(attempt, minItems=1),
+            "attempts": array({"oneOf": attempts}, minItems=1),
             "selected_attempt": nullable({"type": "integer", "minimum": 0}),
             "estimator": nullable({"enum": ["mle", "lmoments"]}),
             "converged": {"type": "boolean"},
@@ -147,7 +208,7 @@ def fitting_schema():
     return {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": "https://climateriskcommons.org/schemas/fitting/1.0",
-        "$defs": {"specification": {"oneOf": specs}, "sample_specification": specs[0]},
+        "$defs": specs,
         **record,
     }
 

@@ -18,7 +18,6 @@ from ._diagnostics import ScientificValue
 from ._distribution import (
     ArrayLike,
     Distribution,
-    FloatArray,
     ValueResult,
     Values,
     _snapshot,
@@ -639,112 +638,6 @@ class Impact:
             return math.fsum(contributions)
         except ValueError:
             return math.nan
-
-    def _threshold_probability(
-        self,
-        source: Distribution,
-        value: float,
-        inclusive: bool,
-        *,
-        exceedance: bool = False,
-        at_atom: bool = False,
-    ) -> float | None:
-        """Invert supported monotone responses without subtracting rare tails."""
-        document = _load(self.to_json())
-        model = cast(dict[str, object], document["model"])
-        kind = model["kind"]
-        minimum = maximum = None
-        clamp = None
-        if kind == "linear":
-            direction = float(cast(float, model["slope"]))
-            intercept = float(cast(float, model["intercept"]))
-            clamp = cast(dict[str, float] | None, document.get("clamp"))
-            if clamp is not None:
-                minimum, maximum = clamp.get("minimum"), clamp.get("maximum")
-            if direction == 0:
-                response = float(self.evaluate(0.0))
-                return float(
-                    (response >= value if inclusive else response > value)
-                    if exceedance
-                    else (response <= value if inclusive else response < value)
-                )
-            threshold = (value - intercept) / direction
-        elif (
-            kind == "sigmoid"
-            and "zero_below" not in model
-            and "origin_adjustment" not in model
-        ):
-            amplitude = float(cast(float, model["amplitude"]))
-            steepness = float(cast(float, model["steepness"]))
-            offset = float(cast(float, model["offset"]))
-            direction = amplitude * steepness
-            if direction == 0:
-                response = float(self.evaluate(0.0))
-                return float(
-                    (response >= value if inclusive else response > value)
-                    if exceedance
-                    else (response <= value if inclusive else response < value)
-                )
-            minimum, maximum = (
-                min(offset, offset + amplitude),
-                max(offset, offset + amplitude),
-            )
-            fraction = (value - offset) / amplitude
-            if fraction <= 0 or fraction >= 1:
-                # Continuous probability excludes the asymptotes, but an
-                # explicit source atom can round to one when evaluated.
-                endpoint_mass = 0.0
-                if at_atom:
-                    endpoint_mass = math.fsum(
-                        mass
-                        for x, mass in source._point_atoms()
-                        if self.evaluate(x) == value
-                    )
-                if value <= minimum:
-                    if exceedance:
-                        return 1.0 if inclusive else 1.0 - endpoint_mass
-                    return endpoint_mass if inclusive else 0.0
-                if exceedance:
-                    return endpoint_mass if inclusive else 0.0
-                return 1.0 if inclusive else 1.0 - endpoint_mass
-            threshold = (
-                float(cast(float, model["midpoint"]))
-                + (math.log(fraction) - math.log1p(-fraction)) / steepness
-            )
-        else:
-            return None
-        if minimum is not None and (
-            value < minimum
-            or value == minimum
-            and (inclusive if exceedance else not inclusive)
-        ):
-            return 1.0 if exceedance else 0.0
-        if maximum is not None and (
-            value > maximum
-            or value == maximum
-            and (not inclusive if exceedance else inclusive)
-        ):
-            return 0.0 if exceedance else 1.0
-        if at_atom and clamp is None:
-            atoms = [x for x, _ in source._point_atoms()]
-            mapped = cast(FloatArray, self.evaluate(atoms))
-            matches = [x for x, y in zip(atoms, mapped) if y == value]
-            if matches:
-                # Inverting a rounded response can land on either side of
-                # its exact source atom. Use the matching source endpoint.
-                source_cdf = (direction > 0) != exceedance
-                threshold = max(matches) if source_cdf == inclusive else min(matches)
-        if exceedance:
-            return float(
-                source.exceedance(threshold, inclusive=inclusive)
-                if direction > 0
-                else source.cdf(threshold, inclusive=inclusive)
-            )
-        return float(
-            source.cdf(threshold, inclusive=inclusive)
-            if direction > 0
-            else source.exceedance(threshold, inclusive=inclusive)
-        )
 
     def _operation(
         self, distribution: Distribution

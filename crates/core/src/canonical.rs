@@ -4,7 +4,7 @@ use std::sync::LazyLock;
 
 use crate::error::{CrcError, Result};
 use crate::numerical::{
-    NumericalLaw, ProbabilitySegment, condition_segments, segment_integral,
+    NumericalLaw, ProbabilitySegment, condition_segments, linear_interpolate, segment_integral,
     segment_inverse_survival, segment_probability, segment_quantile,
 };
 use crate::{
@@ -674,42 +674,19 @@ impl Numerical {
                     Ok((base.exceedance(x, inclusive)? / surviving_mass) * (1.0 - p))
                 }
             }
-            Compiled::Transformed { source, image, .. } => {
+            Compiled::Transformed { image, .. } => {
                 if let Some(segments) = self.finite_segments()? {
-                    let image = ImpactSource::from_segments(segments).map_err(invalid)?;
-                    return Ok(image.survival_at(x, inclusive));
+                    return Ok(segment_probability(
+                        &segments,
+                        x,
+                        f64::INFINITY,
+                        inclusive,
+                        false,
+                    ));
                 }
-                let document = &self.document["impact"];
-                let model = &document["model"];
-                if model["kind"] == "linear" && document.get("clamp").is_none() {
-                    let slope = number(model, "slope")?;
-                    let intercept = model
-                        .get("intercept")
-                        .and_then(Value::as_f64)
-                        .unwrap_or(0.0);
-                    if slope > 0.0 {
-                        return source.exceedance((x - intercept) / slope, inclusive);
-                    }
-                    if slope < 0.0 {
-                        return Ok(1.0 - source.exceedance((x - intercept) / slope, !inclusive)?);
-                    }
-                    return Ok(f64::from(if inclusive {
-                        intercept >= x
-                    } else {
-                        intercept > x
-                    }));
-                }
-                let (mut lo, mut hi) = (0.0, 1.0);
-                for _ in 0..64 {
-                    let mid = (lo + hi) * 0.5;
-                    let v = image.inverse_survival(mid).map_err(invalid)?;
-                    if if inclusive { v >= x } else { v > x } {
-                        lo = mid;
-                    } else {
-                        hi = mid;
-                    }
-                }
-                Ok((lo + hi) * 0.5)
+                image
+                    .threshold_probability(x, inclusive, true)
+                    .map_err(invalid)
             }
             Compiled::Curve { .. } => Err(invalid(
                 "quantile evidence has no whole-law threshold probability",
@@ -866,10 +843,11 @@ fn interpolate(q: &[f64], x: &[f64], p: f64) -> Result<f64> {
         Ok(x[upper])
     } else {
         let i = upper - 1;
-        // Match the public quantile curve's slope-first interpolation exactly
-        // when reconstructing the endpoints of recorded conditioning.
-        let slope = (x[upper] - x[i]) / (q[upper] - q[i]);
-        Ok(slope * (p - q[i]) + x[i])
+        Ok(linear_interpolate(
+            x[i],
+            x[upper],
+            (p - q[i]) / (q[upper] - q[i]),
+        ))
     }
 }
 fn law_source(law: &NumericalLaw) -> Result<ImpactSource> {

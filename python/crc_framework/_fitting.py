@@ -350,7 +350,11 @@ class FitRecord:
 
     @classmethod
     def from_json(cls, text: str) -> FitRecord:
-        return _decode_record(_load_json(text))
+        """Validate the shared fitting contract and restore its typed record."""
+        _core.validate_document(
+            "https://climateriskcommons.org/schemas/fitting/1.0", text
+        )
+        return _decode_record(json.loads(text))
 
 
 @dataclass(frozen=True)
@@ -381,6 +385,11 @@ class FitError(ValueError):
 def _diagnostic(
     code: str, message: str, details: dict[str, ScientificValue], *, error: bool = False
 ) -> Diagnostic:
+    if any(
+        isinstance(value, float) and not math.isfinite(value)
+        for value in details.values()
+    ):
+        raise ValueError("fitting diagnostics must be finite")
     return Diagnostic(
         code=code,
         message=message,
@@ -1002,190 +1011,36 @@ def _decode_record(value: object) -> FitRecord:
         "engine_version",
     }
     data = _document(value, fields, fields)
-    specification = _decode_spec(data["specification"])
-
-    def permitted(value: FitSpec) -> set[str]:
-        result = {value.to_json()}
-        if isinstance(value, ModelSelection):
-            for candidate in value.candidates:
-                result.update(permitted(candidate))
-        if isinstance(value, SampleFit):
-            for fallback in value.fallbacks:
-                result.update(permitted(fallback))
-        return result
-
-    allowed = permitted(specification)
+    support = cast(list[float] | None, data["evidence_support"])
     attempts = []
     for raw in _items(data["attempts"]):
-        a = _document(
-            raw,
-            {"specification", "status", "reason", "diagnostics"},
-            {"specification", "status", "reason", "diagnostics"},
-        )
-        reason = a["reason"]
-        if reason is not None and not isinstance(reason, str):
-            raise ValueError("attempt reason must be text or null")
+        a = cast(dict[str, object], raw)
         attempts.append(
             FitAttempt(
                 _decode_spec(a["specification"]),
                 FitStatus(_text(a["status"])),
-                reason,
+                cast(str | None, a["reason"]),
                 tuple(_decode_diagnostic(d) for d in _items(a["diagnostics"])),
             )
         )
-        attempt = attempts[-1]
-        if attempt.specification.to_json() not in allowed or isinstance(
-            attempt.specification, ModelSelection
-        ):
-            raise ValueError(
-                "attempt was not among the requested candidates or explicit alternatives"
-            )
-        if attempt.status is FitStatus.CONVERGED and reason is not None:
-            raise ValueError("a converged attempt cannot have a failure reason")
-        if attempt.status is not FitStatus.CONVERGED and not reason:
-            raise ValueError("a failed or rejected attempt requires its reason")
-        converged_attempt = attempt.status is FitStatus.CONVERGED
-        expected_code = (
-            f"fit.{attempt.specification.kind.value}"
-            if converged_attempt
-            else "fit.failed"
-        )
-        expected_severity = (
-            DiagnosticSeverity.INFO if converged_attempt else DiagnosticSeverity.ERROR
-        )
-        if not any(
-            d.code == expected_code and d.severity is expected_severity and d.message
-            for d in attempt.diagnostics
-        ):
-            raise ValueError("a fit attempt requires diagnostics for its outcome")
-    if not attempts:
-        raise ValueError("a fitting record requires at least one attempt")
-    cursor = 0
-
-    def replay(requested: FitSpec) -> bool:
-        nonlocal cursor
-        if (
-            cursor >= len(attempts)
-            or attempts[cursor].specification.to_json() != requested.to_json()
-        ):
-            raise ValueError(
-                "attempt trace does not execute the requested candidate sequence"
-            )
-        attempt = attempts[cursor]
-        cursor += 1
-        if attempt.status is FitStatus.CONVERGED:
-            return True
-        if isinstance(requested, SampleFit):
-            for alternative in requested.fallbacks:
-                if replay(alternative):
-                    return True
-        return False
-
-    candidates = (
-        specification.candidates
-        if isinstance(specification, ModelSelection)
-        else (specification,)
-    )
-    for requested in candidates:
-        replay(requested)
-    if cursor != len(attempts):
-        raise ValueError("attempt trace contains unexecuted alternatives")
-    count, used, excluded = (
-        _count(data[k]) for k in ("evidence_count", "used_count", "excluded_count")
-    )
-    if used + excluded != count:
-        raise ValueError("used and excluded evidence counts must sum to evidence_count")
-    selected = data["selected_attempt"]
-    if selected is not None:
-        selected = _count(selected)
-        if (
-            selected >= len(attempts)
-            or attempts[selected].status is not FitStatus.CONVERGED
-        ):
-            raise ValueError("selected_attempt must point to a converged attempt")
-    converged = data["converged"]
-    if type(converged) is not bool or converged != (selected is not None):
-        raise ValueError("convergence must agree with selected_attempt")
-    if converged != any(a.status is FitStatus.CONVERGED for a in attempts):
-        raise ValueError("overall convergence must agree with the actual attempts")
-    estimator = (
-        None if data["estimator"] is None else SampleEstimator(_text(data["estimator"]))
-    )
-    actual = attempts[selected].specification if selected is not None else None
-    if estimator != (actual.estimator if isinstance(actual, SampleFit) else None):
-        raise ValueError("actual estimator contradicts the selected attempt")
-    weights = None
-    if data["weights"] is not None:
-        parsed = tuple(_optional_float(v) for v in _items(data["weights"]))
-        if (
-            len(parsed) != count
-            or any(v is None or not 0 <= v <= 1 for v in parsed)
-            or not math.isclose(
-                math.fsum(cast(tuple[float, ...], parsed)), 1, rel_tol=0, abs_tol=1e-12
-            )
-        ):
-            raise ValueError("effective weights must match evidence and sum to one")
-        weights = cast(tuple[float, ...], parsed)
-        if sum(v > 0 for v in weights) != used:
-            raise ValueError("positive weights must agree with used_count")
-        if isinstance(actual, (QuantileFit, CensoredQuantileFit, HurdleQuantileFit)):
-            requested_weights = (
-                actual.weights if isinstance(actual, QuantileFit) else None
-            )
-            if requested_weights is not None and len(requested_weights) != count:
-                raise ValueError(
-                    "selected specification needs one weight per supplied knot"
-                )
-            expected = _normalized_weights(
-                np.asarray(requested_weights, dtype=np.float64)
-                if requested_weights is not None
-                else np.ones(count, dtype=np.float64)
-            )
-            # Native validation uses a different summation order. Allow a
-            # rounding unit for subnormals without changing positive support.
-            if any(
-                (weight == 0) != (target == 0)
-                or not math.isclose(
-                    weight, target, rel_tol=1e-12, abs_tol=math.ulp(0.0)
-                )
-                for weight, target in zip(weights, expected, strict=True)
-            ):
-                raise ValueError(
-                    "effective weights contradict the selected specification"
-                )
-    support = None
-    if data["evidence_support"] is not None:
-        values = tuple(_optional_float(v) for v in _items(data["evidence_support"]))
-        if (
-            len(values) != 2
-            or None in values
-            or cast(float, values[0]) > cast(float, values[1])
-        ):
-            raise ValueError("invalid evidence support")
-        support = cast(tuple[float, float], values)
-    sample_evidence = isinstance(specification, SampleFit) or (
-        isinstance(specification, ModelSelection)
-        and isinstance(specification.candidates[0], SampleFit)
-    )
-    if sample_evidence and weights is not None:
-        raise ValueError("sample fitting records do not have quantile weights")
-    if not sample_evidence:
-        if support is None or not 0 <= support[0] < support[1] <= 1:
-            raise ValueError(
-                "quantile evidence requires its actual probability interval"
-            )
-        if converged and weights is None:
-            raise ValueError("a converged quantile fit requires its effective weights")
     return FitRecord(
-        specification=specification,
+        specification=_decode_spec(data["specification"]),
         attempts=tuple(attempts),
-        selected_attempt=selected,
-        estimator=estimator,
-        converged=converged,
-        evidence_count=count,
-        used_count=used,
-        excluded_count=excluded,
-        weights=weights,
-        evidence_support=support,
+        selected_attempt=None
+        if data["selected_attempt"] is None
+        else _count(data["selected_attempt"]),
+        estimator=None
+        if data["estimator"] is None
+        else SampleEstimator(_text(data["estimator"])),
+        converged=cast(bool, data["converged"]),
+        evidence_count=_count(data["evidence_count"]),
+        used_count=_count(data["used_count"]),
+        excluded_count=_count(data["excluded_count"]),
+        weights=None
+        if data["weights"] is None
+        else tuple(float(weight) for weight in cast(list[float], data["weights"])),
+        evidence_support=None
+        if support is None
+        else (float(support[0]), float(support[1])),
         engine_version=_text(data["engine_version"]),
     )

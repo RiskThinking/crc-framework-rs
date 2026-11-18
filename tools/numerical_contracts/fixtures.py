@@ -23,6 +23,7 @@ OUTPUT = ROOT / "python/crc_framework/contracts/numerical/fixtures-1.0.json"
 def build():
     accepted = []
     objects = []
+    tiny_probability = math.ldexp(1, -1030)
     for family, shape in [
         (DistributionFamily.GENERALIZED_EXTREME_VALUE, 0.1),
         (DistributionFamily.WEIBULL_MINIMUM, 2.2),
@@ -46,13 +47,19 @@ def build():
             ("histogram", Distribution.histogram([0, 1, 2, 3], [0.5, 0, 0.5])),
             ("partial", QuantileCurve([0.9, 0.99], [0.5, 2])),
             ("plateau", QuantileCurve([0, 0.2, 0.5, 0.9, 1], [0, 1, 1, 8, 10])),
+            (
+                "subnormal-probability-curve",
+                QuantileCurve([0, tiny_probability], [0, 1]),
+            ),
+            ("wide-curve", QuantileCurve([0, 1], [-1e308, 1e308])),
+            ("wide-histogram", Distribution.histogram([-1e308, 1e308], [1])),
         ]
     )
     curve = QuantileCurve([0.1, 0.5, 0.9], [0, 1, 3])
     complete = curve.complete(TailCompletion(lower=-1, upper=4))
-    conditioned = QuantileCurve(
-        [0.1, 0.4, 0.7, 0.9], [-50, -31, 7, 11]
-    ).condition(q_min=0.2, q_max=0.6)
+    conditioned = QuantileCurve([0.1, 0.4, 0.7, 0.9], [-50, -31, 7, 11]).condition(
+        q_min=0.2, q_max=0.6
+    )
     discrete_base = Distribution.discrete([-1, 2, 3], [0.5, 0.1, 0.4])
     discrete_hurdle = Distribution.hurdle(discrete_base, atom_probability=0.2)
     gapped_image = Impact.linear(slope=3, input=Ratio(), output=Ratio()).pushforward(
@@ -66,6 +73,17 @@ def build():
     clamped_affine = Impact.linear(
         slope=0.5, intercept=3, maximum=6, input=Ratio(), output=Ratio()
     )
+    deep_tail = Distribution.parametric(
+        DistributionFamily.GUMBEL_RIGHT, location=-50, scale=1
+    )
+    deep_sigmoid_hurdle = Distribution.hurdle(
+        sigmoid.pushforward(deep_tail), atom_probability=0.25, atom_location=0.5
+    )
+    tabulated = json.loads(
+        Impact.tabulated([(0, 0), (3, 3)], input=Ratio(), output=Ratio()).to_json()
+    )
+    tabulated["model"]["outside_domain"] = "clamp"
+    tabulated = Impact.from_json(json.dumps(tabulated))
     objects.extend(
         [
             ("completed", complete),
@@ -91,11 +109,42 @@ def build():
             ),
             (
                 "transformed-histogram-hurdle",
-                Distribution.hurdle(gapped_image, atom_probability=0.2, atom_location=4),
+                Distribution.hurdle(
+                    gapped_image, atom_probability=0.2, atom_location=4
+                ),
             ),
             (
                 "subnormal-transformed-histogram-hurdle",
-                Distribution.hurdle(subnormal_image, atom_probability=0.25, atom_location=4),
+                Distribution.hurdle(
+                    subnormal_image, atom_probability=0.25, atom_location=4
+                ),
+            ),
+            ("deep-sigmoid-hurdle", deep_sigmoid_hurdle),
+            (
+                "deep-clamped-affine-hurdle",
+                Distribution.hurdle(
+                    clamped_affine.pushforward(deep_tail),
+                    atom_probability=0.25,
+                    atom_location=3,
+                ),
+            ),
+            (
+                "deep-tabulated-hurdle",
+                Distribution.hurdle(
+                    tabulated.pushforward(deep_tail),
+                    atom_probability=0.25,
+                    atom_location=0.5,
+                ),
+            ),
+            (
+                "deep-hurdle-at-clamp-minimum",
+                Distribution.hurdle(
+                    Impact.linear(
+                        slope=1, minimum=0, input=Ratio(), output=Ratio()
+                    ).pushforward(deep_tail),
+                    atom_probability=0.25,
+                    atom_location=0,
+                ),
             ),
         ]
     )
@@ -119,6 +168,10 @@ def build():
         coordinates = [0, 0.1, 0.5, 0.9, 0.99, 1]
         if name in ("discrete-hurdle", "transformed-histogram-hurdle"):
             coordinates[2:2] = [0.2, math.nextafter(0.2, 1.0)]
+        if name == "subnormal-probability-curve":
+            coordinates = [0, tiny_probability / 2, tiny_probability, 0.1]
+        if name.startswith("deep-"):
+            coordinates.insert(3, 0.75)
         for q in coordinates:
             try:
                 result = float(value.quantile(q))
@@ -142,6 +195,11 @@ def build():
 
     def bad(name, document, structural=True):
         rejected.append({"name": name, "document": document, "structural": structural})
+
+    for name, cutoff in [("at-maximum", 1), ("above-maximum", 2)]:
+        document = json.loads(deep_sigmoid_hurdle.to_json())
+        document["atom_location"] = cutoff
+        bad(f"sigmoid-hurdle-{name}", document, False)
 
     bad(
         "old-curve-fields",

@@ -189,6 +189,9 @@ class NativeImpactDistribution:
         self, lo: float, hi: float, center: float, square: bool
     ) -> float: ...
     def quantiles(self, probabilities: Sequence[float]) -> list[float]: ...
+    def threshold_probabilities(
+        self, values: Sequence[float], inclusive: bool, exceedance: bool
+    ) -> list[float]: ...
 
 class NativeImpactReference:
     @staticmethod

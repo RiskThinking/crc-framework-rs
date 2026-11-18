@@ -195,6 +195,25 @@ impl PyImpactDistribution {
             .map_err(|error| impact_error(py, error))
     }
 
+    fn threshold_probabilities(
+        &self,
+        py: Python<'_>,
+        values: Vec<f64>,
+        inclusive: bool,
+        exceedance: bool,
+    ) -> PyResult<Vec<f64>> {
+        py.detach(|| {
+            values
+                .into_iter()
+                .map(|value| {
+                    self.inner
+                        .threshold_probability(value, inclusive, exceedance)
+                })
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .map_err(|error| impact_error(py, error))
+    }
+
     fn integral(
         &self,
         py: Python<'_>,

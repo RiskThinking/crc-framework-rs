@@ -82,6 +82,12 @@ def test_discrete_normalizes_roundoff_merges_ties_and_drops_zero_mass() -> None:
         Distribution.discrete([0, 1], [1.1, -0.1])
 
 
+@pytest.mark.parametrize("stored_zero", [0.0, -0.0])
+def test_empirical_atoms_do_not_distinguish_signed_zero(stored_zero: float) -> None:
+    law = Distribution.empirical([stored_zero, -stored_zero, 1.0])
+    assert law.mass(0.0) == law.mass(-0.0) == pytest.approx(2 / 3)
+
+
 def test_rare_mass_is_kept_in_statistics_and_probability_queries() -> None:
     law = Distribution.discrete([0, 1_000_000], [0.999999, 0.000001])
     result = law.statistics(metrics=list(Statistic), level=0.95)
@@ -402,6 +408,46 @@ def test_deep_hurdle_over_a_nonlinear_response_keeps_analytical_tail_queries() -
     assert law.quantile(0.75) == pytest.approx(0.75)
     assert law.cdf(0.75) == pytest.approx(0.75)
     assert law.exceedance(0.75) == pytest.approx(0.25)
+
+
+@pytest.mark.parametrize("slope", [1.0, -1.0])
+@pytest.mark.parametrize("lower", [True, False])
+def test_strict_response_tail_at_clamp_keeps_rare_continuous_mass(
+    slope: float, lower: bool
+) -> None:
+    right = lower == (slope > 0)
+    base = Distribution.parametric(
+        DistributionFamily.GUMBEL_RIGHT if right else DistributionFamily.GUMBEL_LEFT,
+        location=-50 if right else 50,
+        scale=1,
+    )
+    measurement = Measurement(quantity="x", unit="u")
+    response = Impact.linear(
+        slope=slope,
+        minimum=0 if lower else None,
+        maximum=None if lower else 0,
+        input=measurement,
+        output=measurement,
+    ).pushforward(base)
+
+    assert response.mass(0) == 1.0
+    tail = response.exceedance(0) if lower else response.cdf(0, inclusive=False)
+    assert tail == pytest.approx(math.exp(-50), rel=1e-14, abs=0)
+
+
+def test_finite_linear_interpolation_avoids_overflow() -> None:
+    partial = QuantileCurve([0, 1e-310], [0, 1])
+    assert partial.quantile(5e-311) == pytest.approx(0.5)
+    assert partial.condition(q_min=0, q_max=5e-311).quantile(1) == pytest.approx(0.5)
+
+    histogram = Distribution.histogram([-1e308, 1e308], [1])
+    completed = QuantileCurve([0, 1], [-1e308, 1e308]).condition(q_min=0, q_max=1)
+    measurement = Measurement(quantity="x", unit="u")
+    identity = Impact.linear(slope=1, input=measurement, output=measurement)
+    for law in (histogram, completed):
+        for distribution in (law, identity.pushforward(law)):
+            assert distribution.quantile(0.5) == 0.0
+            assert distribution.cdf(0) == distribution.exceedance(0) == 0.5
 
 
 def test_concentrated_weibull_variance_is_positive_and_stable() -> None:

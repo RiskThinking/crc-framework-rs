@@ -14,8 +14,8 @@ from types import MappingProxyType
 from typing import ClassVar, Protocol, TypeAlias, cast, runtime_checkable
 from urllib.parse import unquote
 
-from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
-from jsonschema.exceptions import SchemaError, ValidationError  # type: ignore[import-untyped]
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import SchemaError, ValidationError
 from referencing import Registry, Resource
 from referencing.exceptions import Unresolvable
 from referencing.jsonschema import DRAFT202012

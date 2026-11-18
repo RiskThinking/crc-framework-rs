@@ -511,11 +511,126 @@
         },
         {
           "probability": 0.99,
-          "value": 9.799999999999999
+          "value": 9.8
         },
         {
           "probability": 1,
           "value": 10.0
+        }
+      ]
+    },
+    {
+      "name": "subnormal-probability-curve",
+      "document": {
+        "object": "quantile_curve",
+        "probabilities": [
+          0.0,
+          8.691694759794e-311
+        ],
+        "schema_version": "1.0",
+        "values": [
+          0.0,
+          1.0
+        ]
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 4.345847379897e-311,
+          "value": 0.5
+        },
+        {
+          "probability": 8.691694759794e-311,
+          "value": 1.0
+        },
+        {
+          "probability": 0.1,
+          "outcome": "out_of_support"
+        }
+      ]
+    },
+    {
+      "name": "wide-curve",
+      "document": {
+        "object": "quantile_curve",
+        "probabilities": [
+          0.0,
+          1.0
+        ],
+        "schema_version": "1.0",
+        "values": [
+          -1e+308,
+          1e+308
+        ]
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -1e+308
+        },
+        {
+          "probability": 0.1,
+          "value": -8.000000000000001e+307
+        },
+        {
+          "probability": 0.5,
+          "value": 0.0
+        },
+        {
+          "probability": 0.9,
+          "value": 8.000000000000001e+307
+        },
+        {
+          "probability": 0.99,
+          "value": 9.800000000000001e+307
+        },
+        {
+          "probability": 1,
+          "value": 1e+308
+        }
+      ]
+    },
+    {
+      "name": "wide-histogram",
+      "document": {
+        "edges": [
+          -1e+308,
+          1e+308
+        ],
+        "kind": "histogram",
+        "object": "distribution",
+        "probabilities": [
+          1.0
+        ],
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -1e+308
+        },
+        {
+          "probability": 0.1,
+          "value": -8.000000000000001e+307
+        },
+        {
+          "probability": 0.5,
+          "value": 0.0
+        },
+        {
+          "probability": 0.9,
+          "value": 8.000000000000001e+307
+        },
+        {
+          "probability": 0.99,
+          "value": 9.800000000000001e+307
+        },
+        {
+          "probability": 1,
+          "value": 1e+308
         }
       ]
     },
@@ -685,19 +800,19 @@
         ],
         "schema_version": "1.0",
         "values": [
-          -43.66666666666667,
+          -43.666666666666664,
           -31.0,
-          -5.666666666666664
+          -5.666666666666668
         ]
       },
       "queries": [
         {
           "probability": 0,
-          "value": -43.66666666666667
+          "value": -43.666666666666664
         },
         {
           "probability": 0.1,
-          "value": -41.13333333333334
+          "value": -41.13333333333333
         },
         {
           "probability": 0.5,
@@ -705,15 +820,15 @@
         },
         {
           "probability": 0.9,
-          "value": -10.73333333333333
+          "value": -10.733333333333334
         },
         {
           "probability": 0.99,
-          "value": -6.173333333333332
+          "value": -6.173333333333336
         },
         {
           "probability": 1,
-          "value": -5.666666666666664
+          "value": -5.666666666666668
         }
       ]
     },
@@ -1083,6 +1198,292 @@
         {
           "probability": 1,
           "value": 9.0
+        }
+      ]
+    },
+    {
+      "name": "deep-sigmoid-hurdle",
+      "document": {
+        "atom_location": 0.5,
+        "atom_probability": 0.25,
+        "base": {
+          "impact": {
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "amplitude": 1,
+              "kind": "sigmoid",
+              "midpoint": 0,
+              "offset": 0,
+              "steepness": 1
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "family": "gumbel_r",
+            "kind": "parametric",
+            "location": -50.0,
+            "object": "distribution",
+            "scale": 1.0,
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.5
+        },
+        {
+          "probability": 0.1,
+          "value": 0.5
+        },
+        {
+          "probability": 0.5,
+          "value": 0.6000000000000006
+        },
+        {
+          "probability": 0.75,
+          "value": 0.7499999999999996
+        },
+        {
+          "probability": 0.9,
+          "value": 0.8823529411764705
+        },
+        {
+          "probability": 0.99,
+          "value": 0.9868421052631579
+        },
+        {
+          "probability": 1,
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "name": "deep-clamped-affine-hurdle",
+      "document": {
+        "atom_location": 3.0,
+        "atom_probability": 0.25,
+        "base": {
+          "impact": {
+            "clamp": {
+              "maximum": 6
+            },
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "intercept": 3,
+              "kind": "linear",
+              "slope": 0.5
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "family": "gumbel_r",
+            "kind": "parametric",
+            "location": -50.0,
+            "object": "distribution",
+            "scale": 1.0,
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 3.0
+        },
+        {
+          "probability": 0.1,
+          "value": 3.0
+        },
+        {
+          "probability": 0.5,
+          "value": 3.2027325540540836
+        },
+        {
+          "probability": 0.75,
+          "value": 3.5493061443340537
+        },
+        {
+          "probability": 0.9,
+          "value": 4.007451510271132
+        },
+        {
+          "probability": 0.99,
+          "value": 5.158744056768153
+        },
+        {
+          "probability": 1,
+          "value": 6.0
+        }
+      ]
+    },
+    {
+      "name": "deep-tabulated-hurdle",
+      "document": {
+        "atom_location": 0.5,
+        "atom_probability": 0.25,
+        "base": {
+          "impact": {
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "interpolation": "linear",
+              "kind": "tabulated",
+              "outside_domain": "clamp",
+              "points": [
+                {
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "x": 3,
+                  "y": 3
+                }
+              ]
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "family": "gumbel_r",
+            "kind": "parametric",
+            "location": -50.0,
+            "object": "distribution",
+            "scale": 1.0,
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.5
+        },
+        {
+          "probability": 0.1,
+          "value": 0.5
+        },
+        {
+          "probability": 0.5,
+          "value": 0.9054651081081673
+        },
+        {
+          "probability": 0.75,
+          "value": 1.5986122886681144
+        },
+        {
+          "probability": 0.9,
+          "value": 2.5149030205422704
+        },
+        {
+          "probability": 0.99,
+          "value": 3.0
+        },
+        {
+          "probability": 1,
+          "value": 3.0
+        }
+      ]
+    },
+    {
+      "name": "deep-hurdle-at-clamp-minimum",
+      "document": {
+        "atom_location": 0.0,
+        "atom_probability": 0.25,
+        "base": {
+          "impact": {
+            "clamp": {
+              "minimum": 0
+            },
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 1
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "family": "gumbel_r",
+            "kind": "parametric",
+            "location": -50.0,
+            "object": "distribution",
+            "scale": 1.0,
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 0.1,
+          "value": 0.0
+        },
+        {
+          "probability": 0.5,
+          "value": 0.40546510810816727
+        },
+        {
+          "probability": 0.75,
+          "value": 1.0986122886681073
+        },
+        {
+          "probability": 0.9,
+          "value": 2.0149030205422633
+        },
+        {
+          "probability": 0.99,
+          "value": 4.317488113536307
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
         }
       ]
     },
@@ -1493,6 +1894,86 @@
   ],
   "rejected": [
     {
+      "name": "sigmoid-hurdle-at-maximum",
+      "document": {
+        "atom_location": 1,
+        "atom_probability": 0.25,
+        "base": {
+          "impact": {
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "amplitude": 1,
+              "kind": "sigmoid",
+              "midpoint": 0,
+              "offset": 0,
+              "steepness": 1
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "family": "gumbel_r",
+            "kind": "parametric",
+            "location": -50.0,
+            "object": "distribution",
+            "scale": 1.0,
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "structural": false
+    },
+    {
+      "name": "sigmoid-hurdle-above-maximum",
+      "document": {
+        "atom_location": 2,
+        "atom_probability": 0.25,
+        "base": {
+          "impact": {
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "amplitude": 1,
+              "kind": "sigmoid",
+              "midpoint": 0,
+              "offset": 0,
+              "steepness": 1
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "family": "gumbel_r",
+            "kind": "parametric",
+            "location": -50.0,
+            "object": "distribution",
+            "scale": 1.0,
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "structural": false
+    },
+    {
       "name": "old-curve-fields",
       "document": {
         "curve_kind": "point_mass",
@@ -1716,9 +2197,9 @@
         ],
         "schema_version": "1.0",
         "values": [
-          -43.66666666666667,
+          -43.666666666666664,
           -31.0,
-          -4.666666666666664
+          -4.666666666666668
         ]
       },
       "structural": false
