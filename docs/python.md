@@ -153,8 +153,11 @@ A `FitResult` contains the law, the selected attempt's typed `diagnostic`, and
 a `FitRecord` with the requested
 specification, actual estimator, convergence, attempts, the selected attempt
 index, effective weights, evidence counts and support, and engine version.
-Sample attempts report their KS statistic and p-value. Quantile attempts
-report normalized RMSE and the residual measures for the requested operation.
+Sample attempts report their KS statistic and p-value. Quantile attempts report
+the residual measures for the requested operation and compare predicted
+quantiles at every supplied interior probability. This comparison weights the
+knots equally and divides RMSE by their observed value span, so candidates are
+scored on the same evidence even when their estimation weights differ.
 Model selection picks the first converged candidate with the lowest recorded
 score. Distribution parameters are available on the fitted law.
 

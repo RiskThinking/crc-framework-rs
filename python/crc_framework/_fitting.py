@@ -730,6 +730,14 @@ def fit_quantiles(
     probabilities, values = curve.probabilities, curve.values
     count = len(values)
     support = curve.probability_interval
+    interior = (probabilities > 0) & (probabilities < 1)
+    comparison_probabilities = probabilities[interior]
+    comparison_values = values[interior]
+    # Model selection needs one observable target and one scale. Candidate
+    # weights and censor levels affect estimation, not the comparison evidence.
+    comparison_span = (
+        float(np.ptp(comparison_values)) if comparison_values.size else 0.0
+    )
     attempts: list[FitAttempt] = []
     successes: list[tuple[float, Distribution, tuple[float, ...], int, int]] = []
     last_used = 0
@@ -748,7 +756,7 @@ def fit_quantiles(
             if weights.shape != values.shape:
                 raise ValueError("weights must have one entry per supplied knot")
             active = weights > 0
-            if np.any(((probabilities <= 0) | (probabilities >= 1)) & active):
+            if np.any(~interior & active):
                 raise ValueError(
                     "parametric fitting requires interior probabilities; endpoint evidence cannot be silently excluded"
                 )
@@ -808,23 +816,16 @@ def fit_quantiles(
                     **options,
                 )
                 distribution = Distribution._from_native(native.distribution)
-            predicted = np.asarray(
-                distribution.quantile(fit_probabilities), dtype=np.float64
-            )
-            observed = fit_values
-            if isinstance(candidate, CensoredQuantileFit):
-                observed = np.maximum(fit_values, candidate.censor_location)
-                predicted = np.maximum(predicted, candidate.censor_location)
-            effective = fit_weights
-            observed_used = observed[effective > 0]
-            value_span = float(np.max(observed_used) - np.min(observed_used))
-            if value_span <= 0:
+            if comparison_span <= 0 or not math.isfinite(comparison_span):
                 raise ValueError(
-                    "normalized RMSE requires nonconstant effective evidence"
+                    "normalized RMSE requires a finite, nonzero interior evidence span"
                 )
-            normalized_residuals = (predicted - observed) / value_span
-            score = float(np.sqrt(np.sum(effective * normalized_residuals**2)))
-            diagnostic = _quantile_diagnostic(native, score, value_span)
+            predicted = np.asarray(
+                distribution.quantile(comparison_probabilities), dtype=np.float64
+            )
+            normalized_residuals = (predicted - comparison_values) / comparison_span
+            score = float(np.sqrt(np.mean(normalized_residuals**2)))
+            diagnostic = _quantile_diagnostic(native, score, comparison_span)
             attempts.append(FitAttempt(candidate, FitStatus.CONVERGED, diagnostic))
             successes.append((score, distribution, normalized, used, len(attempts) - 1))
         except ValueError as error:

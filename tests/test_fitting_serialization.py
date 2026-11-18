@@ -311,6 +311,24 @@ def test_effective_weights_match_the_selected_quantile_specification():
         _core.validate_document(SCHEMA["$id"], json.dumps(document))
 
 
+def test_failed_quantile_record_still_validates_executed_weights():
+    with pytest.raises(FitError) as caught:
+        fit_quantiles(
+            QuantileCurve([0.1, 0.3, 0.5, 0.7, 0.9], [1, 2, 3, 4, 5]),
+            QuantileFit(
+                family=DistributionFamily.GUMBEL_RIGHT,
+                weights=(1, 2, 3, 4, 5),
+                constraints=FitConstraints(minimum_value=1, maximum_value=2),
+            ),
+        )
+    record = caught.value.record
+    assert FitRecord.from_json(record.to_json()) == record
+    document = json.loads(record.to_json())
+    document["weights"].reverse()
+    with pytest.raises(ValueError, match="effective weights contradict"):
+        FitRecord.from_json(json.dumps(document))
+
+
 @pytest.mark.parametrize(
     "diagnostic",
     [None, {}, {"message": "fit failed"}, {"ks_statistic": 0.25}],

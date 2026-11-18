@@ -871,7 +871,7 @@ fn quantile_shape_step(kind: DistributionKind, shape: f64) -> f64 {
     }
 }
 
-fn log_standard_normal_cdf(value: f64) -> f64 {
+pub(crate) fn log_standard_normal_cdf(value: f64) -> f64 {
     if value >= 0.0 {
         // The upper half is bounded away from zero, so `1 + erf` does not cancel.
         return (0.5 * (1.0 + erf(value / SQRT_2))).ln();
@@ -879,8 +879,8 @@ fn log_standard_normal_cdf(value: f64) -> f64 {
     // Φ(z) = erfc(-z/√2) / 2. Forming `1 + erf(z/√2)` cancels once `erf` is
     // `erfc - 1`, which is every moderately negative argument.
     let tail = erfc((-value) / SQRT_2);
-    if tail > 0.0 {
-        return (0.5 * tail).ln();
+    if tail >= f64::MIN_POSITIVE {
+        return tail.ln() - std::f64::consts::LN_2;
     }
     // `erfc` underflows for z ≲ -37. The Mills expansion stays finite there.
     let inverse_square = 1.0 / (value * value);

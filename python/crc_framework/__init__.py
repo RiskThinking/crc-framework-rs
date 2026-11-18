@@ -188,12 +188,3 @@ __all__ = [
     "lookup_ipcc_region",
     "rank_scenarios",
 ]
-
-
-# Public scientific types have one canonical import path, including discoverable
-# model-owned context constructors.
-for _name in __all__:
-    _value = globals()[_name]
-    if isinstance(_value, type) and _value.__module__.startswith("crc_framework"):
-        _value.__module__ = __name__
-del _name, _value

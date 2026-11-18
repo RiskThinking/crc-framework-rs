@@ -7,6 +7,29 @@ fn validate_document(py: Python<'_>, schema: &str, text: &str) -> PyResult<()> {
         .map_err(error)
 }
 
+#[pyfunction]
+fn validate_fitted_curve(
+    py: Python<'_>,
+    record: &str,
+    curve: &str,
+    variable: &str,
+    provenance: &str,
+) -> PyResult<()> {
+    use crc_framework_core::canonical::parse_document;
+    py.detach(|| {
+        let provenance = parse_document(provenance)?;
+        crc_framework_core::dataset::validate_fitted_curve(
+            &parse_document(record)?,
+            &parse_document(curve)?,
+            variable,
+            provenance.as_array().ok_or_else(|| {
+                crc_framework_core::CrcError::InvalidInput("expected a provenance array".into())
+            })?,
+        )
+    })
+    .map_err(error)
+}
+
 #[pyclass(name = "NativeNumericalDocument", frozen)]
 struct PyNumericalDocument {
     inner: crc_framework_core::Numerical,
@@ -21,13 +44,9 @@ impl PyNumericalDocument {
             .map_err(error)
     }
     #[staticmethod]
-    fn finite_hurdle(py: Python<'_>, text: &str) -> PyResult<Option<Self>> {
+    fn prepared_hurdle(py: Python<'_>, text: &str) -> PyResult<Option<Self>> {
         let document = Self::new(py, text)?;
-        Ok(document
-            .inner
-            .finite_hurdle_segments()
-            .is_some()
-            .then_some(document))
+        Ok(document.inner.has_prepared_hurdle().then_some(document))
     }
     fn quantile(&self, py: Python<'_>, probability: f64) -> PyResult<f64> {
         py.detach(|| self.inner.quantile(probability))
@@ -46,9 +65,16 @@ impl PyNumericalDocument {
         py.detach(|| self.inner.inverse_survival(probability))
             .map_err(error)
     }
-    fn hurdle_segments(&self, py: Python<'_>) -> PyResult<Vec<(f64, f64, f64)>> {
+    fn hurdle_segments(&self, py: Python<'_>) -> Option<Vec<(f64, f64, f64)>> {
         py.detach(|| self.inner.finite_hurdle_segments().map(<[_]>::to_vec))
-            .ok_or_else(|| PyValueError::new_err("requires a finite compound hurdle"))
+    }
+    fn impact_source(&self, py: Python<'_>) -> PyResult<crate::impact::PyImpactSource> {
+        py.detach(|| self.inner.impact_source())
+            .map(|inner| crate::impact::PyImpactSource { inner })
+            .map_err(error)
+    }
+    fn hurdle_atoms(&self, py: Python<'_>) -> PyResult<Vec<(f64, f64)>> {
+        py.detach(|| self.inner.hurdle_atoms()).map_err(error)
     }
     fn hurdle_cdf(&self, py: Python<'_>, values: Vec<f64>, inclusive: bool) -> PyResult<Vec<f64>> {
         py.detach(|| {
@@ -56,7 +82,7 @@ impl PyNumericalDocument {
                 .into_iter()
                 .map(|x| {
                     self.inner
-                        .finite_hurdle_probability(f64::NEG_INFINITY, x, false, inclusive)
+                        .hurdle_probability(f64::NEG_INFINITY, x, false, inclusive)
                 })
                 .collect::<Result<Vec<_>, _>>()
         })
@@ -73,7 +99,7 @@ impl PyNumericalDocument {
                 .into_iter()
                 .map(|x| {
                     self.inner
-                        .finite_hurdle_probability(x, f64::INFINITY, inclusive, false)
+                        .hurdle_probability(x, f64::INFINITY, inclusive, false)
                 })
                 .collect::<Result<Vec<_>, _>>()
         })
@@ -83,7 +109,7 @@ impl PyNumericalDocument {
         py.detach(|| {
             values
                 .into_iter()
-                .map(|x| self.inner.finite_hurdle_probability(x, x, true, true))
+                .map(|x| self.inner.hurdle_probability(x, x, true, true))
                 .collect::<Result<Vec<_>, _>>()
         })
         .map_err(error)
@@ -97,11 +123,8 @@ impl PyNumericalDocument {
         square: bool,
         survival: bool,
     ) -> PyResult<f64> {
-        py.detach(|| {
-            self.inner
-                .finite_hurdle_integral(lo, hi, center, square, survival)
-        })
-        .map_err(error)
+        py.detach(|| self.inner.hurdle_integral(lo, hi, center, square, survival))
+            .map_err(error)
     }
 }
 
@@ -192,5 +215,6 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyNumericalLaw>()?;
     module.add_class::<PyNumericalDocument>()?;
     module.add_function(wrap_pyfunction!(validate_document, module)?)?;
+    module.add_function(wrap_pyfunction!(validate_fitted_curve, module)?)?;
     Ok(())
 }

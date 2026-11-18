@@ -372,49 +372,141 @@ pub fn validate_fit_record(record: &Value) -> Result<()> {
     validate_record(record).map(|_| ())
 }
 
-fn validate_selected_weights(weights: &[f64], specification: &Value) -> Result<()> {
-    let requested = specification["weights"]
-        .as_array()
-        .map(|values| {
-            values
-                .iter()
-                .map(|value| {
-                    value
-                        .as_f64()
-                        .filter(|w| w.is_finite() && *w >= 0.0)
-                        .ok_or_else(|| invalid("invalid requested weight"))
-                })
-                .collect::<Result<Vec<_>>>()
-        })
-        .transpose()?;
-    let uniform = 1.0 / weights.len() as f64;
-    let scale = if let Some(requested) = &requested {
-        if requested.len() != weights.len() {
-            return Err(invalid(
-                "selected specification needs one weight per supplied knot",
-            ));
+/// Check that a row carries the law produced by its selected fitting operation.
+pub fn validate_fitted_curve(
+    record: &Value,
+    curve: &Value,
+    variable: &str,
+    provenance: &[Value],
+) -> Result<()> {
+    let selected = validate_record(record)?
+        .ok_or_else(|| invalid("fit record has no converged selected attempt"))?;
+    let mut fitted = curve;
+    let mut variable = variable;
+    for step in provenance.iter().rev() {
+        if fitted["kind"] != "transformed" {
+            break;
         }
-        let maximum = requested.iter().copied().fold(0.0, f64::max);
-        (
-            maximum,
-            compensated(requested.iter().map(|weight| weight / maximum)),
-        )
+        if step["kind"] == "rename" && step["dimension"] == "variable" {
+            if let Some((old, _)) = step["mapping"]
+                .as_object()
+                .and_then(|mapping| mapping.iter().find(|(_, new)| *new == variable))
+            {
+                variable = old;
+            }
+        } else if step["kind"] == "unit_conversion" && step["variable_id"] == variable {
+            let impact = &fitted["impact"];
+            let model = &impact["model"];
+            let mut input = impact["input"].clone();
+            let output = &impact["output"];
+            if input["unit"] != step["source_unit"]
+                || output["unit"] != step["target_unit"]
+                || impact.get("clamp").is_some()
+                || impact.get("provenance").is_some()
+                || model["kind"] != "linear"
+                || !scientific_equal(&model["slope"], &step["scale"])
+                || !scientific_equal(&model["intercept"], &step["offset"])
+            {
+                return Err(invalid("fitted curve contradicts its unit conversion"));
+            }
+            input["unit"] = output["unit"].clone();
+            if !scientific_equal(&input, output) {
+                return Err(invalid("unit conversion changes other measurement science"));
+            }
+            fitted = &fitted["source"];
+        }
+    }
+    let base = if selected["kind"] == "hurdle_quantiles" {
+        if fitted["kind"] != "hurdle"
+            || !scientific_equal(&fitted["atom_probability"], &selected["atom_probability"])
+            || fitted["atom_location"].as_f64()
+                != Some(selected["atom_location"].as_f64().unwrap_or(0.0))
+        {
+            return Err(invalid("curve atom contradicts the selected hurdle fit"));
+        }
+        &fitted["base"]
     } else {
-        (1.0, 1.0)
+        fitted
     };
-    for (index, &weight) in weights.iter().enumerate() {
-        let expected = requested
-            .as_ref()
-            .map_or(uniform, |values| (values[index] / scale.0) / scale.1);
-        let positive = requested.as_ref().is_none_or(|values| values[index] > 0.0);
-        let tolerance = (1e-12 * weight.max(expected)).max(f64::from_bits(1));
-        if (weight > 0.0) != positive || (weight - expected).abs() > tolerance {
-            return Err(invalid(
-                "effective weights contradict the selected specification",
-            ));
+    if fitted["object"] != "distribution"
+        || base["kind"] != "parametric"
+        || base["family"] != selected["family"]
+    {
+        return Err(invalid("curve representation contradicts the selected fit"));
+    }
+    if let Some(constraints) = selected.get("constraints").filter(|v| !v.is_null()) {
+        let law = Numerical::from_value(fitted.clone())?;
+        let probability = constraints["probability"].as_f64();
+        if let Some(minimum) = constraints["minimum_value"].as_f64() {
+            if law.quantile(probability.unwrap_or(0.0))? < minimum {
+                return Err(invalid("curve violates the selected fit minimum_value"));
+            }
+        }
+        if let Some(maximum) = constraints["maximum_value"].as_f64() {
+            if law.quantile(probability.unwrap_or(1.0))? > maximum {
+                return Err(invalid("curve violates the selected fit maximum_value"));
+            }
+        }
+        if selected["kind"] == "samples" && constraints["require_sample_support"] == true {
+            let support = &record["evidence_support"];
+            let (first, last) = support[0]
+                .as_f64()
+                .zip(support[1].as_f64())
+                .ok_or_else(|| invalid("fit requires its original sample support"))?;
+            if first < law.quantile(0.0)? || last > law.quantile(1.0)? {
+                return Err(invalid("curve excludes recorded sample support"));
+            }
         }
     }
     Ok(())
+}
+
+fn requested_weights(specification: &Value, count: usize) -> Option<Vec<f64>> {
+    let Some(requested) = specification["weights"].as_array() else {
+        return Some(vec![1.0 / count as f64; count]);
+    };
+    if requested.len() != count {
+        return None;
+    }
+    let mut normalized = requested
+        .iter()
+        .map(Value::as_f64)
+        .collect::<Option<Vec<_>>>()?;
+    let maximum = normalized.iter().copied().fold(0.0, f64::max);
+    let sum = compensated(normalized.iter().map(|weight| weight / maximum));
+    for weight in &mut normalized {
+        let effective = (*weight / maximum) / sum;
+        if (*weight > 0.0 && effective == 0.0) || !effective.is_finite() {
+            return None;
+        }
+        *weight = effective;
+    }
+    Some(normalized)
+}
+
+fn failed_attempt_weights(record: &Value, attempts: &[Value], count: usize) -> Option<Vec<f64>> {
+    let support = &record["evidence_support"];
+    let first = support[0].as_f64()?;
+    let last = support[1].as_f64()?;
+    // The record retains the last attempt that passed input checks and
+    // reached optimization. Effective weights are available from that point.
+    attempts.iter().rev().find_map(|attempt| {
+        let specification = &attempt["specification"];
+        if specification["kind"] == "samples" {
+            return None;
+        }
+        let minimum = specification
+            .get("minimum_knots")
+            .map_or(Some(4), |value| unsigned(value).ok())?;
+        let weights = requested_weights(specification, count)?;
+        if (first == 0.0 && weights.first().is_some_and(|w| *w > 0.0))
+            || (last == 1.0 && weights.last().is_some_and(|w| *w > 0.0))
+            || (weights.iter().filter(|&&w| w > 0.0).count() as u64) < minimum
+        {
+            return None;
+        }
+        Some(weights)
+    })
 }
 
 fn converged_score(attempt: &Value, evidence_count: &Value, used_count: &Value) -> Result<f64> {
@@ -486,9 +578,20 @@ fn validate_record(record: &Value) -> Result<Option<&Value>> {
     let attempts = array(&record["attempts"])?;
     text(&record["engine_version"])?;
     let mut winner = None;
+    let mut comparison_span = None;
     for (index, attempt) in attempts.iter().enumerate() {
         if attempt["status"] == "converged" {
             let score = converged_score(attempt, &evidence_count, &used_count)?;
+            if let Some(span) = attempt["diagnostic"]["normalization_scale"].as_f64() {
+                if comparison_span
+                    .replace(span)
+                    .is_some_and(|previous| previous != span)
+                {
+                    return Err(invalid(
+                        "quantile candidates must share one comparison span",
+                    ));
+                }
+            }
             if winner.is_none_or(|(_, best)| score < best) {
                 winner = Some((index, score));
             }
@@ -545,8 +648,20 @@ fn validate_record(record: &Value) -> Result<Option<&Value>> {
         {
             return Err(invalid("effective weights contradict evidence counts"));
         }
-        if let Some(actual) = selected.filter(|s| s["kind"] != "samples") {
-            validate_selected_weights(&weights, actual)?;
+        let expected = match selected {
+            Some(actual) if actual["kind"] != "samples" => requested_weights(actual, weights.len()),
+            Some(_) => None,
+            None => failed_attempt_weights(record, attempts, weights.len()),
+        };
+        if expected.is_none_or(|expected| {
+            weights.iter().zip(expected).any(|(&weight, expected)| {
+                let tolerance = (1e-12 * weight.max(expected)).max(f64::from_bits(1));
+                (weight > 0.0) != (expected > 0.0) || (weight - expected).abs() > tolerance
+            })
+        }) {
+            return Err(invalid(
+                "effective weights contradict the executed specification",
+            ));
         }
     }
     if let Some(support) = record["evidence_support"].as_array() {
@@ -575,8 +690,10 @@ fn validate_record(record: &Value) -> Result<Option<&Value>> {
                 "quantile fits require their actual probability interval",
             ));
         }
-        if selected.is_some() && record["weights"].is_null() {
-            return Err(invalid("converged quantile fits require effective weights"));
+        if (selected.is_some() || used != "0") && record["weights"].is_null() {
+            return Err(invalid(
+                "quantile fits using knots require effective weights",
+            ));
         }
     }
     Ok(selected)
@@ -960,7 +1077,8 @@ pub fn validate_dataset(value: &Value) -> Result<()> {
             )
         })
         .collect::<BTreeMap<_, _>>();
-    for transform in array(&metadata["provenance"])?.iter().rev() {
+    let provenance = array(&metadata["provenance"])?;
+    for transform in provenance.iter().rev() {
         if transform["kind"] == "unit_conversion" {
             let id = text(&transform["variable_id"])?;
             if transform["source_unit"] == transform["target_unit"]
@@ -1092,26 +1210,9 @@ pub fn validate_dataset(value: &Value) -> Result<()> {
         }
         supports.insert(support_id.into(), (shape, support_cell));
         if let Some(curve) = row.get("curve") {
-            let curve_value = Numerical::from_value(curve.clone())?;
+            Numerical::from_value(curve.clone())?;
             if let Some(record) = row.get("fit") {
-                let selected = validate_record(record)?
-                    .ok_or_else(|| invalid("fit record has no converged selected attempt"))?;
-                if !curve_value.is_distribution() {
-                    return Err(invalid("fitted curves must be complete distributions"));
-                }
-                let mut base = curve;
-                loop {
-                    base = match base["kind"].as_str() {
-                        Some("hurdle") => &base["base"],
-                        Some("transformed") => &base["source"],
-                        _ => break,
-                    };
-                }
-                if base["kind"] != "parametric" || base["family"] != selected["family"] {
-                    return Err(invalid(
-                        "curve family contradicts selected fit specification",
-                    ));
-                }
+                validate_fitted_curve(record, curve, text(&row["variable_id"])?, provenance)?;
             }
         }
         if let Some(failure) = row.get("failure") {

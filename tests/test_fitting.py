@@ -349,6 +349,31 @@ def test_quantile_model_selection_uses_its_explicit_evidence_criterion() -> None
         )
 
 
+def test_quantile_candidates_are_scored_on_the_same_knots() -> None:
+    probabilities = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99]
+    lower = Distribution.parametric(DistributionFamily.GUMBEL_LEFT, location=1, scale=1)
+    values = [*lower.quantile(probabilities[:4]), 1, 2, 4, 9, 15, 30, 50]
+    curve = QuantileCurve(probabilities, values)
+    candidates = (
+        QuantileFit(family=DistributionFamily.GUMBEL_RIGHT),
+        QuantileFit(family=DistributionFamily.GUMBEL_LEFT, weights=(1,) * 4 + (0,) * 7),
+    )
+    result = fit_quantiles(
+        curve,
+        ModelSelection(
+            candidates=candidates,
+            criterion=SelectionCriterion.NORMALIZED_ROOT_MEAN_SQUARE_ERROR,
+        ),
+    )
+    assert result.record.selected_attempt == 0
+    for candidate, attempt in zip(candidates, result.record.attempts, strict=True):
+        single = fit_quantiles(curve, candidate)
+        assert single.diagnostic == attempt.diagnostic
+        predicted = np.asarray(single.distribution.quantile(probabilities))
+        expected = np.sqrt(np.mean(((predicted - values) / np.ptp(values)) ** 2))
+        assert single.diagnostic.normalized_rmse == pytest.approx(expected)
+
+
 def test_zero_weight_endpoints_are_explicit_exclusions() -> None:
     source = Distribution.parametric(
         DistributionFamily.GUMBEL_RIGHT, location=2.0, scale=3.0

@@ -190,7 +190,7 @@ def test_named_qualifiers_are_validated_and_serialized_once() -> None:
 def test_context_factories_have_real_canonical_types_and_exact_asset_choices() -> None:
     required = Impact.builtin(BuiltinImpact.INUNDATION).requirements
     assert required.context_type is InundationContext
-    assert InundationContext.__module__ == "crc_framework"
+    assert repr(required.context_type) == "<class 'crc_framework.InundationContext'>"
     signature = inspect.signature(required.context_type)
     assert list(signature.parameters) == ["region", "asset_type"]
     assert "building_type" not in signature.parameters

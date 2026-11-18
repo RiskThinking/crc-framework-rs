@@ -410,6 +410,110 @@ def test_deep_hurdle_over_a_nonlinear_response_keeps_analytical_tail_queries() -
     assert law.exceedance(0.75) == pytest.approx(0.25)
 
 
+@pytest.mark.parametrize("location", [-740, -1000])
+def test_hurdle_keeps_interior_quantiles_when_source_survival_underflows(
+    location: int,
+) -> None:
+    base = Distribution.parametric(
+        DistributionFamily.GUMBEL_RIGHT, location=location, scale=1
+    )
+    law = Distribution.hurdle(base, atom_probability=0.25)
+    q = 0.999999
+    quantile = -math.log((1 - q) / 0.75)
+    assert law.quantile(q) == pytest.approx(quantile, abs=2e-12)
+    assert law.exceedance(quantile) == pytest.approx(1 - q, rel=2e-12, abs=0)
+    assert law.mass(quantile) == 0.0
+    values = law.statistics(metrics=[Statistic.MEAN, Statistic.VARIANCE]).values
+    assert values[Statistic.MEAN].value == pytest.approx(0.75, abs=1e-9)
+    assert values[Statistic.VARIANCE].value == pytest.approx(0.9375, abs=1e-9)
+    measurement = Measurement(quantity="x", unit="u")
+    image = Impact.linear(slope=2, input=measurement, output=measurement).pushforward(
+        law
+    )
+    assert image.quantile(q) == pytest.approx(2 * quantile, abs=4e-12)
+
+
+@pytest.mark.parametrize("location", [-740, -1000])
+@pytest.mark.parametrize(
+    ("family", "slope"),
+    [(DistributionFamily.GUMBEL_RIGHT, 2), (DistributionFamily.GUMBEL_LEFT, -2)],
+)
+def test_hurdle_over_affine_image_keeps_subnormal_tail_queries(
+    location: int, family: DistributionFamily, slope: int
+) -> None:
+    base = Distribution.parametric(
+        family, location=math.copysign(abs(location), -slope), scale=1
+    )
+    measurement = Measurement(quantity="x", unit="u")
+    affine = Impact.linear(slope=slope, input=measurement, output=measurement)
+    law = Distribution.hurdle(affine.pushforward(base), atom_probability=0.25)
+    q = 0.999999
+    quantile = -2 * math.log((1 - q) / 0.75)
+    for distribution in (law, Distribution.from_json(law.to_json())):
+        assert distribution.quantile(q) == pytest.approx(quantile, abs=4e-12)
+        assert distribution.exceedance(quantile) == pytest.approx(1 - q, rel=2e-12)
+        assert distribution.cdf(quantile) == pytest.approx(q, abs=2e-12)
+        assert distribution.mass(0) == 0.25
+        values = distribution.statistics(
+            metrics=[Statistic.MEAN, Statistic.VARIANCE]
+        ).values
+        assert values[Statistic.MEAN].value == pytest.approx(1.5, abs=2e-9)
+        assert values[Statistic.VARIANCE].value == pytest.approx(3.75, abs=4e-9)
+        assert affine.pushforward(distribution).quantile(q) == pytest.approx(
+            abs(slope) * quantile if slope > 0 else 0.0, abs=8e-12
+        )
+    assert json.loads(law.to_json())["base"]["kind"] == "transformed"
+
+
+def test_skew_normal_thin_tail_keeps_positive_density_mass() -> None:
+    law = Distribution.parametric(
+        DistributionFamily.SKEW_NORMAL, location=0, scale=1, shape=-5
+    )
+    reflected = Distribution.parametric(
+        DistributionFamily.SKEW_NORMAL, location=0, scale=1, shape=5
+    )
+    # Independent integral of exp(-x*x/2) * erfc(5*x/sqrt(2)) / sqrt(2*pi)
+    # over x >= 2, rounded to 15 significant digits.
+    expected = 1.55326826787107e-26
+    assert law.exceedance(2) == pytest.approx(expected, rel=1e-10, abs=0)
+    assert reflected.cdf(-2) == pytest.approx(expected, rel=1e-10, abs=0)
+
+    hurdle = Distribution.hurdle(law, atom_probability=0.25, atom_location=2)
+    q = 0.75
+    value = float(hurdle.quantile(q))
+    assert value > 2
+    assert hurdle.exceedance(value) == pytest.approx(1 - q, rel=1e-10)
+
+
+@pytest.mark.parametrize(
+    ("law", "variance"),
+    [
+        (Distribution.discrete([0, 1e200], [1, 1e-300]), 1e100),
+        (Distribution.histogram([0, 1, 1e200], [1, 1e-300]), 1e100 / 3),
+    ],
+)
+def test_probability_weighting_retains_large_finite_second_moments(
+    law: Distribution, variance: float
+) -> None:
+    values = law.statistics(
+        metrics=[Statistic.VARIANCE, Statistic.STANDARD_DEVIATION]
+    ).values
+    assert values[Statistic.VARIANCE].value == pytest.approx(variance, rel=1e-14)
+    assert values[Statistic.STANDARD_DEVIATION].value == pytest.approx(
+        math.sqrt(variance), rel=1e-14
+    )
+
+
+def test_nonlinear_image_retains_the_weighted_variance_of_a_rare_atom() -> None:
+    source = Distribution.discrete([-1000, 1000], [1, 1e-300])
+    measurement = Measurement(quantity="x", unit="u")
+    law = Impact.sigmoid(
+        midpoint=0, steepness=1, amplitude=1e200, input=measurement, output=measurement
+    ).pushforward(source)
+    values = law.statistics(metrics=[Statistic.VARIANCE]).values
+    assert values[Statistic.VARIANCE].value == pytest.approx(1e100, rel=1e-14)
+
+
 @pytest.mark.parametrize("slope", [1.0, -1.0])
 @pytest.mark.parametrize("lower", [True, False])
 def test_strict_response_tail_at_clamp_keeps_rare_continuous_mass(

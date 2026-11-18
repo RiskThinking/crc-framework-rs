@@ -79,6 +79,20 @@ def build():
     deep_sigmoid_hurdle = Distribution.hurdle(
         sigmoid.pushforward(deep_tail), atom_probability=0.25, atom_location=0.5
     )
+    deep_parametric_hurdle = Distribution.hurdle(
+        Distribution.parametric(
+            DistributionFamily.GUMBEL_RIGHT, location=-1000, scale=1
+        ),
+        atom_probability=0.25,
+    )
+    deep_parametric_hurdle_over_image = Distribution.hurdle(
+        Impact.linear(slope=2, input=Ratio(), output=Ratio()).pushforward(
+            Distribution.parametric(
+                DistributionFamily.GUMBEL_RIGHT, location=-1000, scale=1
+            )
+        ),
+        atom_probability=0.25,
+    )
     tabulated = json.loads(
         Impact.tabulated([(0, 0), (3, 3)], input=Ratio(), output=Ratio()).to_json()
     )
@@ -120,6 +134,27 @@ def build():
                 ),
             ),
             ("deep-sigmoid-hurdle", deep_sigmoid_hurdle),
+            ("deep-parametric-hurdle", deep_parametric_hurdle),
+            (
+                "deep-parametric-hurdle-over-affine-image",
+                deep_parametric_hurdle_over_image,
+            ),
+            (
+                "deep-parametric-hurdle-image",
+                Impact.linear(slope=2, input=Ratio(), output=Ratio()).pushforward(
+                    deep_parametric_hurdle
+                ),
+            ),
+            (
+                "deep-skew-normal-hurdle",
+                Distribution.hurdle(
+                    Distribution.parametric(
+                        DistributionFamily.SKEW_NORMAL, location=0, scale=1, shape=-5
+                    ),
+                    atom_probability=0.25,
+                    atom_location=2,
+                ),
+            ),
             (
                 "deep-clamped-affine-hurdle",
                 Distribution.hurdle(
@@ -172,6 +207,11 @@ def build():
             coordinates = [0, tiny_probability / 2, tiny_probability, 0.1]
         if name.startswith("deep-"):
             coordinates.insert(3, 0.75)
+        if (
+            name.startswith("deep-parametric-hurdle")
+            or name == "deep-skew-normal-hurdle"
+        ):
+            coordinates.insert(-1, 0.999999)
         for q in coordinates:
             try:
                 result = float(value.quantile(q))

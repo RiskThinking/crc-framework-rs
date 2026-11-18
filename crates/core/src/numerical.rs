@@ -117,6 +117,11 @@ pub(crate) fn compensated(values: impl Iterator<Item = f64>) -> f64 {
     let mut correction: f64 = 0.0;
     for value in values {
         let next = sum + value;
+        if !next.is_finite() {
+            sum = next;
+            correction = 0.0;
+            continue;
+        }
         correction += if sum.abs() >= value.abs() {
             (sum - next) + value
         } else {
@@ -125,6 +130,30 @@ pub(crate) fn compensated(values: impl Iterator<Item = f64>) -> f64 {
         sum = next;
     }
     sum + correction
+}
+
+fn scaled_difference(value: f64, center: f64, scale: f64) -> f64 {
+    let difference = value - center;
+    if difference.is_finite() {
+        difference * scale
+    } else {
+        value * scale - center * scale
+    }
+}
+
+pub(crate) fn segment_moment(weight: f64, a: f64, b: f64, center: f64, square: bool) -> f64 {
+    if weight == 0.0 {
+        return 0.0;
+    }
+    if !square {
+        return scaled_difference(a.midpoint(b), center, weight);
+    }
+    // Incorporate the mass before squaring so a large value with a small
+    // probability can still have a representable contribution to the moment.
+    let scale = weight.sqrt();
+    let mean = scaled_difference(a.midpoint(b), center, scale);
+    let deviation = scaled_difference(b, a, scale / 12.0_f64.sqrt());
+    mean.powi(2) + deviation.powi(2)
 }
 
 // Local probability coordinates avoid subtracting two cumulative values near
@@ -374,14 +403,9 @@ pub(crate) fn segment_integral(
                 (left, right, xa, xb)
             };
             let (width, a, b) = local_interval(lo, hi, start, end, mass);
-            let x = linear_interpolate(xa, xb, a) - center;
-            let y = linear_interpolate(xa, xb, b) - center;
-            width
-                * if square {
-                    (x * x + x * y + y * y) / 3.0
-                } else {
-                    x.midpoint(y)
-                }
+            let x = linear_interpolate(xa, xb, a);
+            let y = linear_interpolate(xa, xb, b);
+            segment_moment(width, x, y, center, square)
         },
     ))
 }
@@ -486,27 +510,11 @@ impl NumericalLaw {
                 base,
                 atom_probability,
                 atom_location,
-            } => {
-                if !atom_location.is_finite()
-                    || !atom_probability.is_finite()
-                    || !(0.0..=1.0).contains(&atom_probability)
-                {
-                    return Err(invalid(
-                        "hurdle atom must be finite and its probability in [0, 1]",
-                    ));
-                }
-                let base = Self::from_specification(*base)?;
-                if atom_probability < 1.0 && base.exceedance(atom_location, false) <= 0.0 {
-                    return Err(invalid(
-                        "hurdle base must have positive probability strictly above its atom",
-                    ));
-                }
-                Self::Hurdle {
-                    base: Box::new(base),
-                    atom_probability,
-                    atom_location,
-                }
-            }
+            } => Self::hurdle(
+                Self::from_specification(*base)?,
+                atom_probability,
+                atom_location,
+            )?,
             Specification::Quantile {
                 probabilities,
                 values,
@@ -531,6 +539,24 @@ impl NumericalLaw {
                     values,
                 }
             }
+        })
+    }
+
+    pub(crate) fn hurdle(base: Self, atom_probability: f64, atom_location: f64) -> Result<Self> {
+        if !atom_location.is_finite() || !(0.0..=1.0).contains(&atom_probability) {
+            return Err(invalid(
+                "hurdle atom must be finite and its probability in [0, 1]",
+            ));
+        }
+        if atom_probability < 1.0 && !base.log_exceedance(atom_location, false).is_finite() {
+            return Err(invalid(
+                "hurdle base must have positive probability strictly above its atom",
+            ));
+        }
+        Ok(Self::Hurdle {
+            base: Box::new(base),
+            atom_probability,
+            atom_location,
         })
     }
 
@@ -689,10 +715,8 @@ impl NumericalLaw {
                 } else if let Some(segments) = self.finite_segments() {
                     segment_quantile(&segments, q, false)
                 } else {
-                    let surviving = base.exceedance(*x, false);
-                    let survival = (1.0 - q) / (1.0 - p) * surviving;
                     return base
-                        .inverse_survival(survival)
+                        .conditioned_quantile(*x, (1.0 - q) / (1.0 - p))
                         .map(|quantile| quantile.max(*x));
                 }
             }
@@ -756,10 +780,76 @@ impl NumericalLaw {
                 return Ok(*x);
             }
             return base
-                .inverse_survival(s / (1.0 - p) * base.exceedance(*x, false))
+                .conditioned_quantile(*x, s / (1.0 - p))
                 .map(|quantile| quantile.max(*x));
         }
         unreachable!("all numerical representations covered")
+    }
+
+    fn conditioned_quantile(&self, cutoff: f64, survival: f64) -> Result<f64> {
+        let target = survival * self.exceedance(cutoff, false);
+        if target >= f64::MIN_POSITIVE || survival == 0.0 {
+            self.inverse_survival(target)
+        } else {
+            self.inverse_log_survival(survival.ln() + self.log_exceedance(cutoff, false))
+        }
+    }
+
+    fn inverse_log_survival(&self, logarithm: f64) -> Result<f64> {
+        if !logarithm.is_finite() || logarithm > f64::MIN_POSITIVE.ln() {
+            return self.inverse_survival(logarithm.exp());
+        }
+        match self {
+            Self::Parametric(law) => law.inverse_log_survival(logarithm),
+            Self::Hurdle {
+                base,
+                atom_probability: p,
+                atom_location: cutoff,
+            } if self.finite_segments().is_none() => {
+                let log_weight = (-p).ln_1p();
+                if logarithm >= log_weight {
+                    Ok(*cutoff)
+                } else {
+                    base.inverse_log_survival(
+                        logarithm - log_weight + base.log_exceedance(*cutoff, false),
+                    )
+                    .map(|quantile| quantile.max(*cutoff))
+                }
+            }
+            _ => self.inverse_survival(logarithm.exp()),
+        }
+    }
+
+    fn log_exceedance(&self, x: f64, inclusive: bool) -> f64 {
+        match self {
+            Self::Parametric(law) => law.log_survival(x),
+            Self::Hurdle {
+                base,
+                atom_probability: p,
+                atom_location: cutoff,
+            } if self.finite_segments().is_none() => {
+                if x < *cutoff || (inclusive && x == *cutoff) {
+                    0.0
+                } else {
+                    (-p).ln_1p()
+                        + (base.log_exceedance(x, inclusive) - base.log_exceedance(*cutoff, false))
+                            .min(0.0)
+                }
+            }
+            _ => self.exceedance(x, inclusive).ln(),
+        }
+    }
+
+    fn conditional_exceedance(&self, x: f64, inclusive: bool, cutoff: f64) -> f64 {
+        let numerator = self.exceedance(x, inclusive);
+        let denominator = self.exceedance(cutoff, false);
+        if numerator >= f64::MIN_POSITIVE && denominator >= f64::MIN_POSITIVE {
+            numerator / denominator
+        } else {
+            (self.log_exceedance(x, inclusive) - self.log_exceedance(cutoff, false))
+                .min(0.0)
+                .exp()
+        }
     }
 
     /// Integral in survival coordinates, preserving conditional tail mass
@@ -782,24 +872,21 @@ impl NumericalLaw {
         {
             let w = 1.0 - p;
             let atom_width = (hi - lo.max(w)).max(0.0);
-            let atom = atom_width
-                * if square {
-                    (x - center).powi(2)
-                } else {
-                    x - center
-                };
+            let atom = segment_moment(atom_width, *x, *x, center, square);
             if lo >= w {
                 return Ok(atom);
             }
+            let upper = hi.min(w);
             let surviving = base.exceedance(*x, false);
-            return Ok(atom
-                + w / surviving
-                    * base.tail_integral(
-                        lo / w * surviving,
-                        hi.min(w) / w * surviving,
-                        center,
-                        square,
-                    )?);
+            let lower_base = lo / w * surviving;
+            let upper_base = upper / w * surviving;
+            let tail =
+                if upper_base < f64::MIN_POSITIVE || (lo > 0.0 && lower_base < f64::MIN_POSITIVE) {
+                    self.integrate_deep_tail(lo, upper, center, square)?
+                } else {
+                    w / surviving * base.tail_integral(lower_base, upper_base, center, square)?
+                };
+            return Ok(atom + tail);
         }
         if let Self::Parametric(d) = self {
             let c = d.shape.unwrap_or(0.0);
@@ -832,30 +919,52 @@ impl NumericalLaw {
                     a * (hi - lo) + b * power_integral(c)
                 });
             }
-            let result = integrate(&[(0.0, 1.0)], &GaussKronrod::defaults(), |t| {
-                let (s, jac) = if lo == 0.0 {
-                    (hi * t.powi(4), 4.0 * t.powi(3))
-                } else {
-                    (lo + (hi - lo) * t, 1.0)
-                };
-                let value = d.isf(s).map_err(|e| crate::impact::ImpactContractError {
-                    code: "numerical_failure",
-                    path: "".into(),
-                    message: e.to_string(),
-                })? - center;
-                Ok(if square {
-                    value * value * jac
-                } else {
-                    value * jac
-                })
-            })
-            .map_err(|e| invalid(&e.to_string()))?;
-            // Error control applies to the conditional expectation. Factoring
-            // out the rank width prevents rare tails from satisfying absolute
-            // tolerance before their conditional moments are accurate.
-            return Ok((hi - lo) * result.value);
+            return self.integrate_deep_tail(lo, hi, center, square);
         }
         unreachable!("all numerical representations covered")
+    }
+
+    fn integrate_deep_tail(&self, lo: f64, hi: f64, center: f64, square: bool) -> Result<f64> {
+        if lo == 0.0 && self.upper_tail_moment_diverges(square) {
+            return Ok(f64::INFINITY);
+        }
+        let width = hi - lo;
+        let mut options = GaussKronrod::defaults();
+        // Apply error control to the conditional expectation, even when the
+        // interval itself holds a very small part of the whole law.
+        options.absolute_tolerance = (options.absolute_tolerance * width).max(f64::MIN_POSITIVE);
+        let result = integrate(&[(0.0, 1.0)], &options, |t| {
+            // Integrate in the conditional law's probability coordinates. The
+            // original survival can be too small to multiply or to divide by.
+            let (log_survival, jacobian) = if lo == 0.0 {
+                (hi.ln() + 4.0 * t.ln(), 4.0 * t.powi(3))
+            } else {
+                ((lo + width * t).ln(), 1.0)
+            };
+            let value = self.inverse_log_survival(log_survival).map_err(|e| {
+                crate::impact::ImpactContractError::new("numerical_failure", "", e.to_string())
+            })?;
+            Ok(jacobian * segment_moment(width, value, value, center, square))
+        })
+        .map_err(|e| invalid(&e.to_string()))?;
+        Ok(result.value)
+    }
+
+    fn upper_tail_moment_diverges(&self, square: bool) -> bool {
+        match self {
+            Self::Hurdle {
+                base,
+                atom_probability,
+                ..
+            } => *atom_probability < 1.0 && base.upper_tail_moment_diverges(square),
+            Self::Parametric(law) => {
+                let shape = law.shape.unwrap_or(0.0);
+                let order = if square { 2.0 } else { 1.0 };
+                (law.family == DistributionFamily::GenPareto && shape * order >= 1.0)
+                    || (law.family == DistributionFamily::GenExtreme && shape * order <= -1.0)
+            }
+            _ => false,
+        }
     }
 
     pub fn cdf(&self, x: f64, inclusive: bool) -> f64 {
@@ -936,8 +1045,7 @@ impl NumericalLaw {
                 } else if *p == 1.0 {
                     1.0
                 } else {
-                    p + (1.0 - p)
-                        * (1.0 - base.exceedance(x, !inclusive) / base.exceedance(*v, false))
+                    p + (1.0 - p) * (1.0 - base.conditional_exceedance(x, !inclusive, *v))
                 }
             }
         }
@@ -971,7 +1079,12 @@ impl NumericalLaw {
                 if x == *v {
                     *p
                 } else if x > *v && *p < 1.0 {
-                    (base.mass(x) / base.exceedance(*v, false)) * (1.0 - p)
+                    let mass = base.mass(x);
+                    if mass == 0.0 {
+                        0.0
+                    } else {
+                        (mass.ln() - base.log_exceedance(*v, false)).exp() * (1.0 - p)
+                    }
                 } else {
                     0.0
                 }
@@ -1038,7 +1151,7 @@ impl NumericalLaw {
                 } else if *p == 1.0 {
                     0.0
                 } else {
-                    (1.0 - p) * base.exceedance(x, inclusive) / base.exceedance(*v, false)
+                    (1.0 - p) * base.conditional_exceedance(x, inclusive, *v)
                 }
             }
             _ => 1.0 - self.cdf(x, !inclusive),
@@ -1065,22 +1178,12 @@ impl NumericalLaw {
             if a >= b {
                 return 0.0;
             }
-            let x = linear_interpolate(xa, xb, (a - qa) / (qb - qa)) - center;
-            let y = linear_interpolate(xa, xb, (b - qa) / (qb - qa)) - center;
-            (b - a)
-                * if square {
-                    (x * x + x * y + y * y) / 3.0
-                } else {
-                    x.midpoint(y)
-                }
+            let x = linear_interpolate(xa, xb, (a - qa) / (qb - qa));
+            let y = linear_interpolate(xa, xb, (b - qa) / (qb - qa));
+            segment_moment(b - a, x, y, center, square)
         };
         match self {
-            Self::PointMass(x) => Ok((hi - lo)
-                * if square {
-                    (x - center).powi(2)
-                } else {
-                    x - center
-                }),
+            Self::PointMass(x) => Ok(segment_moment(hi - lo, *x, *x, center, square)),
             Self::Discrete {
                 values,
                 probabilities,
@@ -1091,12 +1194,7 @@ impl NumericalLaw {
                     .zip(mass_intervals(probabilities))
                     .map(|(x, (left, right, mass))| {
                         let (width, _, _) = local_interval(lo, hi, left, right, mass);
-                        width
-                            * if square {
-                                (x - center).powi(2)
-                            } else {
-                                x - center
-                            }
+                        segment_moment(width, *x, *x, center, square)
                     }),
             )),
             Self::Histogram {
@@ -1110,14 +1208,9 @@ impl NumericalLaw {
                     .filter(|(_, (_, _, mass))| *mass > 0.0)
                     .map(|(x, (left, right, mass))| {
                         let (width, a, b) = local_interval(lo, hi, left, right, mass);
-                        let xa = linear_interpolate(x[0], x[1], a) - center;
-                        let xb = linear_interpolate(x[0], x[1], b) - center;
-                        width
-                            * if square {
-                                (xa * xa + xa * xb + xb * xb) / 3.0
-                            } else {
-                                xa.midpoint(xb)
-                            }
+                        let xa = linear_interpolate(x[0], x[1], a);
+                        let xb = linear_interpolate(x[0], x[1], b);
+                        segment_moment(width, xa, xb, center, square)
                     }),
             )),
             Self::Quantile {
@@ -1127,28 +1220,16 @@ impl NumericalLaw {
                 segment(probabilities[i], probabilities[i + 1], x[0], x[1])
             }))),
             Self::Hurdle {
-                base,
                 atom_probability: p,
                 atom_location: x,
+                ..
             } => {
                 if *p == 1.0 {
-                    return Ok((hi - lo)
-                        * if square {
-                            (x - center).powi(2)
-                        } else {
-                            x - center
-                        });
+                    return Ok(segment_moment(hi - lo, *x, *x, center, square));
                 }
-                let w = 1.0 - p;
-                let surviving = base.exceedance(*x, false);
                 let mut terms = vec![segment(0.0, *p, *x, *x)];
                 if hi > *p {
-                    let lower_survival = surviving * (1.0 - hi) / w;
-                    let upper_survival = surviving * (1.0 - lo.max(*p)) / w;
-                    terms.push(
-                        w / surviving
-                            * base.tail_integral(lower_survival, upper_survival, center, square)?,
-                    );
+                    terms.push(self.tail_integral(1.0 - hi, 1.0 - lo.max(*p), center, square)?);
                 }
                 Ok(compensated(terms.into_iter()))
             }

@@ -93,8 +93,8 @@ impl PyExpression {
 }
 
 #[pyclass(name = "NativeImpactSource", frozen)]
-struct PyImpactSource {
-    inner: ImpactSource,
+pub(crate) struct PyImpactSource {
+    pub(crate) inner: ImpactSource,
 }
 
 #[pymethods]
