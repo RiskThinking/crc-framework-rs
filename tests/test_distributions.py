@@ -279,6 +279,58 @@ def test_hurdle_accepts_a_complete_transformed_law_and_round_trips() -> None:
     assert Distribution.from_json(law.to_json()).to_json() == law.to_json()
 
 
+def test_compound_hurdle_uses_the_first_surviving_support_above_a_gap() -> None:
+    measurement = Measurement(quantity="x", unit="u")
+    scale = Impact.linear(slope=3, input=measurement, output=measurement)
+    base = scale.pushforward(Distribution.histogram([0, 1, 2, 3], [0.5, 0, 0.5]))
+    law = Distribution.hurdle(base, atom_probability=0, atom_location=4)
+
+    assert law.support == (6, 9)
+    assert law._inverse_survival(1.0) == 6
+    assert law._inverse_survival(0.0) == 9
+    assert law.cdf(4) == law.mass(4) == 0
+    assert law.exceedance(6) == law.exceedance(6, inclusive=True) == 1
+    np.testing.assert_allclose(law.quantile([0, 0.5, 1]), [6, 7.5, 9])
+    reopened = Distribution.from_json(law.to_json())
+    assert reopened.support == law.support
+    assert reopened.quantile(0) == 6
+
+    reverse = Impact.linear(slope=-1, input=measurement, output=measurement)
+    response = reverse.pushforward(law)
+    assert response.support == (-9, -6)
+    assert response.quantile(0.5) == -7.5
+    assert reverse.expectation(law) == -7.5
+
+    with_atom = Distribution.hurdle(base, atom_probability=0.2, atom_location=4)
+    assert with_atom.support == (4, 9)
+    assert with_atom.quantile(0.2) == 4
+    assert with_atom.quantile(math.nextafter(0.2, 1.0)) == 6
+    assert with_atom.cdf(4, inclusive=False) == 0
+    assert with_atom.cdf(4) == with_atom.mass(4) == pytest.approx(0.2)
+    assert with_atom.exceedance(4) == pytest.approx(0.8)
+    assert with_atom.exceedance(4, inclusive=True) == 1
+
+
+def test_compound_hurdle_integrates_subnormal_retained_histogram_mass() -> None:
+    measurement = Measurement(quantity="x", unit="u")
+    scale = Impact.linear(slope=3, input=measurement, output=measurement)
+    base = scale.pushforward(
+        Distribution.histogram([0, 1, 2, 3], [1, 0, math.ulp(0.0)])
+    )
+    law = Distribution.hurdle(base, atom_probability=0.25, atom_location=4)
+    assert law.cdf(7.5) == pytest.approx(0.625)
+    assert law.exceedance(7.5) == pytest.approx(0.375)
+    assert law.quantile(0.625) == pytest.approx(7.5)
+    assert law.mass(4) == pytest.approx(0.25)
+    expected_mean = 0.25 * 4 + 0.75 * 7.5
+    summary = law.statistics(metrics=[Statistic.MEAN, Statistic.CVAR])
+    assert summary.values[Statistic.MEAN].value == pytest.approx(expected_mean)
+    assert summary.values[Statistic.CVAR].value == pytest.approx(8.9)
+    identity = Impact.linear(slope=1, input=measurement, output=measurement)
+    assert identity.expectation(law) == pytest.approx(expected_mean)
+    assert identity.pushforward(law).mass(4) == pytest.approx(0.25)
+
+
 def test_nested_quantile_modelling_record_is_kept_by_hurdle_serialization() -> None:
     completed = QuantileCurve([0.2, 0.8], [1, 3]).complete(
         TailCompletion(lower=0, upper=4)
@@ -335,6 +387,21 @@ def test_deep_hurdle_survival_is_preserved_for_native_and_transformed_bases() ->
             0.9375 * scale**2, abs=1e-8
         )
         assert law.quantile(0.75) == pytest.approx(-scale * math.log(1 / 3), abs=1e-8)
+
+
+def test_deep_hurdle_over_a_nonlinear_response_keeps_analytical_tail_queries() -> None:
+    base = Distribution.parametric(
+        DistributionFamily.GUMBEL_RIGHT, location=-50, scale=1
+    )
+    measurement = Measurement(quantity="x", unit="u")
+    response = Impact.sigmoid(
+        midpoint=0, steepness=1, input=measurement, output=measurement
+    ).pushforward(base)
+    law = Distribution.hurdle(response, atom_probability=0.25, atom_location=0.5)
+
+    assert law.quantile(0.75) == pytest.approx(0.75)
+    assert law.cdf(0.75) == pytest.approx(0.75)
+    assert law.exceedance(0.75) == pytest.approx(0.25)
 
 
 def test_concentrated_weibull_variance_is_positive_and_stable() -> None:

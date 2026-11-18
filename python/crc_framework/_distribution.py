@@ -189,6 +189,7 @@ class Distribution:
     _transformed: _core.NativeImpactDistribution | None
     _record: dict[str, object] | None
     _base: Distribution | None
+    _compound: _core.NativeNumericalDocument | None
 
     def __init__(self) -> None:
         raise TypeError("construct a Distribution with a named constructor")
@@ -206,7 +207,6 @@ class Distribution:
             hydrated = cls.from_json(
                 _dump({"schema_version": "1.0", "object": "distribution", **base_data})
             )
-            native_data["base"] = hydrated._native_data()
             if hydrated._native is None:
                 base = hydrated
                 probability = _finite(
@@ -219,6 +219,8 @@ class Distribution:
                     raise ValueError(
                         "hurdle requires a probability in [0, 1] and a nonempty strict upper tail"
                     )
+            else:
+                native_data["base"] = hydrated._native_data()
         object.__setattr__(
             result,
             "_native",
@@ -228,6 +230,13 @@ class Distribution:
         object.__setattr__(result, "_transformed", None)
         object.__setattr__(result, "_record", record)
         object.__setattr__(result, "_base", base)
+        object.__setattr__(
+            result,
+            "_compound",
+            None
+            if base is None
+            else _core.NativeNumericalDocument.finite_hurdle(result.to_json()),
+        )
         return result
 
     def _native_data(self) -> dict[str, object]:
@@ -351,16 +360,14 @@ class Distribution:
     def support(self) -> tuple[float, float]:
         if self._native is not None:
             return self._native.support()
+        if self._compound is not None:
+            return self._compound.quantile(0.0), self._compound.quantile(1.0)
         if self._base is not None:
             atom = cast(float, self._data["atom_location"])
             p = cast(float, self._data["atom_probability"])
             return (
-                (atom, atom)
-                if p == 1
-                else (
-                    atom if p else max(atom, self._base.support[0]),
-                    self._base.support[1],
-                )
+                atom if p else max(atom, self._base.support[0]),
+                atom if p == 1 else self._base.support[1],
             )
         assert self._transformed is not None
         return self._transformed.quantile(0.0), self._transformed.quantile(1.0)
@@ -369,14 +376,21 @@ class Distribution:
         query, scalar = _input(probabilities, probabilities=True)
         if self._native is not None:
             result = self._native.quantile(query.reshape(-1).tolist())
+        elif self._compound is not None:
+            result = self._compound.quantiles(query.reshape(-1).tolist())
         elif self._base is not None:
             p = cast(float, self._data["atom_probability"])
             atom = cast(float, self._data["atom_location"])
             surviving = cast(float, self._base.exceedance(atom))
             result = [
-                atom
+                self.support[0]
+                if q == 0
+                else atom
                 if q <= p
-                else self._base._inverse_survival((1 - float(q)) / (1 - p) * surviving)
+                else max(
+                    atom,
+                    self._base._inverse_survival((1 - float(q)) / (1 - p) * surviving),
+                )
                 for q in query.reshape(-1)
             ]
         else:
@@ -390,6 +404,8 @@ class Distribution:
         query, scalar = _input(values)
         if self._native is not None:
             result = self._native.cdf(query.reshape(-1).tolist(), inclusive)
+        elif self._compound is not None:
+            result = self._compound.hurdle_cdf(query.reshape(-1).tolist(), inclusive)
         elif self._base is not None:
             result = [
                 self._compound_cdf(float(x), inclusive) for x in query.reshape(-1)
@@ -406,6 +422,10 @@ class Distribution:
             raise TypeError("inclusive must be bool")
         if self._native is not None:
             result = self._native.exceedance(query.reshape(-1).tolist(), inclusive)
+        elif self._compound is not None:
+            result = self._compound.hurdle_exceedance(
+                query.reshape(-1).tolist(), inclusive
+            )
         elif self._base is not None:
             p, atom = (
                 cast(float, self._data["atom_probability"]),
@@ -418,8 +438,10 @@ class Distribution:
                 else 0.0
                 if p == 1
                 else (1 - p)
-                * cast(float, self._base.exceedance(float(x), inclusive=inclusive))
-                / surviving
+                * (
+                    cast(float, self._base.exceedance(float(x), inclusive=inclusive))
+                    / surviving
+                )
                 for x in query.reshape(-1)
             ]
         else:
@@ -433,6 +455,8 @@ class Distribution:
         query, scalar = _input(values)
         if self._native is not None:
             result = self._native.mass(query.reshape(-1).tolist())
+        elif self._compound is not None:
+            result = self._compound.hurdle_mass(query.reshape(-1).tolist())
         elif self._base is not None:
             p, atom = (
                 cast(float, self._data["atom_probability"]),
@@ -442,7 +466,7 @@ class Distribution:
             result = [
                 p
                 if x == atom
-                else (1 - p) * cast(float, self._base.mass(float(x))) / surviving
+                else (1 - p) * (cast(float, self._base.mass(float(x))) / surviving)
                 if x > atom and p < 1
                 else 0.0
                 for x in query.reshape(-1)
@@ -458,6 +482,12 @@ class Distribution:
             return self._native.atoms()
         if self._transformed is not None:
             return self._transformed.atoms()
+        if self._compound is not None:
+            return [
+                (lo, mass)
+                for lo, hi, mass in self._compound.hurdle_segments()
+                if lo == hi
+            ]
         assert self._base is not None
         p = cast(float, self._data["atom_probability"])
         atom = cast(float, self._data["atom_location"])
@@ -550,6 +580,8 @@ class Distribution:
     ) -> float:
         if self._native is not None:
             return self._native.integral(lo, hi, center, square)
+        if self._compound is not None:
+            return self._compound.hurdle_integral(lo, hi, center, square, False)
         if self._base is not None:
             return self._tail_integral(1 - hi, 1 - lo, center=center, square=square)
         # Transformed finite laws retain all exact probability atoms. General
@@ -571,6 +603,8 @@ class Distribution:
     def _inverse_survival(self, probability: float) -> float:
         if self._native is not None:
             return self._native.inverse_survival(probability)
+        if self._compound is not None:
+            return self._compound.inverse_survival(probability)
         if probability == 0:
             return self.support[1]
         if probability == 1:
@@ -583,7 +617,10 @@ class Distribution:
             if probability >= 1 - p:
                 return atom
             surviving = cast(float, self._base.exceedance(atom))
-            return self._base._inverse_survival(probability / (1 - p) * surviving)
+            return max(
+                atom,
+                self._base._inverse_survival(probability / (1 - p) * surviving),
+            )
         assert self._transformed is not None
         impact, source = self._impact_source()
         exact = impact._inverse_survival(source, probability)
@@ -598,6 +635,8 @@ class Distribution:
     ) -> float:
         if self._native is not None:
             return self._native.tail_integral(lo, hi, center, square)
+        if self._compound is not None:
+            return self._compound.hurdle_integral(lo, hi, center, square, True)
         if self._base is not None:
             p, atom = (
                 cast(float, self._data["atom_probability"]),
@@ -695,6 +734,7 @@ class Distribution:
         object.__setattr__(result, "_transformed", native)
         object.__setattr__(result, "_record", None)
         object.__setattr__(result, "_base", None)
+        object.__setattr__(result, "_compound", None)
         object.__setattr__(
             result,
             "_data",
@@ -771,6 +811,8 @@ class Distribution:
 
     def _segments(self) -> list[tuple[float, float, float]]:
         """Ordered exact uniform intervals and atoms for a finite law."""
+        if self._compound is not None:
+            return self._compound.hurdle_segments()
         data = self._data
         if self.kind is DistributionKind.DISCRETE:
             return [
@@ -819,7 +861,7 @@ class Distribution:
                     continue
                 retained = 1.0 if lower >= atom else (upper - atom) / (upper - lower)
                 result.append(
-                    (max(lower, atom), upper, mass * retained * (1 - p) / surviving)
+                    (max(lower, atom), upper, (mass * retained / surviving) * (1 - p))
                 )
             return result
         if self.kind is DistributionKind.TRANSFORMED:

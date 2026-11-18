@@ -4,8 +4,8 @@ use std::sync::LazyLock;
 
 use crate::error::{CrcError, Result};
 use crate::numerical::{
-    NumericalLaw, ProbabilitySegment, condition_segments, segment_inverse_survival,
-    segment_quantile,
+    NumericalLaw, ProbabilitySegment, condition_segments, segment_integral,
+    segment_inverse_survival, segment_probability, segment_quantile,
 };
 use crate::{
     DiscreteDistribution, HistogramExposure, HurdleDistribution, ImpactDefinition,
@@ -416,6 +416,8 @@ enum Compiled {
         base: Box<Numerical>,
         probability: f64,
         location: f64,
+        surviving_mass: f64,
+        segments: Option<Vec<ProbabilitySegment>>,
     },
     Transformed {
         source: Box<Numerical>,
@@ -496,9 +498,12 @@ impl Numerical {
             let base = Box::new(Self::from_value(envelope(&document["base"]))?);
             let probability = number(&document, "atom_probability")?;
             let location = number(&document, "atom_location")?;
-            if !base.is_distribution()
-                || (probability < 1.0 && base.exceedance(location, false)? <= 0.0)
-            {
+            let surviving_mass = if probability < 1.0 {
+                base.exceedance(location, false)?
+            } else {
+                1.0
+            };
+            if !base.is_distribution() || surviving_mass <= 0.0 {
                 return Err(invalid(
                     "hurdle requires a complete nonempty conditional tail",
                 ));
@@ -509,11 +514,25 @@ impl Numerical {
                     atom_probability: probability,
                     atom_location: location,
                 }),
-                _ => Compiled::Hurdle {
-                    base,
-                    probability,
-                    location,
-                },
+                _ => {
+                    let segments = if probability == 1.0 {
+                        Some(vec![(location, location, 1.0)])
+                    } else {
+                        base.finite_segments()?.map(|segments| {
+                            condition_segments(segments, probability, location, surviving_mass)
+                        })
+                    };
+                    if segments.as_ref().is_some_and(Vec::is_empty) {
+                        return Err(invalid("hurdle requires a nonempty strict upper tail"));
+                    }
+                    Compiled::Hurdle {
+                        base,
+                        probability,
+                        location,
+                        surviving_mass,
+                        segments,
+                    }
+                }
             }
         } else {
             Compiled::Law(NumericalLaw::from_json(&bare(&document).to_string())?)
@@ -524,6 +543,48 @@ impl Numerical {
     }
     pub fn is_distribution(&self) -> bool {
         self.document["object"] == "distribution"
+    }
+    /// Whether a compound hurdle has exact, prepared interval and atom masses.
+    pub fn finite_hurdle_segments(&self) -> Option<&[(f64, f64, f64)]> {
+        if let Compiled::Hurdle { segments, .. } = &self.compiled {
+            segments.as_deref()
+        } else {
+            None
+        }
+    }
+    pub fn finite_hurdle_probability(
+        &self,
+        lower: f64,
+        upper: f64,
+        include_lower: bool,
+        include_upper: bool,
+    ) -> Result<f64> {
+        let segments = self
+            .finite_hurdle_segments()
+            .ok_or_else(|| invalid("requires a finite compound hurdle"))?;
+        Ok(segment_probability(
+            segments,
+            lower,
+            upper,
+            include_lower,
+            include_upper,
+        ))
+    }
+    pub fn finite_hurdle_integral(
+        &self,
+        lo: f64,
+        hi: f64,
+        center: f64,
+        square: bool,
+        survival: bool,
+    ) -> Result<f64> {
+        if !lo.is_finite() || !hi.is_finite() || lo < 0.0 || hi > 1.0 || hi < lo {
+            return Err(invalid("invalid integration probability interval"));
+        }
+        let segments = self
+            .finite_hurdle_segments()
+            .ok_or_else(|| invalid("requires a finite compound hurdle"))?;
+        Ok(segment_integral(segments, lo, hi, center, square, survival))
     }
     pub fn canonical_json(&self) -> String {
         self.document.to_string()
@@ -542,21 +603,27 @@ impl Numerical {
                 base,
                 probability: p,
                 location: a,
+                surviving_mass,
+                segments,
             } => {
                 if *p == 1.0 || q <= *p && *p > 0.0 {
                     Ok(*a)
-                } else if let Some(segments) = self.finite_segments()? {
-                    Ok(segment_quantile(&segments, q, false))
+                } else if let Some(segments) = segments {
+                    Ok(segment_quantile(segments, q, false))
                 } else {
                     Ok(base
-                        .inverse_survival((1.0 - q) / (1.0 - p) * base.exceedance(*a, false)?)?
+                        .inverse_survival((1.0 - q) / (1.0 - p) * surviving_mass)?
                         .max(*a))
                 }
             }
             Compiled::Transformed { image, .. } => image.quantile(q).map_err(invalid),
         }
     }
-    fn inverse_survival(&self, s: f64) -> Result<f64> {
+    /// Evaluate a complete law at a direct upper-tail probability.
+    pub fn inverse_survival(&self, s: f64) -> Result<f64> {
+        if !s.is_finite() || !(0.0..=1.0).contains(&s) {
+            return Err(invalid("survival probability must be finite and in [0,1]"));
+        }
         match &self.compiled {
             Compiled::Law(law) => law.inverse_survival(s),
             Compiled::Transformed { image, .. } => image.inverse_survival(s).map_err(invalid),
@@ -564,14 +631,16 @@ impl Numerical {
                 base,
                 probability: p,
                 location: a,
+                surviving_mass,
+                segments,
             } => {
                 if *p == 1.0 || *p > 0.0 && s >= 1.0 - p {
                     Ok(*a)
-                } else if let Some(segments) = self.finite_segments()? {
-                    Ok(segment_inverse_survival(&segments, s, false))
+                } else if let Some(segments) = segments {
+                    Ok(segment_inverse_survival(segments, s, false))
                 } else {
                     Ok(base
-                        .inverse_survival(s / (1.0 - p) * base.exceedance(*a, false)?)?
+                        .inverse_survival(s / (1.0 - p) * surviving_mass)?
                         .max(*a))
                 }
             }
@@ -585,13 +654,24 @@ impl Numerical {
                 base,
                 probability: p,
                 location: a,
+                surviving_mass,
+                segments,
             } => {
+                if let Some(segments) = segments {
+                    return Ok(segment_probability(
+                        segments,
+                        x,
+                        f64::INFINITY,
+                        inclusive,
+                        false,
+                    ));
+                }
                 if x < *a || inclusive && x == *a {
                     Ok(1.0)
                 } else if *p == 1.0 {
                     Ok(0.0)
                 } else {
-                    Ok((1.0 - p) * base.exceedance(x, inclusive)? / base.exceedance(*a, false)?)
+                    Ok((base.exceedance(x, inclusive)? / surviving_mass) * (1.0 - p))
                 }
             }
             Compiled::Transformed { source, image, .. } => {
@@ -677,24 +757,7 @@ impl Numerical {
     fn finite_segments(&self) -> Result<Option<Vec<ProbabilitySegment>>> {
         match &self.compiled {
             Compiled::Law(law) => Ok(law.finite_segments()),
-            Compiled::Hurdle {
-                base,
-                probability,
-                location,
-            } => {
-                if *probability == 1.0 {
-                    return Ok(Some(vec![(*location, *location, 1.0)]));
-                }
-                let Some(segments) = base.finite_segments()? else {
-                    return Ok(None);
-                };
-                Ok(Some(condition_segments(
-                    segments,
-                    *probability,
-                    *location,
-                    base.exceedance(*location, false)?,
-                )))
-            }
+            Compiled::Hurdle { segments, .. } => Ok(segments.clone()),
             Compiled::Transformed { image, .. } if image.is_discrete() => Ok(Some(
                 image
                     .atoms()

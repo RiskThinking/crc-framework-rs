@@ -55,6 +55,12 @@ def build():
     ).condition(q_min=0.2, q_max=0.6)
     discrete_base = Distribution.discrete([-1, 2, 3], [0.5, 0.1, 0.4])
     discrete_hurdle = Distribution.hurdle(discrete_base, atom_probability=0.2)
+    gapped_image = Impact.linear(slope=3, input=Ratio(), output=Ratio()).pushforward(
+        Distribution.histogram([0, 1, 2, 3], [0.5, 0, 0.5])
+    )
+    subnormal_image = Impact.linear(slope=3, input=Ratio(), output=Ratio()).pushforward(
+        Distribution.histogram([0, 1, 2, 3], [1, 0, math.ulp(0.0)])
+    )
     decreasing = Impact.linear(slope=-2, intercept=1, input=Ratio(), output=Ratio())
     sigmoid = Impact.sigmoid(midpoint=0, steepness=1, input=Ratio(), output=Ratio())
     clamped_affine = Impact.linear(
@@ -79,6 +85,18 @@ def build():
                 "conditioned-discrete-law",
                 Distribution.hurdle(discrete_base, atom_probability=0.0),
             ),
+            (
+                "conditioned-transformed-histogram",
+                Distribution.hurdle(gapped_image, atom_probability=0, atom_location=4),
+            ),
+            (
+                "transformed-histogram-hurdle",
+                Distribution.hurdle(gapped_image, atom_probability=0.2, atom_location=4),
+            ),
+            (
+                "subnormal-transformed-histogram-hurdle",
+                Distribution.hurdle(subnormal_image, atom_probability=0.25, atom_location=4),
+            ),
         ]
     )
     objects.extend(
@@ -99,7 +117,7 @@ def build():
     for name, value in objects:
         queries = []
         coordinates = [0, 0.1, 0.5, 0.9, 0.99, 1]
-        if name == "discrete-hurdle":
+        if name in ("discrete-hurdle", "transformed-histogram-hurdle"):
             coordinates[2:2] = [0.2, math.nextafter(0.2, 1.0)]
         for q in coordinates:
             try:
