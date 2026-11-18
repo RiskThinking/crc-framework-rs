@@ -418,7 +418,8 @@ class FitRecord:
     used_count: int
     excluded_count: int
     weights: tuple[float, ...] | None
-    evidence_support: tuple[float, float] | None
+    value_interval: tuple[float, float] | None
+    probability_interval: tuple[float, float] | None
     engine_version: str
 
     def to_json(self) -> str:
@@ -480,9 +481,11 @@ def _record(
     count: int,
     used: int,
     weights: tuple[float, ...] | None,
-    support: tuple[float, float] | None,
+    value_interval: tuple[float, float] | None,
     converged: bool,
     selected_attempt: int | None = None,
+    *,
+    probability_interval: tuple[float, float] | None = None,
 ) -> FitRecord:
     return FitRecord(
         specification=specification,
@@ -494,7 +497,8 @@ def _record(
         used_count=used,
         excluded_count=count - used,
         weights=weights,
-        evidence_support=support,
+        value_interval=value_interval,
+        probability_interval=probability_interval,
         engine_version=f"crc-framework/{_core.__version__}",
     )
 
@@ -525,7 +529,9 @@ def _failure(
     count: int,
     used: int,
     weights: tuple[float, ...] | None,
-    support: tuple[float, float] | None,
+    value_interval: tuple[float, float] | None,
+    *,
+    probability_interval: tuple[float, float] | None = None,
 ) -> FitError:
     failures = "; ".join(
         f"{_label(attempt.specification)}: {attempt.diagnostic.message}"
@@ -536,7 +542,15 @@ def _failure(
     return FitError(
         message,
         record=_record(
-            specification, attempts, None, count, used, weights, support, False
+            specification,
+            attempts,
+            None,
+            count,
+            used,
+            weights,
+            value_interval,
+            False,
+            probability_interval=probability_interval,
         ),
     )
 
@@ -741,7 +755,6 @@ def fit_quantiles(
         raise TypeError("quantile model selection requires quantile fitting candidates")
     probabilities, values = curve.probabilities, curve.values
     count = len(values)
-    support = curve.probability_interval
     interior = (probabilities > 0) & (probabilities < 1)
     comparison_probabilities = probabilities[interior]
     comparison_values = values[interior]
@@ -757,9 +770,12 @@ def fit_quantiles(
         float(np.ptp(comparison_values)) if comparison_values.size else 0.0
     )
     attempts: list[FitAttempt] = []
-    successes: list[tuple[float, Distribution, tuple[float, ...], int, int]] = []
+    successes: list[
+        tuple[float, Distribution, tuple[float, ...], int, int, tuple[float, float]]
+    ] = []
     last_used = 0
     last_weights: tuple[float, ...] | None = None
+    last_interval: tuple[float, float] | None = None
     for candidate in candidates:
         assert isinstance(
             candidate, (QuantileFit, CensoredQuantileFit, HurdleQuantileFit)
@@ -786,6 +802,13 @@ def fit_quantiles(
             normalized = _normalized_weights(weights)
             last_used, last_weights = used, normalized
             fit_probabilities, fit_values = probabilities[active], values[active]
+            observed = (
+                np.maximum(fit_values, candidate.censor_location)
+                if isinstance(candidate, CensoredQuantileFit)
+                else fit_values
+            )
+            value_interval = (float(observed[0]), float(observed[-1]))
+            last_interval = value_interval
             fit_weights = np.asarray(normalized, dtype=np.float64)[active]
             bounds = candidate.constraints or FitConstraints()
             options: _NativeBounds = {
@@ -847,7 +870,16 @@ def fit_quantiles(
             score = float(np.sqrt(np.mean(normalized_residuals**2)))
             diagnostic = _quantile_diagnostic(native, score, comparison_span)
             attempts.append(FitAttempt(candidate, FitStatus.CONVERGED, diagnostic))
-            successes.append((score, distribution, normalized, used, len(attempts) - 1))
+            successes.append(
+                (
+                    score,
+                    distribution,
+                    normalized,
+                    used,
+                    len(attempts) - 1,
+                    value_interval,
+                )
+            )
         except ValueError as error:
             attempts.append(
                 FitAttempt(
@@ -855,8 +887,16 @@ def fit_quantiles(
                 )
             )
     if not successes:
-        raise _failure(specification, attempts, count, last_used, last_weights, support)
-    _, distribution, normalized, used, selected = min(
+        raise _failure(
+            specification,
+            attempts,
+            count,
+            last_used,
+            last_weights,
+            last_interval,
+            probability_interval=curve.probability_interval,
+        )
+    _, distribution, normalized, used, selected, value_interval = min(
         successes, key=lambda result: result[0]
     )
     return FitResult(
@@ -868,9 +908,10 @@ def fit_quantiles(
             count,
             used,
             normalized,
-            support,
+            value_interval,
             True,
             selected,
+            probability_interval=curve.probability_interval,
         ),
     )
 
@@ -1082,9 +1123,8 @@ def _record_document(record: FitRecord) -> dict[str, object]:
         "used_count": record.used_count,
         "excluded_count": record.excluded_count,
         "weights": None if record.weights is None else list(record.weights),
-        "evidence_support": None
-        if record.evidence_support is None
-        else list(record.evidence_support),
+        "value_interval": record.value_interval,
+        "probability_interval": record.probability_interval,
         "engine_version": record.engine_version,
     }
 
@@ -1100,11 +1140,16 @@ def _decode_record(value: object) -> FitRecord:
         "used_count",
         "excluded_count",
         "weights",
-        "evidence_support",
+        "value_interval",
+        "probability_interval",
         "engine_version",
     }
     data = _document(value, fields, fields)
-    support = cast(list[float] | None, data["evidence_support"])
+
+    def interval(name: str) -> tuple[float, float] | None:
+        values = cast(list[float] | None, data[name])
+        return None if values is None else (float(values[0]), float(values[1]))
+
     return FitRecord(
         specification=_decode_spec(data["specification"]),
         attempts=tuple(_decode_attempt(item) for item in _items(data["attempts"])),
@@ -1121,8 +1166,7 @@ def _decode_record(value: object) -> FitRecord:
         weights=None
         if data["weights"] is None
         else tuple(float(weight) for weight in cast(list[float], data["weights"])),
-        evidence_support=None
-        if support is None
-        else (float(support[0]), float(support[1])),
+        value_interval=interval("value_interval"),
+        probability_interval=interval("probability_interval"),
         engine_version=_text(data["engine_version"]),
     )

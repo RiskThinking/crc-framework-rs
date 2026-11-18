@@ -1,5 +1,8 @@
 use crc_framework_core::numerical::NumericalLaw;
-use pyo3::{exceptions::PyValueError, prelude::*};
+use pyo3::{
+    exceptions::{PyTypeError, PyValueError},
+    prelude::*,
+};
 
 #[pyfunction]
 fn validate_document(py: Python<'_>, schema: &str, text: &str) -> PyResult<()> {
@@ -60,13 +63,15 @@ impl PyNumericalDocument {
         py.detach(|| self.inner.inverse_survival(probability))
             .map_err(error)
     }
-    fn hurdle_segments(&self, py: Python<'_>) -> Option<Vec<(f64, f64, f64)>> {
-        py.detach(|| self.inner.finite_hurdle_segments().map(<[_]>::to_vec))
-    }
     fn impact_source(&self, py: Python<'_>) -> PyResult<crate::impact::PyImpactSource> {
         py.detach(|| self.inner.impact_source())
             .map(|inner| crate::impact::PyImpactSource { inner })
-            .map_err(error)
+            .map_err(|failure| match failure {
+                crc_framework_core::CrcError::Unsupported(_) => {
+                    PyTypeError::new_err(failure.to_string())
+                }
+                _ => error(failure),
+            })
     }
     fn hurdle_atoms(&self, py: Python<'_>) -> PyResult<Vec<(f64, f64)>> {
         py.detach(|| self.inner.hurdle_atoms()).map_err(error)

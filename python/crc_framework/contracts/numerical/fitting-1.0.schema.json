@@ -829,7 +829,7 @@
         }
       ]
     },
-    "evidence_support": {
+    "value_interval": {
       "anyOf": [
         {
           "type": "array",
@@ -837,6 +837,23 @@
             "type": "number",
             "minimum": -1.7976931348623157e+308,
             "maximum": 1.7976931348623157e+308
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "probability_interval": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
           },
           "minItems": 2,
           "maxItems": 2
@@ -861,7 +878,8 @@
     "used_count",
     "excluded_count",
     "weights",
-    "evidence_support",
+    "value_interval",
+    "probability_interval",
     "engine_version"
   ],
   "additionalProperties": false

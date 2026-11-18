@@ -152,7 +152,13 @@ requested fit; they do not authorize fitting other families.
 A `FitResult` contains the law, the selected attempt's typed `diagnostic`, and
 a `FitRecord` with the requested
 specification, actual estimator, convergence, attempts, the selected attempt
-index, effective weights, evidence counts and support, and engine version.
+index, effective weights, evidence counts, and engine version. The
+`value_interval` records the observed value range. For a quantile fit it
+reflects the selected attempt's positive-weight knots and any declared
+censoring. Failed quantile fits record the last attempt that used knots. The
+`probability_interval` describes the original supplied knots and applies only
+to quantile evidence. Reopening a fitted curve checks that its support covers
+the recorded values when `require_sample_support=True`.
 Sample attempts report their KS statistic and p-value. Quantile attempts report
 the residual measures for the requested operation and compare predicted
 quantiles at every supplied interior probability. This comparison weights the

@@ -212,9 +212,7 @@ def test_samples_record_matches_the_attempts_and_observed_range(samples):
     assert FitRecord.from_json(record.to_json()) == record
     insufficient = len(samples) < 3
     assert record.used_count == (0 if insufficient else len(samples))
-    assert record.evidence_support == (
-        (min(samples), max(samples)) if samples else None
-    )
+    assert record.value_interval == ((min(samples), max(samples)) if samples else None)
     document = json.loads(record.to_json())
     document.update(used_count=1, excluded_count=len(samples) - 1)
     with pytest.raises(ValueError):
@@ -229,7 +227,7 @@ def test_converged_sample_record_cannot_invent_exclusions_or_drop_support():
     fabricated_records = (
         {"used_count": 3, "excluded_count": 5},
         {"evidence_count": 9, "excluded_count": 1},
-        {"evidence_support": None},
+        {"value_interval": None},
     )
     for changes in fabricated_records:
         document = json.loads(original.to_json())
@@ -297,8 +295,8 @@ def test_same_family_candidates_remain_disambiguated_by_selected_attempt():
         ("weights", [1]),
         ("weights", [0.2] * 8),
         ("weights", [None] * 8),
-        ("evidence_support", [2, 1]),
-        ("evidence_support", [1]),
+        ("value_interval", [2, 1]),
+        ("value_interval", [1]),
         ("attempts", []),
     ],
 )
@@ -355,9 +353,9 @@ def test_failed_record_cannot_hide_a_converged_attempt_without_selection():
 def test_quantile_record_requires_probability_support_and_effective_weights():
     document = json.loads(quantile_record().to_json())
     for field, value in [
-        ("evidence_support", [-1, 2]),
-        ("evidence_support", [0.5, 0.5]),
-        ("evidence_support", [0, 1]),
+        ("probability_interval", [-1, 2]),
+        ("probability_interval", [0.5, 0.5]),
+        ("probability_interval", [0, 1]),
         ("weights", None),
     ]:
         malformed = deepcopy(document)

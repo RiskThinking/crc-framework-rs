@@ -69,6 +69,8 @@ def build():
         Distribution.histogram([0, 1, 2, 3], [1, 0, math.ulp(0.0)])
     )
     decreasing = Impact.linear(slope=-2, intercept=1, input=Ratio(), output=Ratio())
+    identity = Impact.linear(slope=1, input=Ratio(), output=Ratio())
+    wide_histogram = Distribution.histogram([-1e308, 1e308], [1])
     sigmoid = Impact.sigmoid(midpoint=0, steepness=1, input=Ratio(), output=Ratio())
     clamped_affine = Impact.linear(
         slope=0.5, intercept=3, maximum=6, input=Ratio(), output=Ratio()
@@ -220,6 +222,24 @@ def build():
         [
             ("hurdle-completed", Distribution.hurdle(complete, atom_probability=0.2)),
             ("decreasing", decreasing.pushforward(objects[0][1])),
+            (
+                "decreasing-parametric-deep-ranks",
+                decreasing.pushforward(
+                    Distribution.parametric(
+                        DistributionFamily.GUMBEL_RIGHT, location=0, scale=1
+                    )
+                ),
+            ),
+            (
+                "composed-wide-histogram",
+                identity.pushforward(identity.pushforward(wide_histogram)),
+            ),
+            (
+                "wide-tabulated-impact",
+                Impact.tabulated(
+                    [(-1e308, -1), (1e308, 1)], input=Ratio(), output=Ratio()
+                ).pushforward(wide_histogram),
+            ),
             ("transformed-discrete-hurdle", decreasing.pushforward(discrete_hurdle)),
             (
                 "composed-clamped-affine",
@@ -242,6 +262,8 @@ def build():
             coordinates.insert(3, 0.75)
         if name == "pareto-interior-near-lower-bound":
             coordinates.insert(1, 1e-20)
+        if name == "decreasing-parametric-deep-ranks":
+            coordinates[1:1] = [1e-18, 1e-16]
         if (
             name.startswith("deep-parametric-hurdle")
             or name == "deep-skew-normal-hurdle"
@@ -270,6 +292,11 @@ def build():
 
     def bad(name, document, structural=True):
         rejected.append({"name": name, "document": document, "structural": structural})
+
+    for axis, coordinates in (("probabilities", [False, 0.9]), ("values", [0, True])):
+        document = json.loads(QuantileCurve([0.1, 0.9], [0, 1]).to_json())
+        document[axis] = coordinates
+        bad(f"boolean-curve-{axis}", document)
 
     for name, cutoff in [("at-maximum", 1), ("above-maximum", 2)]:
         document = json.loads(deep_sigmoid_hurdle.to_json())

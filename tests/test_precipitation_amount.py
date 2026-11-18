@@ -56,7 +56,7 @@ def test_no_usable_samples_produces_an_authoritative_failed_fit_record() -> None
     with pytest.raises(FitError) as raised:
         fit_samples([], spec)
     record = raised.value.record
-    assert not record.converged and record.evidence_support is None
+    assert not record.converged and record.value_interval is None
     assert record.evidence_count == record.used_count == record.excluded_count == 0
     assert record.attempts[0].specification == spec
     diagnostic = record.attempts[0].diagnostic

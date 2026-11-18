@@ -184,7 +184,10 @@ def fitting_schema():
             "used_count": {"type": "integer", "minimum": 0},
             "excluded_count": {"type": "integer", "minimum": 0},
             "weights": nullable(array(PROBABILITY)),
-            "evidence_support": nullable(array(NUMBER, minItems=2, maxItems=2)),
+            "value_interval": nullable(array(NUMBER, minItems=2, maxItems=2)),
+            "probability_interval": nullable(
+                array(PROBABILITY, minItems=2, maxItems=2)
+            ),
             "engine_version": {"type": "string", "minLength": 1},
         }
     )

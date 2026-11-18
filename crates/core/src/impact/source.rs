@@ -539,6 +539,9 @@ impl ImpactSource {
             {
                 Ok(segment_quantile(&segments.0, probability, true))
             }
+            Self::Hurdle(distribution) if probability == distribution.atom_probability() => {
+                hurdle_tail_lower_bound(distribution)
+            }
             _ => self.quantile(probability),
         }
     }
@@ -559,21 +562,7 @@ impl ImpactSource {
                 .map_err(distribution_error),
             Self::Histogram(histogram) => Ok(histogram.inverse_survival(survival, false)),
             Self::Tabulated(distribution) => {
-                let mut consumed = 0.0;
-                let q = distribution.probabilities();
-                let x = distribution.values();
-                for index in (0..q.len() - 1).rev() {
-                    let mass = q[index + 1] - q[index];
-                    if mass > 0.0 && (survival < consumed + mass || survival == 0.0) {
-                        return Ok(linear_interpolate(
-                            x[index + 1],
-                            x[index],
-                            (survival - consumed) / mass,
-                        ));
-                    }
-                    consumed += mass;
-                }
-                Ok(x[0])
+                Ok(tabulated_inverse_survival(distribution, survival, false))
             }
             Self::PointMass(distribution) => Ok(distribution.location()),
             Self::Segments(segments) => Ok(segment_inverse_survival(&segments.0, survival, false)),
@@ -595,6 +584,13 @@ impl ImpactSource {
         match self {
             Self::Segments(segments) => Ok(segment_inverse_survival(&segments.0, survival, true)),
             Self::Histogram(histogram) => Ok(histogram.inverse_survival(survival, true)),
+            Self::Hurdle(distribution) if survival == 1.0 - distribution.atom_probability() => {
+                hurdle_tail_lower_bound(distribution)
+            }
+            Self::Tabulated(distribution) if survival <= 0.5 => {
+                Ok(tabulated_inverse_survival(distribution, survival, true))
+            }
+            Self::Fitted(_) | Self::Hurdle(_) if survival <= 0.5 => self.inverse_survival(survival),
             _ => self.upper_quantile(1.0 - survival),
         }
     }
@@ -827,6 +823,32 @@ impl ImpactSource {
             Self::Hurdle(distribution) => fitted_mean_is_finite(distribution.base()),
         }
     }
+}
+
+fn hurdle_tail_lower_bound(distribution: &HurdleDistribution) -> ContractResult<f64> {
+    distribution
+        .base()
+        .ppf(0.0)
+        .map(|lower| lower.max(distribution.atom_location()))
+        .map_err(distribution_error)
+}
+
+fn tabulated_inverse_survival(
+    distribution: &TabulatedDistribution,
+    survival: f64,
+    upper: bool,
+) -> f64 {
+    let q = distribution.probabilities();
+    let x = distribution.values();
+    for index in (0..q.len() - 1).rev() {
+        let mass = q[index + 1] - q[index];
+        let right = 1.0 - q[index];
+        if mass > 0.0 && (survival < right || upper && survival == right) {
+            let weight = ((survival - (1.0 - q[index + 1])) / mass).clamp(0.0, 1.0);
+            return linear_interpolate(x[index + 1], x[index], weight);
+        }
+    }
+    x[0]
 }
 
 fn flat_knots(probabilities: &[f64], values: &[f64]) -> Vec<(f64, f64)> {

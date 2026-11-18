@@ -116,7 +116,10 @@ def _finite(value: float, label: str) -> float:
 
 
 def _vector(values: ArrayLike, label: str) -> FloatArray:
-    if numpy.asarray(values).dtype.kind not in "iuf":
+    if numpy.asarray(values).dtype.kind not in "iuf" or (
+        isinstance(values, Sequence)
+        and any(isinstance(value, (bool, numpy.bool_)) for value in values)
+    ):
         raise TypeError(f"{label} must contain real numbers")
     array = numpy.asarray(values, dtype=numpy.float64)
     if array.ndim != 1 or array.size == 0 or not numpy.isfinite(array).all():
@@ -520,13 +523,7 @@ class Distribution:
         if probability == 1:
             return self.support[0]
         assert self._transformed is not None
-        impact, source = self._impact_source()
-        exact = impact._inverse_survival(source, probability)
-        return (
-            exact
-            if exact is not None
-            else self._transformed.inverse_survival(probability)
-        )
+        return self._transformed.inverse_survival(probability)
 
     def _tail_integral(
         self, lo: float, hi: float, *, center: float = 0.0, square: bool = False
@@ -537,7 +534,9 @@ class Distribution:
             return self._compound.hurdle_integral(lo, hi, center, square, True)
         assert self._transformed is not None
         impact, source = self._impact_source()
-        exact = impact._tail_integral(source, lo, hi, center=center, square=square)
+        exact = impact._integral(
+            source, lo, hi, center=center, square=square, survival=True
+        )
         return (
             exact
             if exact is not None
@@ -624,81 +623,7 @@ class Distribution:
                 return Distribution.point_mass(
                     cast(float, data["atom_location"])
                 )._source()
-            return self._segment_source()
-        if self.kind is DistributionKind.TRANSFORMED:
-            return self._segment_source()
-        raise TypeError("this law requires its exact compound representation")
-
-    def _segment_source(self) -> _core.NativeImpactSource:
-        return _core.NativeImpactSource.segments(self._segments())
-
-    def _segments(self) -> list[tuple[float, float, float]]:
-        """Ordered exact uniform intervals and atoms for a finite law."""
-        if self._compound is not None:
-            segments = self._compound.hurdle_segments()
-            if segments is None:
-                raise TypeError(
-                    "this law has no finite piecewise uniform representation"
-                )
-            return segments
-        data = self._data
-        if self.kind is DistributionKind.DISCRETE:
-            return [
-                (x, x, p)
-                for x, p in zip(
-                    cast(list[float], data["values"]),
-                    cast(list[float], data["probabilities"]),
-                )
-            ]
-        if self.kind is DistributionKind.POINT_MASS:
-            x = cast(float, data["value"])
-            return [(x, x, 1.0)]
-        if self.kind is DistributionKind.HISTOGRAM:
-            edges = cast(list[float], data["edges"])
-            return [
-                (a, b, p)
-                for a, b, p in zip(
-                    edges, edges[1:], cast(list[float], data["probabilities"])
-                )
-                if p > 0
-            ]
-        if self.kind is DistributionKind.QUANTILE:
-            q = cast(list[float], data["probabilities"])
-            knots = cast(list[float], data["values"])
-            return [(a, b, q1 - q0) for a, b, q0, q1 in zip(knots, knots[1:], q, q[1:])]
-        if self.kind is DistributionKind.HURDLE:
-            base = Distribution.from_json(
-                _dump(
-                    {
-                        "schema_version": "1.0",
-                        "object": "distribution",
-                        **cast(dict[str, object], data["base"]),
-                    }
-                )
-            )
-            p, atom = (
-                cast(float, data["atom_probability"]),
-                cast(float, data["atom_location"]),
-            )
-            if p == 1:
-                return [(atom, atom, 1.0)]
-            surviving = cast(float, base.exceedance(atom))
-            result = [(atom, atom, p)] if p else []
-            for lower, upper, mass in base._segments():
-                if upper <= atom:
-                    continue
-                retained = 1.0 if lower >= atom else (upper - atom) / (upper - lower)
-                result.append(
-                    (max(lower, atom), upper, (mass * retained / surviving) * (1 - p))
-                )
-            return result
-        if self.kind is DistributionKind.TRANSFORMED:
-            from ._impacts import Impact
-
-            impact = Impact.from_json(_dump(data["impact"]))
-            source = Distribution.from_json(_dump(data["source"]))
-            return impact._segments(source)
-        raise TypeError("this law has no finite piecewise uniform representation")
+        return _core.NativeNumericalDocument(self.to_json()).impact_source()
 
     def to_json(self) -> str:
         data = {
@@ -854,18 +779,26 @@ class QuantileCurve:
         return _output(result, query.shape, scalar)
 
     def _inverse_survival(self, probability: float) -> float:
-        q = 1 - probability
         lo, hi = self.probability_interval
-        if not lo <= q <= hi:
+        min_tail, max_tail = 1 - hi, 1 - lo
+        if probability < min_tail or probability > max_tail:
+            bound = min_tail if probability < min_tail else max_tail
+            # Decimal knots such as 0.99 and their corresponding period
+            # (100 years) can differ in their final binary tail digits.
+            if math.isclose(probability, bound, rel_tol=1e-12):
+                return float(self._values[-1 if probability < min_tail else 0])
             raise ValueError(
                 f"query lies outside supplied probability interval [{lo}, {hi}]"
             )
-        if q <= 0.5 or q == lo:
+        q = 1 - probability
+        if q <= 0.5:
             return float(self.quantile(q))
         right = max(1, int(numpy.searchsorted(self._probabilities, q)))
+        if q == self._probabilities[right] and probability < 1 - q:
+            right += 1
         q_high = float(self._probabilities[right])
         high = float(self._values[right])
-        if q == q_high < 1 or probability == 0:
+        if probability == 1 - q_high:
             return high
         # Use the supplied knots' original width. Converting all knots to
         # survival first could erase distinct probabilities near zero.
@@ -948,9 +881,11 @@ class QuantileCurve:
     @classmethod
     def from_json(cls, text: str) -> QuantileCurve:
         data = _parse(text)
-        _fields(data, {"schema_version", "object", "probabilities", "values"})
-        if data["schema_version"] != "1.0" or data["object"] != "quantile_curve":
+        if data.get("object") != "quantile_curve":
             raise ValueError("expected numerical quantile_curve schema 1.0")
+        _core.validate_document(
+            "https://climateriskcommons.org/schemas/numerical/1.0", text
+        )
         return cls(
             cast(ArrayLike, data["probabilities"]), cast(ArrayLike, data["values"])
         )

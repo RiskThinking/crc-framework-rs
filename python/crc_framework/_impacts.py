@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from enum import Enum
 from functools import cache
-from itertools import pairwise
 from types import MappingProxyType
 from typing import cast
 
@@ -368,57 +367,6 @@ class Impact:
             return float(result)
         return _snapshot(result)
 
-    def _segments(self, distribution: Distribution) -> list[tuple[float, float, float]]:
-        """Exact finite strata for a piecewise-affine response."""
-        document = _load(self.to_json())
-        model = cast(dict[str, object], document["model"])
-        kind = model["kind"]
-        if kind not in ("linear", "tabulated", "binned"):
-            raise TypeError(
-                "the transformed law has no exact finite piecewise-affine representation"
-            )
-        cuts: list[float] = []
-        if kind == "tabulated":
-            cuts = [
-                float(point["x"])
-                for point in cast(list[dict[str, float]], model["points"])
-            ]
-        elif kind == "binned":
-            cuts = cast(list[float], model["bin_edges"])
-        elif model["slope"] != 0:
-            slope, intercept = (
-                float(cast(float, model["slope"])),
-                float(cast(float, model["intercept"])),
-            )
-            clamp = cast(dict[str, float | None] | None, document.get("clamp"))
-            if clamp is not None:
-                cuts = [
-                    (value - intercept) / slope
-                    for value in clamp.values()
-                    if value is not None
-                ]
-        strata: list[tuple[float, float, float]] = []
-        for lower, upper, probability in distribution._segments():
-            if lower == upper:
-                value = float(self.evaluate(lower))
-                strata.append((value, value, probability))
-                continue
-            boundaries = (
-                [lower] + sorted(x for x in cuts if lower < x < upper) + [upper]
-            )
-            for left, right in pairwise(boundaries):
-                mass = probability * (right - left) / (upper - lower)
-                if kind == "binned":
-                    first = last = float(self.evaluate(left + (right - left) / 2))
-                else:
-                    first, last = (
-                        float(self.evaluate(left)),
-                        float(self.evaluate(right)),
-                    )
-                strata.append((min(first, last), max(first, last), mass))
-        strata.sort(key=lambda segment: (segment[0], segment[1]))
-        return strata
-
     def _moments(self, source: Distribution) -> tuple[float, float] | None:
         """Affine moments inherit the source's explicit finite/infinite outcomes."""
         document = _load(self.to_json())
@@ -432,7 +380,7 @@ class Impact:
         if document.get("clamp") is None:
             mean, variance = source._moments()
             return slope * mean + intercept, _scaled_square(slope, variance)
-        clamped_mean = self._tail_integral(source, 0.0, 1.0)
+        clamped_mean = self._integral(source, 0.0, 1.0)
         assert clamped_mean is not None
         if not math.isfinite(clamped_mean):
             return clamped_mean, math.inf if math.isinf(clamped_mean) else math.nan
@@ -450,199 +398,92 @@ class Impact:
         *,
         center: float = 0.0,
         square: bool = False,
+        survival: bool = False,
     ) -> float | None:
-        """Integrate affine ranks through the source's authoritative law.
-
-        This avoids numerical quadrature misreporting a divergent tail as a
-        finite value, and handles negative slopes by reversing rank intervals.
-        Clamps split rank space into exact constant tails and an affine middle.
-        """
+        """Integrate affine ranks in the nearer tail's probability coordinates."""
         document = _load(self.to_json())
         model = cast(dict[str, object], document["model"])
         if model["kind"] != "linear":
             return None
         slope = float(cast(float, model["slope"]))
         intercept = float(cast(float, model["intercept"]))
-        if slope == 0:
-            value = float(self.evaluate(0.0)) - center
-            return (hi - lo) * (value * value if square else value)
-
-        def affine(left: float, right: float) -> float:
-            if right <= left:
-                return 0.0
-            start, end = (left, right) if slope > 0 else (1 - right, 1 - left)
-            if square:
-                return _scaled_square(
-                    slope,
-                    source._integral(
-                        start, end, center=(center - intercept) / slope, square=True
-                    ),
-                )
-            return slope * source._integral(start, end) + (intercept - center) * (
-                right - left
-            )
-
-        clamp = cast(dict[str, float] | None, document.get("clamp"))
-        if clamp is None:
-            return affine(lo, hi)
+        clamp = cast(dict[str, float], document.get("clamp", {}))
         minimum, maximum = clamp.get("minimum"), clamp.get("maximum")
-        contributions: list[float] = []
-        middle_lo, middle_hi = lo, hi
 
         def constant(value: float, width: float) -> float:
-            value -= center
-            return width * (value * value if square else value)
-
-        if minimum is not None:
-            threshold = (minimum - intercept) / slope
-            probability = float(
-                source.cdf(threshold)
-                if slope > 0
-                else source.exceedance(threshold, inclusive=True)
+            scale = math.sqrt(width) if square else width
+            difference = value - center
+            scaled = (
+                difference * scale
+                if math.isfinite(difference)
+                else value * scale - center * scale
             )
-            width = max(0.0, min(hi, probability) - lo)
-            if width > 0:
-                contributions.append(constant(minimum, width))
-            middle_lo = max(middle_lo, probability)
-        if maximum is not None:
-            threshold = (maximum - intercept) / slope
-            probability = float(
-                source.exceedance(threshold)
-                if slope > 0
-                else source.cdf(threshold, inclusive=False)
-            )
-            boundary = 1 - probability
-            if probability > 0 and boundary == 1.0:
-                raise ImpactError(
-                    "precision_limit",
-                    "/statistics",
-                    "the clamped tail lies beyond representable rank resolution",
-                )
-            width = (
-                probability
-                if lo <= boundary and hi == 1
-                else max(0.0, hi - max(lo, boundary))
-            )
-            if width > 0:
-                contributions.append(constant(maximum, width))
-            middle_hi = min(middle_hi, boundary)
-        contributions.append(affine(middle_lo, middle_hi))
-        try:
-            return math.fsum(contributions)
-        except ValueError:
-            return math.nan
+            return scaled * scaled if square else scaled
 
-    def _inverse_survival(self, source: Distribution, survival: float) -> float | None:
-        document = _load(self.to_json())
-        model = cast(dict[str, object], document["model"])
-        if model["kind"] != "linear":
-            return None
-        slope = float(cast(float, model["slope"]))
-        intercept = float(cast(float, model["intercept"]))
-        if slope == 0:
-            return float(self.evaluate(0.0))
-        value = (
-            slope
-            * float(
-                source._inverse_survival(survival)
-                if slope > 0
-                else source.quantile(survival)
-            )
-            + intercept
-        )
-        clamp = cast(dict[str, float] | None, document.get("clamp"))
-        if clamp is not None:
-            if "minimum" in clamp:
-                value = max(clamp["minimum"], value)
-            if "maximum" in clamp:
-                value = min(clamp["maximum"], value)
-        return value
+        if lo == hi:
+            return 0.0
+        if slope == 0 or minimum == maximum and minimum is not None:
+            return constant(float(self.evaluate(0.0)), hi - lo)
 
-    def _tail_integral(
-        self,
-        source: Distribution,
-        s_min: float,
-        s_max: float,
-        *,
-        center: float = 0.0,
-        square: bool = False,
-    ) -> float | None:
-        """Integrate upper ranks using survival coordinates without cancellation."""
-        document = _load(self.to_json())
-        model = cast(dict[str, object], document["model"])
-        if model["kind"] != "linear":
-            return None
-        slope = float(cast(float, model["slope"]))
-        intercept = float(cast(float, model["intercept"]))
-        if slope == 0:
-            value = float(self.evaluate(0.0)) - center
-            return (s_max - s_min) * (value * value if square else value)
+        def add(values: Sequence[float]) -> float:
+            try:
+                return math.fsum(values)
+            except ValueError:
+                return math.nan
 
-        def affine(left: float, right: float) -> float:
+        def part(left: float, right: float, from_upper: bool) -> float:
             if right <= left:
                 return 0.0
-            integrate = source._tail_integral if slope > 0 else source._integral
-            if square:
-                return _scaled_square(
-                    slope,
-                    integrate(
-                        left, right, center=(center - intercept) / slope, square=True
-                    ),
-                )
-            return slope * integrate(left, right) + (intercept - center) * (
-                right - left
-            )
+            source_upper = from_upper if slope > 0 else not from_upper
+            integrate = source._tail_integral if source_upper else source._integral
 
-        clamp = cast(dict[str, float] | None, document.get("clamp"))
-        if clamp is None:
-            return affine(s_min, s_max)
-        contributions: list[float] = []
-        middle_lo, middle_hi = s_min, s_max
+            def cut(value: float) -> float:
+                threshold = (value - intercept) / slope
+                if source_upper:
+                    return float(source.exceedance(threshold, inclusive=not from_upper))
+                return float(source.cdf(threshold, inclusive=not from_upper))
 
-        def constant(value: float, width: float) -> float:
-            value -= center
-            return width * (value * value if square else value)
+            # The first and last ranks are assigned to the corresponding
+            # clamp. Rank cuts are evaluated directly as CDF or survival.
+            first, last = (maximum, minimum) if from_upper else (minimum, maximum)
+            contributions: list[float] = []
+            if first is not None:
+                boundary = cut(first)
+                if boundary > left:
+                    contributions.append(constant(first, min(right, boundary) - left))
+                left = max(left, boundary)
+            if last is not None:
+                boundary = cut(last)
+                if boundary < right and right > left:
+                    contributions.append(constant(last, right - max(left, boundary)))
+                right = min(right, boundary)
+            if right > left:
+                if square:
+                    contribution = _scaled_square(
+                        slope,
+                        integrate(
+                            left,
+                            right,
+                            center=(center - intercept) / slope,
+                            square=True,
+                        ),
+                    )
+                else:
+                    contribution = slope * integrate(left, right) + (
+                        intercept - center
+                    ) * (right - left)
+                contributions.append(contribution)
+            return add(contributions)
 
-        if "maximum" in clamp:
-            maximum = clamp["maximum"]
-            threshold = (maximum - intercept) / slope
-            probability = float(
-                source.exceedance(threshold)
-                if slope > 0
-                else source.cdf(threshold, inclusive=False)
+        # Map only ranks at or above one half into their complements.
+        # This also keeps a tiny endpoint atom representable when the
+        # complementary ordinary probability rounds to one.
+        return add(
+            (
+                part(lo, min(hi, 0.5), survival),
+                part(1 - hi, 1 - max(lo, 0.5), not survival),
             )
-            width = max(0.0, min(s_max, probability) - s_min)
-            if width > 0:
-                contributions.append(constant(maximum, width))
-            middle_lo = max(middle_lo, probability)
-        if "minimum" in clamp:
-            minimum = clamp["minimum"]
-            threshold = (minimum - intercept) / slope
-            probability = float(
-                source.cdf(threshold)
-                if slope > 0
-                else source.exceedance(threshold, inclusive=True)
-            )
-            boundary = 1 - probability
-            if probability > 0 and boundary == 1.0:
-                raise ImpactError(
-                    "precision_limit",
-                    "/statistics",
-                    "the clamped lower tail lies beyond representable survival resolution",
-                )
-            width = (
-                probability
-                if s_min <= boundary and s_max == 1
-                else max(0.0, s_max - max(s_min, boundary))
-            )
-            if width > 0:
-                contributions.append(constant(minimum, width))
-            middle_hi = min(middle_hi, boundary)
-        contributions.append(affine(middle_lo, middle_hi))
-        try:
-            return math.fsum(contributions)
-        except ValueError:
-            return math.nan
+        )
 
     def _operation(
         self, distribution: Distribution

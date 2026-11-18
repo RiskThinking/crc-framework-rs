@@ -971,7 +971,8 @@
         "used_count": "int",
         "excluded_count": "int",
         "weights": "tuple[float, ...] | None",
-        "evidence_support": "tuple[float, float] | None",
+        "value_interval": "tuple[float, float] | None",
+        "probability_interval": "tuple[float, float] | None",
         "engine_version": "str",
         "selected_attempt": "int | None"
       },
