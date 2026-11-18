@@ -622,6 +622,62 @@ impl FittedDistribution {
         }
     }
 
+    pub(crate) fn log_cdf(&self, x: f64) -> f64 {
+        let z = self.z(x);
+        let shape = self.shape.unwrap_or(0.0);
+        match self.family {
+            DistributionFamily::GumbelRight => -(-z).exp(),
+            DistributionFamily::GumbelLeft => log_exponential_complement(z),
+            DistributionFamily::WeibullMin if z > 0.0 => log_exponential_complement(shape * z.ln()),
+            DistributionFamily::WeibullMin => f64::NEG_INFINITY,
+            DistributionFamily::WeibullMax => -(-z).max(0.0).powf(shape),
+            DistributionFamily::GenPareto if z <= 0.0 => f64::NEG_INFINITY,
+            DistributionFamily::GenPareto if shape * z <= -1.0 => 0.0,
+            DistributionFamily::GenPareto => log_exponential_complement(
+                if shape.abs() < EPS {
+                    z
+                } else {
+                    (shape * z).ln_1p() / shape
+                }
+                .ln(),
+            ),
+            DistributionFamily::GenExtreme if shape.abs() < EPS => -(-z).exp(),
+            DistributionFamily::GenExtreme if 1.0 - shape * z <= 0.0 => {
+                if shape > 0.0 {
+                    0.0
+                } else {
+                    f64::NEG_INFINITY
+                }
+            }
+            DistributionFamily::GenExtreme => -((-shape * z).ln_1p() / shape).exp(),
+            DistributionFamily::SkewNormal => skew_normal_log_cdf(z, shape),
+        }
+    }
+
+    pub(crate) fn inverse_log_cdf(&self, logarithm: f64) -> Result<f64> {
+        if logarithm >= f64::MIN_POSITIVE.ln() || logarithm == f64::NEG_INFINITY {
+            return self.ppf(logarithm.exp());
+        }
+        let shape = self.shape.unwrap_or(0.0);
+        let standardized = match self.family {
+            DistributionFamily::GumbelRight => -(-logarithm).ln(),
+            DistributionFamily::GumbelLeft => logarithm,
+            DistributionFamily::WeibullMin => {
+                return Ok(self.location + (self.scale.ln() + logarithm / shape).exp());
+            }
+            DistributionFamily::WeibullMax => -(-logarithm).powf(1.0 / shape),
+            DistributionFamily::GenPareto => {
+                return Ok(self.location + (self.scale.ln() + logarithm).exp());
+            }
+            DistributionFamily::GenExtreme if shape.abs() < EPS => -(-logarithm).ln(),
+            DistributionFamily::GenExtreme => -(shape * (-logarithm).ln()).exp_m1() / shape,
+            DistributionFamily::SkewNormal => {
+                inverse_by_bisection(|z| skew_normal_log_cdf(z, shape), logarithm)
+            }
+        };
+        Ok(self.location + self.scale * standardized)
+    }
+
     /// Invert a positive tail even when its linear probability underflows.
     pub(crate) fn inverse_log_survival(&self, logarithm: f64) -> Result<f64> {
         if logarithm > f64::MIN_POSITIVE.ln() {
@@ -703,7 +759,7 @@ impl FittedDistribution {
                 if c.abs() < EPS {
                     self.location - self.scale * survival.ln()
                 } else {
-                    self.location + self.scale * (survival.powf(-c) - 1.0) / c
+                    self.location + self.scale * ((-c * survival.ln()).exp_m1() / c)
                 }
             }
             DistributionFamily::GenExtreme => {
@@ -714,7 +770,7 @@ impl FittedDistribution {
                 if c.abs() < EPS {
                     self.location - self.scale * neg_log_cdf.ln()
                 } else {
-                    self.location + self.scale * (1.0 - neg_log_cdf.powf(c)) / c
+                    self.location - self.scale * ((c * neg_log_cdf.ln()).exp_m1() / c)
                 }
             }
             DistributionFamily::SkewNormal => {
@@ -907,7 +963,7 @@ impl Distribution for FittedDistribution {
                 if c.abs() < EPS {
                     self.location - self.scale * (-q).ln_1p()
                 } else {
-                    self.location + self.scale * ((1.0 - q).powf(-c) - 1.0) / c
+                    self.location + self.scale * ((-c * (-q).ln_1p()).exp_m1() / c)
                 }
             }
             DistributionFamily::GenExtreme => {
@@ -915,7 +971,7 @@ impl Distribution for FittedDistribution {
                 if c.abs() < EPS {
                     self.location - self.scale * (-q.ln()).ln()
                 } else {
-                    self.location + self.scale * (1.0 - (-q.ln()).powf(c)) / c
+                    self.location - self.scale * ((c * (-q.ln()).ln()).exp_m1() / c)
                 }
             }
             DistributionFamily::SkewNormal => inverse_by_bisection(|x| self.cdf(x), q),
@@ -1002,6 +1058,29 @@ impl HurdleDistribution {
                         .exp()
                 };
             (1.0 - self.atom_probability) * conditional
+        }
+    }
+
+    pub(crate) fn log_survival_at(&self, x: f64, inclusive: bool) -> f64 {
+        if x < self.atom_location || inclusive && x == self.atom_location {
+            0.0
+        } else {
+            (-self.atom_probability).ln_1p()
+                + (self.base.log_survival(x) - self.base_log_sf_at_atom).min(0.0)
+        }
+    }
+
+    pub(crate) fn inverse_log_survival(&self, logarithm: f64) -> Result<f64> {
+        if logarithm >= f64::MIN_POSITIVE.ln() || logarithm == f64::NEG_INFINITY {
+            return self.inverse_survival(logarithm.exp());
+        }
+        let log_weight = (-self.atom_probability).ln_1p();
+        if logarithm >= log_weight {
+            Ok(self.atom_location)
+        } else {
+            self.base
+                .inverse_log_survival(logarithm - log_weight + self.base_log_sf_at_atom)
+                .map(|value| value.max(self.atom_location))
         }
     }
 
@@ -1378,7 +1457,17 @@ pub fn fit_censored_quantiles_with_bounds(
         ));
     }
 
-    let conditioning_scale = censored_conditioning_scale(values, &weights, censor_location);
+    // Values at or below the threshold all encode the same observation.
+    // Use that observation in the optimizer, support checks, and diagnostics.
+    let bounded_values: Vec<f64> = values
+        .iter()
+        .map(|value| value.max(censor_location))
+        .collect();
+    let conditioning_scale = conditioning_scale(
+        &bounded_values,
+        &weights,
+        reference_curve_fitting::positive_value_span(&bounded_values, &weights, censor_location),
+    );
     let residual_scale_floor = (residual_scale_floor_ratio * conditioning_scale).max(EPS);
     if !residual_scale_floor.is_finite()
         || residual_scale_floor > reference_curve_fitting::MAXIMUM_QUANTILE_SCALE
@@ -1392,11 +1481,11 @@ pub fn fit_censored_quantiles_with_bounds(
     let optimized = reference_curve_fitting::fit_censored_quantile_points(
         kind,
         probabilities,
-        values,
+        &bounded_values,
         &weights,
         censor_location,
         residual_scale_floor,
-        Some(&|law| bounds.accepts(law, values)),
+        Some(&|law| bounds.accepts(law, &bounded_values)),
         Some(&|parameters| project_fit_bounds(family, bounds, parameters, true)),
     )
     .ok_or_else(|| CrcError::Unsupported(format!("{} could not be fitted", family.name())))?;
@@ -1419,7 +1508,7 @@ pub fn fit_censored_quantiles_with_bounds(
         .map(|&probability| distribution.ppf(probability))
         .collect::<Result<Vec<_>>>()?;
     let transition_is_preserved =
-        preserves_censor_transition(values, &latent_values, &weights, censor_location);
+        preserves_censor_transition(&bounded_values, &latent_values, &weights, censor_location);
     if !transition_is_preserved {
         return Err(CrcError::Unsupported(
             "censored fit does not preserve the observed censor transition".into(),
@@ -1429,12 +1518,6 @@ pub fn fit_censored_quantiles_with_bounds(
         .iter()
         .map(|value| value.max(censor_location))
         .collect::<Vec<_>>();
-    // Left-censored knots are scored at the bound. A placeholder below it is
-    // not an observed residual.
-    let bounded_values: Vec<f64> = values
-        .iter()
-        .map(|value| value.max(censor_location))
-        .collect();
     let observed = quantile_diagnostics(
         &bounded_values,
         &fitted_values,
@@ -1781,18 +1864,6 @@ fn robust_value_scale(values: &[f64], weights: &[f64]) -> f64 {
     )
 }
 
-fn censored_conditioning_scale(values: &[f64], weights: &[f64], censor_location: f64) -> f64 {
-    let bounded: Vec<f64> = values
-        .iter()
-        .map(|value| value.max(censor_location))
-        .collect();
-    conditioning_scale(
-        &bounded,
-        weights,
-        reference_curve_fitting::positive_value_span(&bounded, weights, censor_location),
-    )
-}
-
 fn conditioning_scale(values: &[f64], weights: &[f64], range: f64) -> f64 {
     let median = weighted_median(
         values
@@ -1965,7 +2036,12 @@ fn log_exponential_complement(log_rate: f64) -> f64 {
     if log_rate < -37.0 {
         log_rate
     } else {
-        (-(-log_rate.exp()).exp_m1()).ln()
+        let rate = log_rate.exp();
+        if rate > std::f64::consts::LN_2 {
+            (-(-rate).exp()).ln_1p()
+        } else {
+            (-(-rate).exp_m1()).ln()
+        }
     }
 }
 

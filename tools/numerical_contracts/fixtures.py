@@ -134,6 +134,39 @@ def build():
                 ),
             ),
             ("deep-sigmoid-hurdle", deep_sigmoid_hurdle),
+            (
+                "deep-sigmoid-hurdle-subnormal",
+                Distribution.hurdle(
+                    sigmoid.pushforward(
+                        Distribution.parametric(
+                            DistributionFamily.GUMBEL_RIGHT, location=-740, scale=1
+                        )
+                    ),
+                    atom_probability=0.25,
+                    atom_location=0.5,
+                ),
+            ),
+            (
+                "deep-sigmoid-hurdle-underflow",
+                Distribution.hurdle(
+                    sigmoid.pushforward(
+                        Distribution.parametric(
+                            DistributionFamily.GUMBEL_RIGHT, location=-1000, scale=1
+                        )
+                    ),
+                    atom_probability=0.25,
+                    atom_location=0.5,
+                ),
+            ),
+            (
+                "pareto-interior-near-lower-bound",
+                Distribution.parametric(
+                    DistributionFamily.GENERALIZED_PARETO,
+                    location=0,
+                    scale=1e20,
+                    shape=0.5,
+                ),
+            ),
             ("deep-parametric-hurdle", deep_parametric_hurdle),
             (
                 "deep-parametric-hurdle-over-affine-image",
@@ -207,6 +240,8 @@ def build():
             coordinates = [0, tiny_probability / 2, tiny_probability, 0.1]
         if name.startswith("deep-"):
             coordinates.insert(3, 0.75)
+        if name == "pareto-interior-near-lower-bound":
+            coordinates.insert(1, 1e-20)
         if (
             name.startswith("deep-parametric-hurdle")
             or name == "deep-skew-normal-hurdle"

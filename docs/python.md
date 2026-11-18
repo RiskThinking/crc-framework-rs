@@ -158,8 +158,17 @@ the residual measures for the requested operation and compare predicted
 quantiles at every supplied interior probability. This comparison weights the
 knots equally and divides RMSE by their observed value span, so candidates are
 scored on the same evidence even when their estimation weights differ.
+For censored selection, every candidate must use the same `censor_location`.
+Scores compare observations and predicted quantiles at the bound wherever they
+are left-censored. Values supplied below the bound are placeholders for the
+same observation.
 Model selection picks the first converged candidate with the lowest recorded
 score. Distribution parameters are available on the fitted law.
+
+The sample fit record counts observations supplied to `fit_samples`. An attempt
+that meets its minimum uses the full sample. If every attempted specification
+requires more observations, the record keeps the supplied sample range and
+reports zero used observations.
 
 ## Evaluate impacts explicitly
 

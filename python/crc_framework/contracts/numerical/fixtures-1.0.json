@@ -19,11 +19,11 @@
         },
         {
           "probability": 0.1,
-          "value": -0.539600778691206
+          "value": -0.5396007786912065
         },
         {
           "probability": 0.5,
-          "value": 1.9197552906442061
+          "value": 1.9197552906442052
         },
         {
           "probability": 0.9,
@@ -245,19 +245,19 @@
         },
         {
           "probability": 0.1,
-          "value": 1.4123949637478144
+          "value": 1.412394963747813
         },
         {
           "probability": 0.5,
-          "value": 2.6609262942379344
+          "value": 2.6609262942379335
         },
         {
           "probability": 0.9,
-          "value": 6.700500594970059
+          "value": 6.700500594970058
         },
         {
           "probability": 0.99,
-          "value": 14.470164199585057
+          "value": 14.470164199585055
         },
         {
           "probability": 1,
@@ -1262,11 +1262,191 @@
         },
         {
           "probability": 0.99,
-          "value": 0.9868421052631579
+          "value": 0.9868421052631581
         },
         {
           "probability": 1,
           "value": 1.0
+        }
+      ]
+    },
+    {
+      "name": "deep-sigmoid-hurdle-subnormal",
+      "document": {
+        "atom_location": 0.5,
+        "atom_probability": 0.25,
+        "base": {
+          "impact": {
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "amplitude": 1,
+              "kind": "sigmoid",
+              "midpoint": 0,
+              "offset": 0,
+              "steepness": 1
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "family": "gumbel_r",
+            "kind": "parametric",
+            "location": -740.0,
+            "object": "distribution",
+            "scale": 1.0,
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.5
+        },
+        {
+          "probability": 0.1,
+          "value": 0.5
+        },
+        {
+          "probability": 0.5,
+          "value": 0.599999999999999
+        },
+        {
+          "probability": 0.75,
+          "value": 0.7500000000000102
+        },
+        {
+          "probability": 0.9,
+          "value": 0.8823529411764749
+        },
+        {
+          "probability": 0.99,
+          "value": 0.9868421052631583
+        },
+        {
+          "probability": 1,
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "name": "deep-sigmoid-hurdle-underflow",
+      "document": {
+        "atom_location": 0.5,
+        "atom_probability": 0.25,
+        "base": {
+          "impact": {
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "amplitude": 1,
+              "kind": "sigmoid",
+              "midpoint": 0,
+              "offset": 0,
+              "steepness": 1
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "family": "gumbel_r",
+            "kind": "parametric",
+            "location": -1000.0,
+            "object": "distribution",
+            "scale": 1.0,
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.5
+        },
+        {
+          "probability": 0.1,
+          "value": 0.5
+        },
+        {
+          "probability": 0.5,
+          "value": 0.599999999999999
+        },
+        {
+          "probability": 0.75,
+          "value": 0.7500000000000102
+        },
+        {
+          "probability": 0.9,
+          "value": 0.8823529411764749
+        },
+        {
+          "probability": 0.99,
+          "value": 0.9868421052631583
+        },
+        {
+          "probability": 1,
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "name": "pareto-interior-near-lower-bound",
+      "document": {
+        "family": "genpareto",
+        "kind": "parametric",
+        "location": 0.0,
+        "object": "distribution",
+        "scale": 1e+20,
+        "schema_version": "1.0",
+        "shape": 0.5
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 1e-20,
+          "value": 1.0
+        },
+        {
+          "probability": 0.1,
+          "value": 1.0818510677891955e+19
+        },
+        {
+          "probability": 0.5,
+          "value": 8.2842712474619e+19
+        },
+        {
+          "probability": 0.9,
+          "value": 4.324555320336759e+20
+        },
+        {
+          "probability": 0.99,
+          "value": 1.7999999999999987e+21
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
         }
       ]
     },
@@ -1575,7 +1755,7 @@
         },
         {
           "probability": 0.99,
-          "value": 5.158744056768153
+          "value": 5.158744056768157
         },
         {
           "probability": 1,
@@ -1640,7 +1820,7 @@
         },
         {
           "probability": 0.5,
-          "value": 0.9054651081081673
+          "value": 0.9054651081081744
         },
         {
           "probability": 0.75,
@@ -1722,7 +1902,7 @@
         },
         {
           "probability": 0.99,
-          "value": 4.317488113536307
+          "value": 4.317488113536314
         },
         {
           "probability": 1,
@@ -1848,15 +2028,15 @@
         },
         {
           "probability": 0.5,
-          "value": -2.8395105812884123
+          "value": -2.8395105812884105
         },
         {
           "probability": 0.9,
-          "value": 2.079201557382412
+          "value": 2.0792015573824134
         },
         {
           "probability": 0.99,
-          "value": 5.199854401469143
+          "value": 5.199854401469139
         },
         {
           "probability": 1,
@@ -2001,15 +2181,15 @@
         },
         {
           "probability": 0.5,
-          "value": -6.919755290644206
+          "value": -6.919755290644205
         },
         {
           "probability": 0.9,
-          "value": -4.460399221308794
+          "value": -4.460399221308793
         },
         {
           "probability": 0.99,
-          "value": -2.9000727992654287
+          "value": -2.9000727992654305
         },
         {
           "probability": 1,

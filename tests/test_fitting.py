@@ -374,6 +374,34 @@ def test_quantile_candidates_are_scored_on_the_same_knots() -> None:
         assert single.diagnostic.normalized_rmse == pytest.approx(expected)
 
 
+def test_censored_selection_scores_observations_at_the_censoring_bound() -> None:
+    probabilities = [0.5, 0.8, 0.9, 0.96, 0.98, 0.99, 0.996, 0.998, 0.999]
+    families = (
+        DistributionFamily.GENERALIZED_EXTREME_VALUE,
+        DistributionFamily.WEIBULL_MINIMUM,
+    )
+    candidates = tuple(
+        CensoredQuantileFit(family=family, censor_location=0.0) for family in families
+    )
+    specification = ModelSelection(
+        candidates=candidates,
+        criterion=SelectionCriterion.NORMALIZED_ROOT_MEAN_SQUARE_ERROR,
+    )
+    observed = [0.0] * 6 + [0.03, 0.06, 0.1]
+    at_bound = fit_quantiles(QuantileCurve(probabilities, observed), specification)
+    below_bound = QuantileCurve(probabilities, [-0.1] * 6 + observed[6:])
+    selected = fit_quantiles(below_bound, specification)
+    assert selected.record == at_bound.record
+    assert selected.distribution.to_json() == at_bound.distribution.to_json()
+    for candidate, attempt in zip(candidates, selected.record.attempts, strict=True):
+        single = fit_quantiles(below_bound, candidate)
+        assert single.diagnostic == attempt.diagnostic
+        predicted = np.maximum(single.distribution.quantile(probabilities), 0.0)
+        expected = np.sqrt(np.mean(((predicted - observed) / 0.1) ** 2))
+        assert single.diagnostic.normalized_rmse == pytest.approx(expected)
+        assert single.diagnostic.normalization_scale == pytest.approx(0.1)
+
+
 def test_zero_weight_endpoints_are_explicit_exclusions() -> None:
     source = Distribution.parametric(
         DistributionFamily.GUMBEL_RIGHT, location=2.0, scale=3.0

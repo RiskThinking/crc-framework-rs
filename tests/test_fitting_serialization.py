@@ -98,6 +98,37 @@ def test_concrete_decoder_rejects_another_discriminator(factory):
 
 
 @pytest.mark.parametrize(
+    "other",
+    [
+        QuantileFit(family=DistributionFamily.GUMBEL_RIGHT),
+        CensoredQuantileFit(
+            family=DistributionFamily.GUMBEL_RIGHT, censor_location=0.1
+        ),
+    ],
+)
+def test_censored_comparison_requires_one_observation_model(other):
+    first = CensoredQuantileFit(
+        family=DistributionFamily.GENERALIZED_EXTREME_VALUE, censor_location=0
+    )
+    criterion = SelectionCriterion.NORMALIZED_ROOT_MEAN_SQUARE_ERROR
+    with pytest.raises(ValueError, match="same censor_location"):
+        ModelSelection(candidates=(first, other), criterion=criterion)
+    text = json.dumps(
+        {
+            "kind": "model_selection",
+            "criterion": criterion.value,
+            "candidates": [
+                json.loads(candidate.to_json()) for candidate in (first, other)
+            ],
+        }
+    )
+    with pytest.raises(ValueError, match="same censor_location"):
+        FitSpec.from_json(text)
+    with pytest.raises(ValueError, match="same censor_location"):
+        _core.validate_document(SCHEMA["$id"] + "#/$defs/specification", text)
+
+
+@pytest.mark.parametrize(
     "path",
     [
         (),
@@ -171,6 +202,43 @@ def test_failed_record_round_trips_without_success_or_actual_estimator():
     assert not restored.converged
     assert restored.selected_attempt is None and restored.estimator is None
     assert restored.to_json() == record.to_json()
+
+
+@pytest.mark.parametrize("samples", [[], [3], [3, 4], [2] * 8])
+def test_samples_record_matches_the_attempts_and_observed_range(samples):
+    with pytest.raises(FitError) as caught:
+        fit_samples(samples, SampleFit(family=DistributionFamily.GUMBEL_RIGHT))
+    record = caught.value.record
+    assert FitRecord.from_json(record.to_json()) == record
+    insufficient = len(samples) < 3
+    assert record.used_count == (0 if insufficient else len(samples))
+    assert record.evidence_support == (
+        (min(samples), max(samples)) if samples else None
+    )
+    document = json.loads(record.to_json())
+    document.update(used_count=1, excluded_count=len(samples) - 1)
+    with pytest.raises(ValueError):
+        FitRecord.from_json(json.dumps(document))
+
+
+def test_converged_sample_record_cannot_invent_exclusions_or_drop_support():
+    original = sample_record()
+    curve = Distribution.parametric(
+        DistributionFamily.GUMBEL_RIGHT, location=0, scale=1
+    )
+    fabricated_records = (
+        {"used_count": 3, "excluded_count": 5},
+        {"evidence_count": 9, "excluded_count": 1},
+        {"evidence_support": None},
+    )
+    for changes in fabricated_records:
+        document = json.loads(original.to_json())
+        document.update(changes)
+        encoded = json.dumps(document)
+        with pytest.raises(ValueError):
+            FitRecord.from_json(encoded)
+        with pytest.raises(ValueError):
+            _core.validate_fitted_curve(encoded, curve.to_json(), "v", "[]")
 
 
 def test_fallback_record_identifies_the_explicitly_executed_alternative():
@@ -289,6 +357,7 @@ def test_quantile_record_requires_probability_support_and_effective_weights():
     for field, value in [
         ("evidence_support", [-1, 2]),
         ("evidence_support", [0.5, 0.5]),
+        ("evidence_support", [0, 1]),
         ("weights", None),
     ]:
         malformed = deepcopy(document)
@@ -326,6 +395,10 @@ def test_failed_quantile_record_still_validates_executed_weights():
     document = json.loads(record.to_json())
     document["weights"].reverse()
     with pytest.raises(ValueError, match="effective weights contradict"):
+        FitRecord.from_json(json.dumps(document))
+    document = json.loads(record.to_json())
+    document.update(weights=None, used_count=0, excluded_count=record.evidence_count)
+    with pytest.raises(ValueError, match="require effective weights"):
         FitRecord.from_json(json.dumps(document))
 
 
@@ -372,20 +445,10 @@ def test_record_cannot_claim_convergence_without_the_required_evidence(
         field
     ] = 100
     assert RECORD_VALIDATOR.is_valid(document)
-    with pytest.raises(ValueError, match="less than its required evidence"):
+    with pytest.raises(ValueError, match="recorded evidence support or count"):
         FitRecord.from_json(json.dumps(document))
-    with pytest.raises(ValueError, match="less than its required evidence"):
+    with pytest.raises(ValueError, match="recorded evidence support or count"):
         _core.validate_document(SCHEMA["$id"], json.dumps(document))
-
-
-def test_sample_record_uses_available_observations_after_exclusion():
-    document = json.loads(sample_record().to_json())
-    document.update(evidence_count=9, excluded_count=1)
-    assert FitRecord.from_json(json.dumps(document)).used_count == 8
-
-    document.update(used_count=2, excluded_count=7)
-    with pytest.raises(ValueError, match="less than its required evidence"):
-        FitRecord.from_json(json.dumps(document))
 
 
 def test_sample_record_cannot_claim_quantile_weights():

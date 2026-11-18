@@ -188,7 +188,6 @@ class Distribution:
     _native: _core.NativeNumericalLaw | None
     _transformed: _core.NativeImpactDistribution | None
     _record: dict[str, object] | None
-    _base: Distribution | None
     _compound: _core.NativeNumericalDocument | None
 
     def __init__(self) -> None:
@@ -199,7 +198,7 @@ class Distribution:
         cls, data: dict[str, object], record: dict[str, object] | None = None
     ) -> Distribution:
         result = object.__new__(cls)
-        base = None
+        compound = False
         native_data = dict(data)
         if data.get("kind") == "hurdle":
             _fields(data, {"kind", "base", "atom_probability", "atom_location"})
@@ -207,25 +206,21 @@ class Distribution:
             hydrated = cls.from_json(
                 _dump({"schema_version": "1.0", "object": "distribution", **base_data})
             )
-            if hydrated._native is None:
-                base = hydrated
-            else:
+            compound = hydrated._native is None
+            if not compound:
                 native_data["base"] = hydrated._native_data()
         object.__setattr__(
             result,
             "_native",
-            None if base is not None else _core.NativeNumericalLaw(_dump(native_data)),
+            None if compound else _core.NativeNumericalLaw(_dump(native_data)),
         )
         object.__setattr__(result, "_data", data)
         object.__setattr__(result, "_transformed", None)
         object.__setattr__(result, "_record", record)
-        object.__setattr__(result, "_base", base)
         object.__setattr__(
             result,
             "_compound",
-            None
-            if base is None
-            else _core.NativeNumericalDocument.prepared_hurdle(result.to_json()),
+            _core.NativeNumericalDocument(result.to_json()) if compound else None,
         )
         return result
 
@@ -352,13 +347,6 @@ class Distribution:
             return self._native.support()
         if self._compound is not None:
             return self._compound.quantile(0.0), self._compound.quantile(1.0)
-        if self._base is not None:
-            atom = cast(float, self._data["atom_location"])
-            p = cast(float, self._data["atom_probability"])
-            return (
-                atom if p else max(atom, self._base.support[0]),
-                atom if p == 1 else self._base.support[1],
-            )
         assert self._transformed is not None
         return self._transformed.quantile(0.0), self._transformed.quantile(1.0)
 
@@ -368,21 +356,6 @@ class Distribution:
             result = self._native.quantile(query.reshape(-1).tolist())
         elif self._compound is not None:
             result = self._compound.quantiles(query.reshape(-1).tolist())
-        elif self._base is not None:
-            p = cast(float, self._data["atom_probability"])
-            atom = cast(float, self._data["atom_location"])
-            surviving = cast(float, self._base.exceedance(atom))
-            result = [
-                self.support[0]
-                if q == 0
-                else atom
-                if q <= p
-                else max(
-                    atom,
-                    self._base._inverse_survival((1 - float(q)) / (1 - p) * surviving),
-                )
-                for q in query.reshape(-1)
-            ]
         else:
             assert self._transformed is not None
             result = self._transformed.quantiles(query.reshape(-1).tolist())
@@ -396,10 +369,6 @@ class Distribution:
             result = self._native.cdf(query.reshape(-1).tolist(), inclusive)
         elif self._compound is not None:
             result = self._compound.hurdle_cdf(query.reshape(-1).tolist(), inclusive)
-        elif self._base is not None:
-            result = [
-                self._compound_cdf(float(x), inclusive) for x in query.reshape(-1)
-            ]
         else:
             assert self._transformed is not None
             result = self._transformed.threshold_probabilities(
@@ -417,24 +386,6 @@ class Distribution:
             result = self._compound.hurdle_exceedance(
                 query.reshape(-1).tolist(), inclusive
             )
-        elif self._base is not None:
-            p, atom = (
-                cast(float, self._data["atom_probability"]),
-                cast(float, self._data["atom_location"]),
-            )
-            surviving = cast(float, self._base.exceedance(atom))
-            result = [
-                1.0
-                if x < atom or inclusive and x == atom
-                else 0.0
-                if p == 1
-                else (1 - p)
-                * (
-                    cast(float, self._base.exceedance(float(x), inclusive=inclusive))
-                    / surviving
-                )
-                for x in query.reshape(-1)
-            ]
         else:
             assert self._transformed is not None
             result = self._transformed.threshold_probabilities(
@@ -448,20 +399,6 @@ class Distribution:
             result = self._native.mass(query.reshape(-1).tolist())
         elif self._compound is not None:
             result = self._compound.hurdle_mass(query.reshape(-1).tolist())
-        elif self._base is not None:
-            p, atom = (
-                cast(float, self._data["atom_probability"]),
-                cast(float, self._data["atom_location"]),
-            )
-            surviving = cast(float, self._base.exceedance(atom))
-            result = [
-                p
-                if x == atom
-                else (1 - p) * (cast(float, self._base.mass(float(x))) / surviving)
-                if x > atom and p < 1
-                else 0.0
-                for x in query.reshape(-1)
-            ]
         else:
             assert self._transformed is not None
             atoms = dict(self._transformed.atoms())
@@ -473,20 +410,8 @@ class Distribution:
             return self._native.atoms()
         if self._transformed is not None:
             return self._transformed.atoms()
-        if self._compound is not None:
-            return self._compound.hurdle_atoms()
-        assert self._base is not None
-        p = cast(float, self._data["atom_probability"])
-        atom = cast(float, self._data["atom_location"])
-        result = [(atom, p)] if p else []
-        if p < 1:
-            survival = float(self._base.exceedance(atom))
-            result.extend(
-                (x, mass / survival * (1 - p))
-                for x, mass in self._base._point_atoms()
-                if x > atom
-            )
-        return result
+        assert self._compound is not None
+        return self._compound.hurdle_atoms()
 
     def sample(
         self, size: int | tuple[int, ...], *, seed: int | None = None
@@ -569,8 +494,6 @@ class Distribution:
             return self._native.integral(lo, hi, center, square)
         if self._compound is not None:
             return self._compound.hurdle_integral(lo, hi, center, square, False)
-        if self._base is not None:
-            return self._tail_integral(1 - hi, 1 - lo, center=center, square=square)
         # Transformed finite laws retain all exact probability atoms. General
         # transformed laws are integrated adaptively by the native engine.
         assert self._transformed is not None
@@ -596,18 +519,6 @@ class Distribution:
             return self.support[1]
         if probability == 1:
             return self.support[0]
-        if self._base is not None:
-            p, atom = (
-                cast(float, self._data["atom_probability"]),
-                cast(float, self._data["atom_location"]),
-            )
-            if probability >= 1 - p:
-                return atom
-            surviving = cast(float, self._base.exceedance(atom))
-            return max(
-                atom,
-                self._base._inverse_survival(probability / (1 - p) * surviving),
-            )
         assert self._transformed is not None
         impact, source = self._impact_source()
         exact = impact._inverse_survival(source, probability)
@@ -624,24 +535,6 @@ class Distribution:
             return self._native.tail_integral(lo, hi, center, square)
         if self._compound is not None:
             return self._compound.hurdle_integral(lo, hi, center, square, True)
-        if self._base is not None:
-            p, atom = (
-                cast(float, self._data["atom_probability"]),
-                cast(float, self._data["atom_location"]),
-            )
-            w = 1 - p
-            value = max(0.0, hi - max(lo, w)) * (
-                (atom - center) ** 2 if square else atom - center
-            )
-            if lo >= w:
-                return value
-            surviving = cast(float, self._base.exceedance(atom))
-            return value + w / surviving * self._base._tail_integral(
-                lo / w * surviving,
-                min(hi, w) / w * surviving,
-                center=center,
-                square=square,
-            )
         assert self._transformed is not None
         impact, source = self._impact_source()
         exact = impact._tail_integral(source, lo, hi, center=center, square=square)
@@ -649,22 +542,6 @@ class Distribution:
             exact
             if exact is not None
             else self._transformed.tail_integral(lo, hi, center, square)
-        )
-
-    def _compound_cdf(self, x: float, inclusive: bool) -> float:
-        assert self._base is not None
-        p, atom = (
-            cast(float, self._data["atom_probability"]),
-            cast(float, self._data["atom_location"]),
-        )
-        if x < atom or not inclusive and x == atom:
-            return 0.0
-        if p == 1:
-            return 1.0
-        surviving = cast(float, self._base.exceedance(atom))
-        return p + (1 - p) * (
-            1
-            - cast(float, self._base.exceedance(x, inclusive=not inclusive)) / surviving
         )
 
     @classmethod
@@ -678,7 +555,6 @@ class Distribution:
         object.__setattr__(result, "_native", None)
         object.__setattr__(result, "_transformed", native)
         object.__setattr__(result, "_record", None)
-        object.__setattr__(result, "_base", None)
         object.__setattr__(result, "_compound", None)
         object.__setattr__(
             result,
@@ -976,6 +852,29 @@ class QuantileCurve:
         result[weight == 0] = low[weight == 0]
         result[weight == 1] = high[weight == 1]
         return _output(result, query.shape, scalar)
+
+    def _inverse_survival(self, probability: float) -> float:
+        q = 1 - probability
+        lo, hi = self.probability_interval
+        if not lo <= q <= hi:
+            raise ValueError(
+                f"query lies outside supplied probability interval [{lo}, {hi}]"
+            )
+        if q <= 0.5 or q == lo:
+            return float(self.quantile(q))
+        right = max(1, int(numpy.searchsorted(self._probabilities, q)))
+        q_high = float(self._probabilities[right])
+        high = float(self._values[right])
+        if q == q_high < 1 or probability == 0:
+            return high
+        # Use the supplied knots' original width. Converting all knots to
+        # survival first could erase distinct probabilities near zero.
+        q_low = float(self._probabilities[right - 1])
+        low = float(self._values[right - 1])
+        weight = (probability - (1 - q_high)) / (q_high - q_low)
+        if low < 0 < high:
+            return low * weight + high * (1 - weight)
+        return high + (low - high) * weight
 
     def condition(self, *, q_min: float, q_max: float) -> Distribution:
         q_min = _finite(q_min, "q_min")

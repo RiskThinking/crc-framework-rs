@@ -289,6 +289,21 @@ impl ImpactDistribution {
         kernel::evaluate(&self.model, &self.clamp, exposure)
     }
 
+    pub(crate) fn inverse_log_survival(&self, logarithm: f64) -> ContractResult<f64> {
+        if logarithm >= f64::MIN_POSITIVE.ln()
+            || logarithm == f64::NEG_INFINITY
+            || self.is_discrete()
+        {
+            return self.inverse_survival(logarithm.exp());
+        }
+        let decreasing = matches!(self.law, Law::Continuous { decreasing: true });
+        let exposure = self.source.inverse_log_tail(logarithm, decreasing)?;
+        if exposure.is_infinite() {
+            return Ok(limit_at_infinity(&self.model, &self.clamp, exposure > 0.0));
+        }
+        kernel::evaluate(&self.model, &self.clamp, exposure)
+    }
+
     /// Query the lower or upper tail directly, with explicit treatment of atoms.
     #[doc(hidden)]
     pub fn threshold_probability(
@@ -297,6 +312,21 @@ impl ImpactDistribution {
         inclusive: bool,
         exceedance: bool,
     ) -> ContractResult<f64> {
+        self.threshold(value, inclusive, exceedance, false)
+    }
+
+    pub(crate) fn log_exceedance(&self, value: f64, inclusive: bool) -> ContractResult<f64> {
+        self.threshold(value, inclusive, true, true)
+    }
+
+    fn threshold(
+        &self,
+        value: f64,
+        inclusive: bool,
+        exceedance: bool,
+        logarithmic: bool,
+    ) -> ContractResult<f64> {
+        let coordinate = |mass: f64| if logarithmic { mass.ln() } else { mass };
         let matches = |response: f64| match (exceedance, inclusive) {
             (true, true) => response >= value,
             (true, false) => response > value,
@@ -304,16 +334,16 @@ impl ImpactDistribution {
             (false, false) => response < value,
         };
         if self.is_discrete() {
-            return Ok(neumaier(
+            return Ok(coordinate(neumaier(
                 self.atoms
                     .iter()
                     .filter(|atom| matches(atom.value))
                     .map(|atom| atom.probability),
-            ));
+            )));
         }
         let (lower, upper) = (self.essential(true)?, self.essential(false)?);
         if lower == upper || value < lower || value > upper {
-            return Ok(f64::from(matches(lower)));
+            return Ok(coordinate(f64::from(matches(lower))));
         }
         let atom_mass = self
             .atoms
@@ -328,40 +358,45 @@ impl ImpactDistribution {
                 value == lower
             };
             if outside_tail {
-                return Ok(if inclusive { atom_mass } else { 0.0 });
+                if logarithmic && inclusive && atom_mass < f64::MIN_POSITIVE {
+                    // A flat at the endpoint can retain positive mass even
+                    // when the unconditioned atom cannot be stored linearly.
+                    if let Some((cut, increasing)) = self.inverse_cut(value)
+                        && (self.clamp.maximum == Some(value) || self.clamp.minimum == Some(value))
+                    {
+                        return Ok(self.source.log_tail_at(cut, true, increasing != exceedance));
+                    }
+                    for region in constant_regions(&self.model, &self.clamp)? {
+                        if region.y != value {
+                            continue;
+                        }
+                        if region.start == f64::NEG_INFINITY {
+                            return Ok(self.source.log_tail_at(
+                                region.end,
+                                region.end_closed,
+                                true,
+                            ));
+                        }
+                        if region.end == f64::INFINITY {
+                            return Ok(self.source.log_tail_at(
+                                region.start,
+                                region.start_closed,
+                                false,
+                            ));
+                        }
+                    }
+                }
+                return Ok(coordinate(if inclusive { atom_mass } else { 0.0 }));
             }
             if inclusive || atom_mass == 0.0 {
-                return Ok(1.0);
+                // A rounded-to-zero atom cannot have a small complement.
+                return Ok(coordinate(1.0));
             }
             // A boundary atom can round to one even when its complementary
             // tail is positive. Measure the strict tail in source coordinates.
         }
 
-        let inverse = match self.model {
-            Model::Linear { slope, intercept } if slope != 0.0 => {
-                Some(((value - intercept) / slope, slope > 0.0))
-            }
-            Model::Sigmoid {
-                midpoint,
-                steepness,
-                offset,
-                amplitude,
-                origin_adjustment: OriginAdjustment::None,
-                zero_below: None,
-            } if amplitude != 0.0 && steepness != 0.0 => {
-                let fraction = (value - offset) / amplitude;
-                if fraction > 0.0 && fraction < 1.0 {
-                    Some((
-                        midpoint + (fraction.ln() - (-fraction).ln_1p()) / steepness,
-                        (amplitude > 0.0) == (steepness > 0.0),
-                    ))
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        };
-        if let Some((mut threshold, increasing)) = inverse {
+        if let Some((mut threshold, increasing)) = self.inverse_cut(value) {
             let lower_tail = increasing != exceedance;
             if atom_mass > 0.0 {
                 // A rounded response can invert to either side of an exact source atom.
@@ -386,11 +421,40 @@ impl ImpactDistribution {
                     };
                 }
             }
+            if logarithmic {
+                return Ok(self.source.log_tail_at(threshold, inclusive, lower_tail));
+            }
             return Ok(match (lower_tail, inclusive) {
                 (true, true) => self.source.cdf(threshold),
                 (true, false) => self.source.cdf_below(threshold),
                 (false, _) => self.source.survival_at(threshold, inclusive),
             });
+        }
+
+        if logarithmic {
+            debug_assert!(exceedance);
+            // Invert in log-probability space, including tails too small for
+            // the ordinary quantile search to reach.
+            let (mut left, mut right) = (-1.0, 0.0);
+            while !matches(self.inverse_log_survival(left)?) {
+                right = left;
+                left *= 2.0;
+                if !left.is_finite() {
+                    return Ok(f64::NEG_INFINITY);
+                }
+            }
+            for _ in 0..64 {
+                let mid = left.midpoint(right);
+                if mid == left || mid == right {
+                    break;
+                }
+                if matches(self.inverse_log_survival(mid)?) {
+                    left = mid;
+                } else {
+                    right = mid;
+                }
+            }
+            return Ok(left);
         }
 
         // Positive binary64 bit patterns are ordered by value. Searching them
@@ -411,6 +475,31 @@ impl ImpactDistribution {
             }
         }
         Ok(f64::from_bits(left))
+    }
+
+    fn inverse_cut(&self, value: f64) -> Option<(f64, bool)> {
+        match self.model {
+            Model::Linear { slope, intercept } if slope != 0.0 => {
+                Some(((value - intercept) / slope, slope > 0.0))
+            }
+            Model::Sigmoid {
+                midpoint,
+                steepness,
+                offset,
+                amplitude,
+                origin_adjustment: OriginAdjustment::None,
+                zero_below: None,
+            } if amplitude != 0.0 && steepness != 0.0 => {
+                let fraction = (value - offset) / amplitude;
+                (fraction > 0.0 && fraction < 1.0).then(|| {
+                    (
+                        midpoint + (fraction.ln() - (-fraction).ln_1p()) / steepness,
+                        (amplitude > 0.0) == (steepness > 0.0),
+                    )
+                })
+            }
+            _ => None,
+        }
     }
 
     /// Quantile integration in direct survival coordinates.

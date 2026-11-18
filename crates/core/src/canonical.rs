@@ -3,9 +3,14 @@ use serde_json::{Value, json};
 use std::sync::LazyLock;
 
 use crate::error::{CrcError, Result};
+use crate::impact::{
+    ImpactContractError,
+    quadrature::{GaussKronrod, integrate},
+};
 use crate::numerical::{
-    NumericalLaw, ProbabilitySegment, condition_segments, linear_interpolate, segment_integral,
-    segment_inverse_survival, segment_probability, segment_quantile,
+    NumericalLaw, ProbabilitySegment, compensated, condition_segments, linear_interpolate,
+    segment_integral, segment_inverse_survival, segment_moment, segment_probability,
+    segment_quantile,
 };
 use crate::{
     DiscreteDistribution, HistogramExposure, HurdleDistribution, ImpactDefinition,
@@ -415,7 +420,7 @@ enum Compiled {
         base: Box<Numerical>,
         probability: f64,
         location: f64,
-        surviving_mass: f64,
+        log_surviving_mass: f64,
         segments: Option<Vec<ProbabilitySegment>>,
     },
     Transformed {
@@ -502,18 +507,19 @@ impl Numerical {
                     Compiled::Law(NumericalLaw::hurdle(law, probability, location)?)
                 }
                 _ => {
-                    let surviving_mass = if probability < 1.0 {
-                        base.exceedance(location, false)?
+                    let log_surviving_mass = if probability < 1.0 {
+                        base.log_exceedance(location, false)?
                     } else {
-                        1.0
+                        0.0
                     };
                     // Conditioning an affine parametric image can use the
                     // same logarithmic survival coordinates as its base law.
-                    let affine = if surviving_mass < 2.0 * f64::MIN_POSITIVE / f64::EPSILON {
-                        base.affine_parametric()
-                    } else {
-                        None
-                    };
+                    let affine =
+                        if log_surviving_mass < (2.0 * f64::MIN_POSITIVE / f64::EPSILON).ln() {
+                            base.affine_parametric()
+                        } else {
+                            None
+                        };
                     if let Some(affine) = affine {
                         Compiled::Law(NumericalLaw::hurdle(
                             NumericalLaw::Parametric(affine),
@@ -521,7 +527,7 @@ impl Numerical {
                             location,
                         )?)
                     } else {
-                        if !base.is_distribution() || surviving_mass <= 0.0 {
+                        if !base.is_distribution() || !log_surviving_mass.is_finite() {
                             return Err(invalid(
                                 "hurdle requires a complete nonempty conditional tail",
                             ));
@@ -530,7 +536,12 @@ impl Numerical {
                             Some(vec![(location, location, 1.0)])
                         } else {
                             base.finite_segments()?.map(|segments| {
-                                condition_segments(segments, probability, location, surviving_mass)
+                                condition_segments(
+                                    segments,
+                                    probability,
+                                    location,
+                                    log_surviving_mass.exp(),
+                                )
                             })
                         };
                         if segments.as_ref().is_some_and(Vec::is_empty) {
@@ -540,7 +551,7 @@ impl Numerical {
                             base,
                             probability,
                             location,
-                            surviving_mass,
+                            log_surviving_mass,
                             segments,
                         }
                     }
@@ -594,23 +605,54 @@ impl Numerical {
         }
     }
 
-    pub fn has_prepared_hurdle(&self) -> bool {
-        matches!(self.compiled, Compiled::Law(NumericalLaw::Hurdle { .. }))
-            || self.finite_hurdle_segments().is_some()
-    }
-
     pub fn hurdle_atoms(&self) -> Result<Vec<(f64, f64)>> {
         if let Compiled::Law(law @ NumericalLaw::Hurdle { .. }) = &self.compiled {
             return Ok(law.atoms());
         }
-        self.finite_hurdle_segments()
-            .map(|segments| {
-                segments
-                    .iter()
-                    .filter_map(|&(a, b, p)| (a == b).then_some((a, p)))
-                    .collect()
-            })
-            .ok_or_else(|| invalid("requires a prepared hurdle"))
+        let Compiled::Hurdle {
+            base,
+            probability,
+            location,
+            segments,
+            ..
+        } = &self.compiled
+        else {
+            return Err(invalid("requires a hurdle"));
+        };
+        if let Some(segments) = segments {
+            return Ok(segments
+                .iter()
+                .filter_map(|&(a, b, p)| (a == b).then_some((a, p)))
+                .collect());
+        }
+        let mut locations: Vec<_> = match &base.compiled {
+            Compiled::Law(law) => law.atoms().into_iter().map(|(x, _)| x).collect(),
+            Compiled::Transformed { image, .. } => {
+                image.atoms().iter().map(|atom| atom.value).collect()
+            }
+            Compiled::Hurdle { .. } => base.hurdle_atoms()?.into_iter().map(|(x, _)| x).collect(),
+            Compiled::Curve { .. } => unreachable!("hurdles require complete distributions"),
+        };
+        // An endpoint clamp can carry a positive atom too small to appear in
+        // the unconditioned list, but significant after normalizing.
+        let upper = base.quantile(1.0)?;
+        if upper.is_finite() {
+            locations.push(upper);
+        }
+        locations.retain(|x| *x > *location);
+        locations.sort_by(f64::total_cmp);
+        locations.dedup();
+        let mut atoms = Vec::new();
+        if *probability > 0.0 {
+            atoms.push((*location, *probability));
+        }
+        for value in locations {
+            let mass = self.hurdle_probability(value, value, true, true)?;
+            if mass > 0.0 {
+                atoms.push((value, mass));
+            }
+        }
+        Ok(atoms)
     }
     /// Whether a compound hurdle has exact, prepared interval and atom masses.
     pub fn finite_hurdle_segments(&self) -> Option<&[(f64, f64, f64)]> {
@@ -638,16 +680,49 @@ impl Numerical {
                 return Err(invalid("invalid hurdle probability bounds"));
             });
         }
-        let segments = self
-            .finite_hurdle_segments()
-            .ok_or_else(|| invalid("requires a finite compound hurdle"))?;
-        Ok(segment_probability(
-            segments,
-            lower,
-            upper,
-            include_lower,
-            include_upper,
-        ))
+        if let Some(segments) = self.finite_hurdle_segments() {
+            return Ok(segment_probability(
+                segments,
+                lower,
+                upper,
+                include_lower,
+                include_upper,
+            ));
+        }
+        let Compiled::Hurdle {
+            probability,
+            location,
+            ..
+        } = &self.compiled
+        else {
+            return Err(invalid("requires a hurdle"));
+        };
+        if lower == f64::NEG_INFINITY && !include_lower {
+            return Ok(
+                if upper < *location || upper == *location && !include_upper {
+                    0.0
+                } else {
+                    -self.log_exceedance(upper, !include_upper)?.exp_m1()
+                },
+            );
+        }
+        if lower == upper && include_lower && include_upper {
+            return Ok(if lower == *location {
+                *probability
+            } else {
+                let inclusive = self.log_exceedance(lower, true)?;
+                let strict = self.log_exceedance(lower, false)?;
+                if inclusive.is_finite() {
+                    inclusive.exp() * -(strict - inclusive).min(0.0).exp_m1()
+                } else {
+                    0.0
+                }
+            });
+        }
+        if upper == f64::INFINITY && !include_upper {
+            return Ok(self.log_exceedance(lower, include_lower)?.exp());
+        }
+        Err(invalid("invalid hurdle probability bounds"))
     }
     pub fn hurdle_integral(
         &self,
@@ -667,10 +742,59 @@ impl Numerical {
                 law.integral(lo, hi, center, square)
             };
         }
-        let segments = self
-            .finite_hurdle_segments()
-            .ok_or_else(|| invalid("requires a finite compound hurdle"))?;
-        Ok(segment_integral(segments, lo, hi, center, square, survival))
+        if let Some(segments) = self.finite_hurdle_segments() {
+            return Ok(segment_integral(segments, lo, hi, center, square, survival));
+        }
+        let (lo, hi) = if survival {
+            (lo, hi)
+        } else {
+            (1.0 - hi, 1.0 - lo)
+        };
+        if lo == hi {
+            return Ok(0.0);
+        }
+        let mut contributions = Vec::new();
+        let mut start = lo;
+        for (value, mass) in self.hurdle_atoms()?.into_iter().rev() {
+            let left = self.log_exceedance(value, false)?.exp();
+            let right = left + mass;
+            if left > hi || right < lo {
+                continue;
+            }
+            if start < left {
+                contributions.push(self.integrate_survival(start, left, center, square)?);
+            }
+            let width = if lo <= left && hi >= right {
+                mass
+            } else {
+                (hi.min(right) - lo.max(left)).max(0.0)
+            };
+            contributions.push(segment_moment(width, value, value, center, square));
+            start = start.max(right);
+        }
+        if start < hi {
+            contributions.push(self.integrate_survival(start, hi, center, square)?);
+        }
+        Ok(compensated(contributions.into_iter()))
+    }
+
+    fn integrate_survival(&self, lo: f64, hi: f64, center: f64, square: bool) -> Result<f64> {
+        let width = hi - lo;
+        let result = integrate(&[(0.0, 1.0)], &GaussKronrod::defaults(), |t| {
+            // Integrating after conditioning avoids dividing by the (possibly
+            // unrepresentable) probability of the original tail.
+            let (logarithm, weight) = if lo == 0.0 {
+                (hi.ln() + 4.0 * t.ln(), width * (4.0 * t.powi(3)))
+            } else {
+                ((lo + width * t).ln(), width)
+            };
+            let value = self.inverse_log_survival(logarithm).map_err(|error| {
+                ImpactContractError::new("numerical_failure", "", error.to_string())
+            })?;
+            Ok(segment_moment(weight, value, value, center, square))
+        })
+        .map_err(invalid)?;
+        Ok(result.value)
     }
     pub fn canonical_json(&self) -> String {
         self.document.to_string()
@@ -686,20 +810,17 @@ impl Numerical {
                 values,
             } => interpolate(probabilities, values, q),
             Compiled::Hurdle {
-                base,
                 probability: p,
                 location: a,
-                surviving_mass,
                 segments,
+                ..
             } => {
                 if *p == 1.0 || q <= *p && *p > 0.0 {
                     Ok(*a)
                 } else if let Some(segments) = segments {
                     Ok(segment_quantile(segments, q, false))
                 } else {
-                    Ok(base
-                        .inverse_survival((1.0 - q) / (1.0 - p) * surviving_mass)?
-                        .max(*a))
+                    self.inverse_survival(1.0 - q)
                 }
             }
             Compiled::Transformed { image, .. } => image.quantile(q).map_err(invalid),
@@ -717,7 +838,7 @@ impl Numerical {
                 base,
                 probability: p,
                 location: a,
-                surviving_mass,
+                log_surviving_mass,
                 segments,
             } => {
                 if *p == 1.0 || *p > 0.0 && s >= 1.0 - p {
@@ -725,54 +846,72 @@ impl Numerical {
                 } else if let Some(segments) = segments {
                     Ok(segment_inverse_survival(segments, s, false))
                 } else {
-                    Ok(base
-                        .inverse_survival(s / (1.0 - p) * surviving_mass)?
-                        .max(*a))
+                    base.inverse_log_survival(s.ln() - (-p).ln_1p() + log_surviving_mass)
+                        .map(|value| value.max(*a))
                 }
             }
             Compiled::Curve { .. } => Err(invalid("partial quantile evidence is not a law")),
         }
     }
-    fn exceedance(&self, x: f64, inclusive: bool) -> Result<f64> {
+    fn inverse_log_survival(&self, logarithm: f64) -> Result<f64> {
+        if logarithm >= f64::MIN_POSITIVE.ln() || logarithm == f64::NEG_INFINITY {
+            return self.inverse_survival(logarithm.exp());
+        }
         match &self.compiled {
-            Compiled::Law(law) => Ok(law.exceedance(x, inclusive)),
+            Compiled::Law(law) => law.inverse_log_survival(logarithm),
+            Compiled::Transformed { image, .. } => {
+                image.inverse_log_survival(logarithm).map_err(invalid)
+            }
+            Compiled::Hurdle {
+                base,
+                probability,
+                location,
+                log_surviving_mass,
+                segments: None,
+            } => {
+                let log_weight = (-probability).ln_1p();
+                if logarithm >= log_weight {
+                    Ok(*location)
+                } else {
+                    base.inverse_log_survival(logarithm - log_weight + log_surviving_mass)
+                        .map(|value| value.max(*location))
+                }
+            }
+            _ => self.inverse_survival(logarithm.exp()),
+        }
+    }
+
+    fn log_exceedance(&self, x: f64, inclusive: bool) -> Result<f64> {
+        match &self.compiled {
+            Compiled::Law(law) => Ok(law.log_exceedance(x, inclusive)),
             Compiled::Hurdle {
                 base,
                 probability: p,
                 location: a,
-                surviving_mass,
+                log_surviving_mass,
                 segments,
             } => {
                 if let Some(segments) = segments {
-                    return Ok(segment_probability(
-                        segments,
-                        x,
-                        f64::INFINITY,
-                        inclusive,
-                        false,
-                    ));
+                    return Ok(
+                        segment_probability(segments, x, f64::INFINITY, inclusive, false).ln(),
+                    );
                 }
                 if x < *a || inclusive && x == *a {
-                    Ok(1.0)
-                } else if *p == 1.0 {
                     Ok(0.0)
+                } else if *p == 1.0 {
+                    Ok(f64::NEG_INFINITY)
                 } else {
-                    Ok((base.exceedance(x, inclusive)? / surviving_mass) * (1.0 - p))
+                    Ok((-p).ln_1p()
+                        + (base.log_exceedance(x, inclusive)? - log_surviving_mass).min(0.0))
                 }
             }
             Compiled::Transformed { image, .. } => {
                 if let Some(segments) = self.finite_segments()? {
-                    return Ok(segment_probability(
-                        &segments,
-                        x,
-                        f64::INFINITY,
-                        inclusive,
-                        false,
-                    ));
+                    return Ok(
+                        segment_probability(&segments, x, f64::INFINITY, inclusive, false).ln(),
+                    );
                 }
-                image
-                    .threshold_probability(x, inclusive, true)
-                    .map_err(invalid)
+                image.log_exceedance(x, inclusive).map_err(invalid)
             }
             Compiled::Curve { .. } => Err(invalid(
                 "quantile evidence has no whole-law threshold probability",

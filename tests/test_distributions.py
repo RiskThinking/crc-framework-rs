@@ -395,19 +395,82 @@ def test_deep_hurdle_survival_is_preserved_for_native_and_transformed_bases() ->
         assert law.quantile(0.75) == pytest.approx(-scale * math.log(1 / 3), abs=1e-8)
 
 
-def test_deep_hurdle_over_a_nonlinear_response_keeps_analytical_tail_queries() -> None:
+@pytest.mark.parametrize("depth", [50, 740, 1000])
+@pytest.mark.parametrize("reflected", [False, True])
+def test_deep_hurdle_over_a_nonlinear_response_keeps_analytical_tail_queries(
+    depth: int, reflected: bool
+) -> None:
     base = Distribution.parametric(
-        DistributionFamily.GUMBEL_RIGHT, location=-50, scale=1
+        DistributionFamily.GUMBEL_LEFT
+        if reflected
+        else DistributionFamily.GUMBEL_RIGHT,
+        location=depth if reflected else -depth,
+        scale=1,
     )
     measurement = Measurement(quantity="x", unit="u")
     response = Impact.sigmoid(
-        midpoint=0, steepness=1, input=measurement, output=measurement
+        midpoint=0,
+        steepness=-1 if reflected else 1,
+        input=measurement,
+        output=measurement,
     ).pushforward(base)
     law = Distribution.hurdle(response, atom_probability=0.25, atom_location=0.5)
 
-    assert law.quantile(0.75) == pytest.approx(0.75)
-    assert law.cdf(0.75) == pytest.approx(0.75)
-    assert law.exceedance(0.75) == pytest.approx(0.25)
+    # The deep Gumbel tail is exponential to machine precision. In the
+    # logistic image, its conditional response is 1/(1+U) for U uniform.
+    mean = 0.25 * 0.5 + 0.75 * math.log(2)
+    variance = 0.25 * 0.5**2 + 0.75 * 0.5 - mean**2
+    for result in (law, Distribution.from_json(law.to_json())):
+        assert result.quantile(0.75) == pytest.approx(0.75, abs=1e-12)
+        assert result.cdf(0.75) == pytest.approx(0.75, abs=1e-12)
+        assert result.exceedance(0.75) == pytest.approx(0.25, abs=1e-12)
+        assert result.mass(0.5) == 0.25
+        assert result.mass(1) == 0
+        values = result.statistics(metrics=[Statistic.MEAN, Statistic.VARIANCE]).values
+        assert values[Statistic.MEAN].value == pytest.approx(mean, abs=1e-10)
+        assert values[Statistic.VARIANCE].value == pytest.approx(variance, abs=1e-10)
+
+
+@pytest.mark.parametrize(("probability", "shape"), [(1e-20, 0.5), (1e-9, 1e-8)])
+def test_genpareto_quantile_inverts_small_positive_probabilities(
+    probability: float, shape: float
+) -> None:
+    law = Distribution.parametric(
+        DistributionFamily.GENERALIZED_PARETO, location=0, scale=1, shape=shape
+    )
+    value = float(law.quantile(probability))
+    assert value > 0
+    assert law.cdf(value) == pytest.approx(probability, rel=1e-13, abs=0)
+
+
+def test_deep_nonlinear_hurdle_recovers_an_underflowed_clamp_atom() -> None:
+    base = Distribution.parametric(
+        DistributionFamily.GUMBEL_RIGHT, location=-1000, scale=1
+    )
+    measurement = Measurement(quantity="x", unit="u")
+    document = json.loads(
+        Impact.sigmoid(
+            midpoint=0, steepness=1, input=measurement, output=measurement
+        ).to_json()
+    )
+    document["clamp"] = {"maximum": 0.9}
+    image = Impact.from_json(json.dumps(document)).pushforward(base)
+    law = Distribution.hurdle(image, atom_probability=0.25, atom_location=0.5)
+    assert law.support == (0.5, 0.9)
+    assert law.exceedance(0.9) == 0
+    assert law.exceedance(0.9, inclusive=True) == pytest.approx(1 / 12)
+    assert law.mass(0.9) == pytest.approx(1 / 12)
+
+
+@pytest.mark.parametrize(
+    "family", [DistributionFamily.WEIBULL_MINIMUM, DistributionFamily.WEIBULL_MAXIMUM]
+)
+def test_large_weibull_shape_and_scale_keep_finite_variance(
+    family: DistributionFamily,
+) -> None:
+    law = Distribution.parametric(family, location=0, scale=1e200, shape=1e200)
+    values = law.statistics(metrics=[Statistic.VARIANCE]).values
+    assert values[Statistic.VARIANCE].value == pytest.approx(math.pi**2 / 6, rel=1e-13)
 
 
 @pytest.mark.parametrize("location", [-740, -1000])

@@ -795,7 +795,7 @@ impl NumericalLaw {
         }
     }
 
-    fn inverse_log_survival(&self, logarithm: f64) -> Result<f64> {
+    pub(crate) fn inverse_log_survival(&self, logarithm: f64) -> Result<f64> {
         if !logarithm.is_finite() || logarithm > f64::MIN_POSITIVE.ln() {
             return self.inverse_survival(logarithm.exp());
         }
@@ -820,7 +820,7 @@ impl NumericalLaw {
         }
     }
 
-    fn log_exceedance(&self, x: f64, inclusive: bool) -> f64 {
+    pub(crate) fn log_exceedance(&self, x: f64, inclusive: bool) -> f64 {
         match self {
             Self::Parametric(law) => law.log_survival(x),
             Self::Hurdle {
@@ -1340,7 +1340,7 @@ impl NumericalLaw {
                         } else {
                             -s * g
                         },
-                        s * s * scaled_variance / c / c,
+                        (s / c * scaled_variance.sqrt()).powi(2),
                     )
                 }
                 DistributionFamily::SkewNormal => {
