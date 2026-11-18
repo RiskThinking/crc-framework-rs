@@ -23,9 +23,8 @@ pub use distribution::{
 pub use error::{CrcError, Result};
 pub use impact::{
     DiscreteDistribution, Expectation, GaussKronrodOptions, HistogramExposure, ImpactAtom,
-    ImpactContractError, ImpactDefinition, ImpactDistribution, ImpactEvaluationRecord,
-    ImpactSource, MethodRequest, RecordedSource, RegistryImpactReference, RequestedMethod,
-    ResolutionContext, ResolvedMethod, SnapshotRef, array_content_sha256, manifest_json,
+    ImpactContractError, ImpactDefinition, ImpactDistribution, ImpactSource, MethodRequest,
+    RegistryImpactReference, RequestedMethod, ResolutionContext, ResolvedMethod, manifest_json,
     registry_identity,
 };
 pub use metrics::{

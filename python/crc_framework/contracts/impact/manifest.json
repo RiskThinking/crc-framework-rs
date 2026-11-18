@@ -112,8 +112,8 @@
     },
     {
       "path": "schemas/impact-definition-1.0.schema.json",
-      "sha256": "3932c5b3b9730e6d0d8f28589b43e6d50749276dc404b160c061b2c6ddb1d717",
-      "bytes": 46298
+      "sha256": "fd828bf395a5ae6bc24c846357fe3bc113cbeae00f5434713a7799c16a8805df",
+      "bytes": 46301
     },
     {
       "path": "schemas/impact-evaluation-record-1.0.schema.json",

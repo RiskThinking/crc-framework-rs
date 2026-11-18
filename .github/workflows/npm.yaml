@@ -33,17 +33,19 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      - name: Verify generated contracts and Python consumers
+      - name: Verify generated contracts and build the Python wheel
         run: |
           pip install maturin numpy pytest jsonschema rfc3339-validator
-          maturin build --release --locked --out /tmp/contract-wheel
-          pip install /tmp/contract-wheel/*.whl
+          maturin build --release --locked --out "$RUNNER_TEMP/contract-wheel"
+          pip install "$RUNNER_TEMP"/contract-wheel/*.whl
           python tools/impact_contracts/generate.py --check
           python tools/numerical_contracts/generate.py --check
           python tools/numerical_contracts/fixtures.py --check
           python tools/scientific_contracts/generate.py --check
-          cd /tmp
-          python -m pytest -q "$GITHUB_WORKSPACE/tests/test_shared_contracts.py" "$GITHUB_WORKSPACE/tests/test_measurements.py" "$GITHUB_WORKSPACE/tests/test_fitting_serialization.py"
+      - uses: ./.github/actions/check-wheel
+        with:
+          python-versions: "3.12"
+          wheel-directory: ${{ runner.temp }}/contract-wheel
   native-contracts:
     runs-on: ubuntu-latest
     steps:
@@ -55,7 +57,7 @@ jobs:
           cargo test -p crc-framework-core --test canonical_consumer --test dataset_contract --test impact_contract_canonical --test impact_definition_conformance --test impact_registry_conformance --locked
           cargo test -p crc-framework-core --no-default-features --test canonical_consumer --test dataset_contract --test impact_contract_canonical --test impact_definition_conformance --test impact_registry_conformance --locked
   build:
-    needs: [python-contracts, native-contracts]
+    needs: [lint, python-contracts, native-contracts]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -71,15 +73,8 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      - name: Test native core and Python parity
-        run: |
-          cargo test -p crc-framework-core --locked
-          cargo test -p crc-framework-core --no-default-features --lib --test canonical_consumer --locked
-          pip install maturin pytest numpy jsonschema rfc3339-validator
-          python tools/impact_contracts/generate.py --check
-          maturin build --release --locked --out /tmp/crc-wheels
-          pip install /tmp/crc-wheels/*.whl
-          python -m pytest -q
+      - name: Test the native workspace
+        run: cargo test --workspace --locked
       - name: Install WASM build tooling
         run: cargo install wasm-pack --version 0.15.0 --locked
       - name: Build and test package
@@ -98,25 +93,9 @@ jobs:
         with:
           name: npm-package
           path: js/dist/*.tgz
-  runtime-contract:
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.2.0
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Build and install isolated Python wheel
-        run: |
-          uv build --wheel --python 3.12 --out-dir "$RUNNER_TEMP/contract-wheel"
-          uv venv --python 3.12 "$RUNNER_TEMP/contract-venv"
-          uv pip install --python "$RUNNER_TEMP/contract-venv/bin/python" "$RUNNER_TEMP"/contract-wheel/*.whl
-      - name: Verify installed runtime before npm publication
-        working-directory: ${{ runner.temp }}
-        run: '"$RUNNER_TEMP/contract-venv/bin/python" -I "$GITHUB_WORKSPACE/tools/api_contracts/check.py" --runtime'
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build, runtime-contract]
+    needs: build
     runs-on: ubuntu-latest
     environment: production
     permissions:

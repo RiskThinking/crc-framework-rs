@@ -2445,7 +2445,8 @@
       "crc_framework.metrics",
       "crc_framework.statistics",
       "crc_framework.models",
-      "crc_framework.spatial"
+      "crc_framework.spatial",
+      "crc_framework.impacts"
     ],
     "methods": {
       "Distribution": [
@@ -2532,7 +2533,6 @@
       "crc_framework.ImpactEvaluationRecord",
       "crc_framework.ImpactEvaluationResult",
       "crc_framework.GaussKronrodOptions",
-      "crc_framework.impacts",
       "crc_framework.BuildingType"
     ],
     "schema_fields": [
@@ -2545,13 +2545,6 @@
       "curve_atom_location",
       "curve_probabilities",
       "curve_values"
-    ],
-    "replacement_tests": {
-      "tests/test_impacts.py": "Delete import/name retention assertions; port scientific point and distribution behavior to Impact.",
-      "tests/test_sdk.py": "Use the coherent Distribution and QuantileCurve operations and explicit fit specifications.",
-      "tests/test_impact_expression.py": "Use Impact event evaluation, expectation, exact pushforward, and typed requirements.",
-      "tests/test_core_numerics.py": "Retain numerical correctness, atoms, tiny probability masses, endpoint, and safety regressions through the new interfaces.",
-      "tests/test_consumer_parity.py": "Consume current numerical representation fixtures in Python, Rust and WASM."
-    }
+    ]
   }
 }

@@ -2,6 +2,11 @@
 use crc_framework_core::{CrcError, Numerical};
 use wasm_bindgen::prelude::*;
 
+#[wasm_bindgen]
+pub fn version() -> String {
+    env!("CARGO_PKG_VERSION").to_owned()
+}
+
 fn error(error: CrcError) -> JsValue {
     match error {
         CrcError::OutOfSupport { .. } => js_sys::RangeError::new(&error.to_string()).into(),

@@ -25,10 +25,7 @@ Read that document in Node:
 import { readFileSync } from "node:fs";
 import init, { prepareNumerical } from "@climateriskcommons/crc-framework";
 
-const wasm = readFileSync(new URL(import.meta.resolve(
-  "@climateriskcommons/crc-framework/crc_framework_bg.wasm"
-)));
-await init({ module_or_path: wasm });
+await init();
 const text = readFileSync("depth.numerical.json", "utf8");
 const curve = prepareNumerical(text);
 try {
@@ -39,9 +36,10 @@ try {
 }
 ```
 
-Imports are safe during server rendering; operations require initialization.
-`init()` is shared and idempotent. In browsers, its default loads the packaged
-WASM asset; bundlers can also supply bytes through `module_or_path`.
+Imports are safe during server rendering. Call `await init()` before operations.
+Initialization loads the packaged WASM asset in Node and in browsers. It is
+shared and idempotent. To load a particular WASM file, pass its URL, bytes, or
+compiled module to `init(wasmInput)`.
 
 `quantile(text, probabilities)` performs a one-shot query. `prepareNumericals`
 accepts an array of numerical documents as JSON text and returns one result per
@@ -57,7 +55,9 @@ null result.
 Use shared structural and scientific validation without guessing schema URIs:
 
 ```javascript
-import { DocumentSchema, validateDocument } from "@climateriskcommons/crc-framework";
+import init, { DocumentSchema, validateDocument } from "@climateriskcommons/crc-framework";
+
+await init();
 const datasetJSONText = await (await fetch("/dataset.json")).text();
 validateDocument(DocumentSchema.DATASET, datasetJSONText);
 ```

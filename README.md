@@ -113,7 +113,7 @@ covers Node initialization, array queries, and shared schema validation.
 | Initialize WASM, prepare collections, or understand canonical inputs and errors | [JavaScript guide](docs/javascript.md) |
 | Pin schemas, validate identities, or record impact provenance | [Impact contracts](docs/impact-contracts.md) |
 | Set up the repository, run checks, or update contributor credits | [Development](docs/development.md) |
-| Bump versions, migrate the npm scope, or publish a release | [Releases](docs/releases.md) |
+| Check release contracts or publish a release | [Releases](docs/releases.md) |
 
 Start with the [documentation index](docs/README.md) for the reading order and
 repository boundaries.

@@ -22,14 +22,11 @@ Path("depth.numerical.json").write_text(curve.to_json(), encoding="utf-8")
 Read that document in Node:
 
 ```javascript
-import { readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import init, { prepareNumerical } from "@climateriskcommons/crc-framework";
 
-const wasm = readFileSync(new URL(import.meta.resolve(
-  "@climateriskcommons/crc-framework/crc_framework_bg.wasm"
-)));
-await init({ module_or_path: wasm });
-const text = readFileSync("depth.numerical.json", "utf8");
+await init();
+const text = await readFile("depth.numerical.json", "utf8");
 const curve = prepareNumerical(text);
 try {
   console.log(curve.quantile(0.99)); // 2: the supplied 100-year upper-tail level
@@ -39,9 +36,10 @@ try {
 }
 ```
 
-Imports are safe during server rendering; operations require initialization.
-`init()` is shared and idempotent. In browsers, its default loads the packaged
-WASM asset; bundlers can also supply bytes through `module_or_path`.
+Import the package during server rendering or in browser code. Call
+`await init()` before running queries or validation. Node.js and browser
+bundlers load the packaged WebAssembly asset. To use your own copy, pass a
+WebAssembly module, bytes, or a URL to `init`.
 
 `quantile(text, probabilities)` performs a one-shot query. `prepareNumericals`
 accepts an array of numerical documents as JSON text and returns one result per
@@ -57,12 +55,14 @@ null result.
 Use shared structural and scientific validation without guessing schema URIs:
 
 ```javascript
-import { DocumentSchema, validateDocument } from "@climateriskcommons/crc-framework";
-const datasetJSONText = await (await fetch("/dataset.json")).text();
-validateDocument(DocumentSchema.DATASET, datasetJSONText);
+import init, { DocumentSchema, validateDocument } from "@climateriskcommons/crc-framework";
+
+await init();
+const response = await fetch("/dataset.json");
+validateDocument(DocumentSchema.DATASET, await response.text());
 ```
 
-Supply original JSON text to preserve unsigned64 cell identifiers and arbitrary
+Supply original JSON text to preserve unsigned 64-bit cell identifiers and arbitrary
 scientific integers. JavaScript's ordinary JSON parser cannot represent every
 integer exactly. Current schemas are also available under the package's
 `contracts/` export. Model provenance, scientific references, fit execution

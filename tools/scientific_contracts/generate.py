@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 from crc_framework import _measurement as science
-from crc_framework import impacts
+from crc_framework import _impacts as impacts
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "python/crc_framework/contracts/scientific"

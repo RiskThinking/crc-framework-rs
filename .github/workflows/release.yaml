@@ -5,20 +5,17 @@ on:
       - "v*"
   workflow_dispatch:
 permissions:
-  contents: write
-  id-token: write
+  contents: read
 jobs:
 
-  runtime-contract:
-    name: Installed Python release contract
+  release-contract:
+    name: Release declarations and Git tag
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.2.0
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
       - name: Validate release tag and declared contract
         env:
           RELEASE_REF_TYPE: ${{ github.ref_type }}
@@ -26,16 +23,9 @@ jobs:
         run: |
           uv run --no-project --python 3.12 python tools/api_contracts/check.py
           uv run --no-project --python 3.12 python -c 'import os, tomllib; version=tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["version"]; assert os.environ["RELEASE_REF_TYPE"] == "tag" and os.environ["RELEASE_REF_NAME"] == "v" + version, "Release must run from the matching version tag"'
-      - name: Build and install isolated wheel
-        run: |
-          uv build --wheel --python 3.12 --out-dir "$RUNNER_TEMP/contract-wheel"
-          uv venv --python 3.12 "$RUNNER_TEMP/contract-venv"
-          uv pip install --python "$RUNNER_TEMP/contract-venv/bin/python" "$RUNNER_TEMP"/contract-wheel/*.whl
-      - name: Verify installed runtime before publication
-        working-directory: ${{ runner.temp }}
-        run: '"$RUNNER_TEMP/contract-venv/bin/python" -I "$GITHUB_WORKSPACE/tools/api_contracts/check.py" --runtime'
 
   linux:
+    needs: release-contract
     runs-on: ubuntu-22.04
     env:
       CARGO_NET_GIT_FETCH_WITH_CLI: "true"
@@ -61,12 +51,17 @@ jobs:
           target: ${{ matrix.target }}
           args: >-
             --release
+            --locked
             --out dist
             --compatibility manylinux_2_28
             --interpreter python3.11 python3.12 python3.13 python3.14 python3.14t
           sccache: "true"
           manylinux: auto
           container: "2_28"
+      - uses: ./.github/actions/check-wheel
+        with:
+          python-versions: 3.11 3.12 3.13 3.14 3.14t
+          wheel-directory: dist
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -74,10 +69,13 @@ jobs:
           path: dist
 
   macos:
-    runs-on: macos-latest
+    needs: release-contract
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        target: [x86_64, aarch64]
+        include:
+          - {os: macos-15-intel, target: x86_64}
+          - {os: macos-15, target: aarch64}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
@@ -105,10 +103,15 @@ jobs:
           target: ${{ matrix.target }}
           args: >-
             --release
+            --locked
             --out dist
-            --find-interpreter
+            --interpreter python3.11 python3.12 python3.13 python3.14 python3.14t
           sccache: "true"
           container: "off"
+      - uses: ./.github/actions/check-wheel
+        with:
+          python-versions: 3.11 3.12 3.13 3.14 3.14t
+          wheel-directory: dist
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -116,6 +119,7 @@ jobs:
           path: dist
 
   windows:
+    needs: release-contract
     runs-on: windows-latest
     env:
       CARGO_NET_GIT_FETCH_WITH_CLI: "true"
@@ -153,10 +157,15 @@ jobs:
           target: x64
           args: >-
             --release
+            --locked
             --out dist
             --interpreter ${{ steps.setup-python.outputs.python-path }}
           sccache: "true"
           container: "off"
+      - uses: ./.github/actions/check-wheel
+        with:
+          python-versions: ${{ matrix.interpreter }}
+          wheel-directory: dist
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -164,6 +173,7 @@ jobs:
           path: dist
 
   sdist:
+    needs: release-contract
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -174,6 +184,13 @@ jobs:
         with:
           command: sdist
           args: --out dist
+      - uses: astral-sh/setup-uv@v10.2.0
+      - name: Build a wheel from the source distribution
+        run: uv build --wheel --python 3.12 --out-dir "$RUNNER_TEMP/sdist-wheel" dist/*.tar.gz
+      - uses: ./.github/actions/check-wheel
+        with:
+          python-versions: "3.12"
+          wheel-directory: ${{ runner.temp }}/sdist-wheel
       - name: Upload sdist
         uses: actions/upload-artifact@v4
         with:
@@ -184,7 +201,10 @@ jobs:
     name: Release
     environment: production
     runs-on: ubuntu-latest
-    needs: [runtime-contract, linux, macos, windows, sdist]
+    needs: [linux, macos, windows, sdist]
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
