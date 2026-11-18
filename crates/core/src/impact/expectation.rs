@@ -11,6 +11,7 @@ use super::error::{ContractResult, fail};
 use super::kernel;
 use super::quadrature::{self, GaussKronrod, neumaier};
 use super::source::{ImpactSource, Tail};
+use crate::numerical::interval_fraction;
 
 pub const EXACT_PIECEWISE_VERSION: &str = "crc-exact-piecewise/1";
 pub const EXACT_MOMENT_VERSION: &str = "crc-exact-moment/1";
@@ -346,8 +347,8 @@ fn weighted_expectation(
         let end = cuts.partition_point(|cut| *cut < hi);
         let mut left = lo;
         for right in cuts[start..end].iter().copied().chain(std::iter::once(hi)) {
-            let fraction = (right - left) / (hi - lo);
-            let midpoint = left + (right - left) * 0.5;
+            let fraction = interval_fraction(lo, hi, left, right);
+            let midpoint = left.midpoint(right);
             contributions.push(mass * fraction * kernel::evaluate(model, clamp, midpoint)?);
             left = right;
         }
@@ -609,7 +610,14 @@ pub(crate) fn response_breakpoints(model: &Model, clamp: &Clamp) -> Vec<f64> {
     points
 }
 
-fn push_crossings(x0: f64, y0: f64, x1: f64, y1: f64, clamp: &Clamp, points: &mut Vec<f64>) {
+pub(super) fn push_crossings(
+    x0: f64,
+    y0: f64,
+    x1: f64,
+    y1: f64,
+    clamp: &Clamp,
+    points: &mut Vec<f64>,
+) {
     if y0 == y1 {
         return;
     }
@@ -617,7 +625,12 @@ fn push_crossings(x0: f64, y0: f64, x1: f64, y1: f64, clamp: &Clamp, points: &mu
         let low = y0.min(y1);
         let high = y0.max(y1);
         if limit > low && limit < high {
-            points.push(x0 + (x1 - x0) * (limit - y0) / (y1 - y0));
+            let (left, right) = if y0 < y1 {
+                ((y0, x0), (y1, x1))
+            } else {
+                ((y1, x1), (y0, x0))
+            };
+            points.push(kernel::interpolate_segment(left, right, limit));
         }
     }
 }

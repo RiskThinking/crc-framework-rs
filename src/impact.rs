@@ -100,13 +100,6 @@ pub(crate) struct PyImpactSource {
 #[pymethods]
 impl PyImpactSource {
     #[staticmethod]
-    fn segments(py: Python<'_>, segments: Vec<(f64, f64, f64)>) -> PyResult<Self> {
-        py.detach(|| ImpactSource::from_segments(segments))
-            .map(|inner| Self { inner })
-            .map_err(|error| impact_error(py, error))
-    }
-
-    #[staticmethod]
     fn histogram(py: Python<'_>, edges: Vec<f64>, weights: Vec<f64>) -> PyResult<Self> {
         let histogram =
             HistogramExposure::new(edges, weights).map_err(|error| impact_error(py, error))?;

@@ -47,6 +47,57 @@ def test_linear_does_not_hide_a_zero_clamp() -> None:
     assert not callable(response)
 
 
+@pytest.mark.parametrize("rank", [1e-16, 1e-18])
+def test_reflected_unbounded_law_keeps_small_interior_ranks(rank: float) -> None:
+    source = Distribution.parametric(
+        DistributionFamily.GUMBEL_RIGHT, location=0, scale=1
+    )
+    image = linear(-1).pushforward(source)
+    expected = math.log(-math.log1p(-rank))
+    assert image.quantile(rank) == pytest.approx(expected, rel=1e-14)
+    assert image.cdf(expected) == pytest.approx(rank, rel=1e-14, abs=0)
+
+
+def test_reflected_hurdle_skips_zero_mass_gap_at_exact_rank() -> None:
+    base = Distribution.parametric(
+        DistributionFamily.WEIBULL_MINIMUM, location=10, scale=1, shape=2
+    )
+    image = linear(-1).pushforward(Distribution.hurdle(base, atom_probability=0.25))
+    assert image.quantile(0.75) == -10
+    assert image._inverse_survival(0.25) == -10
+
+
+def test_affine_composition_preserves_wide_finite_histogram() -> None:
+    response = linear(1)
+    source = Distribution.histogram([-1e308, 1e308], [1])
+    image = response.pushforward(source)
+    composed = response.pushforward(image)
+    assert composed.quantile(0.5) == 0
+    assert response.expectation(image) == 0
+    assert Distribution.from_json(composed.to_json()).quantile(0.5) == 0
+
+
+@pytest.mark.parametrize(
+    "points",
+    [
+        [(-1e308, -1), (1e308, 1)],
+        [(-1, -1e308), (1, 1e308)],
+        [(-1, 1e308), (1, -1e308)],
+    ],
+)
+def test_tabulated_midpoint_handles_wide_finite_intervals(
+    points: list[tuple[float, float]],
+) -> None:
+    response = Impact.tabulated(points, input=Ratio(), output=Ratio())
+    assert response.evaluate(0) == 0
+    assert (
+        response.pushforward(
+            Distribution.histogram([points[0][0], points[1][0]], [1])
+        ).quantile(0.5)
+        == 0
+    )
+
+
 @pytest.mark.parametrize("shape", [(), (4,), (2, 2), (2, 0, 3)])
 def test_all_point_responses_preserve_shape_and_freeze_results(
     shape: tuple[int, ...],
@@ -429,6 +480,31 @@ def test_affine_clamps_can_complete_a_divergent_tail(slope: float) -> None:
         2 * (4 - math.log(5)) - math.log(5) ** 2
     )
     assert image.quantile(1 if slope > 0 else 0) == 4 * slope
+
+
+@pytest.mark.parametrize("slope", [1.0, -1.0])
+@pytest.mark.parametrize(
+    "family", [DistributionFamily.GUMBEL_RIGHT, DistributionFamily.GUMBEL_LEFT]
+)
+def test_affine_clamped_statistics_keep_sub_epsilon_endpoints(
+    slope: float, family: DistributionFamily
+) -> None:
+    base = Distribution.parametric(family, location=0, scale=1)
+    side = slope if family is DistributionFamily.GUMBEL_RIGHT else -slope
+    response = linear(
+        slope, maximum=40 if side > 0 else None, minimum=-40 if side < 0 else None
+    )
+    image = response.pushforward(base)
+    assert 0 < float(image.mass(side * 40)) < math.ulp(1.0)
+    metrics = [Statistic.MEAN, Statistic.VARIANCE, Statistic.CVAR]
+    tail = Tail.UPPER if side > 0 else Tail.LOWER
+    expected = linear(slope).pushforward(base).statistics(metrics=metrics, tail=tail)
+    statistics = image.statistics(metrics=metrics, tail=tail)
+    for metric in metrics:
+        assert statistics.values[metric].status is StatisticStatus.FINITE
+        assert statistics.values[metric].value == pytest.approx(
+            expected.values[metric].value, abs=1e-9
+        )
 
 
 @pytest.mark.parametrize("slope", [1.0, -1.0])

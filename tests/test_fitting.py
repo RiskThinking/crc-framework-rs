@@ -196,7 +196,7 @@ def test_quantile_fit_recovers_values_and_reports_effective_weights() -> None:
     assert result.record.weights == pytest.approx(
         (1 / 15, 0, 2 / 15, 3 / 15, 4 / 15, 5 / 15)
     )
-    assert result.record.evidence_support == (0.1, 0.99)
+    assert result.record.probability_interval == (0.1, 0.99)
     assert result.record.estimator is None
     assert result.diagnostic.normalized_rmse < 1e-6
 
@@ -426,7 +426,7 @@ def test_zero_weight_endpoints_are_explicit_exclusions() -> None:
     assert result.record.weights == pytest.approx(
         (0.0, 1 / 6, 1 / 6, 1 / 6, 1 / 6, 1 / 6, 1 / 6, 0.0)
     )
-    assert result.record.evidence_support == (0.0, 1.0)
+    assert result.record.probability_interval == (0.0, 1.0)
     assert result.record.selected_attempt == 0
 
 

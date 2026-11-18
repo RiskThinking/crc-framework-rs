@@ -2045,6 +2045,227 @@
       ]
     },
     {
+      "name": "decreasing-parametric-deep-ranks",
+      "document": {
+        "impact": {
+          "input": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "model": {
+            "intercept": 1,
+            "kind": "linear",
+            "slope": -2
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "family": "gumbel_r",
+          "kind": "parametric",
+          "location": 0.0,
+          "object": "distribution",
+          "scale": 1.0,
+          "schema_version": "1.0"
+        }
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 1e-18,
+          "value": -81.89306334778564
+        },
+        {
+          "probability": 1e-16,
+          "value": -72.68272297580947
+        },
+        {
+          "probability": 0.1,
+          "value": -3.5007346546248908
+        },
+        {
+          "probability": 0.5,
+          "value": 0.2669741588366713
+        },
+        {
+          "probability": 0.9,
+          "value": 2.668064890495912
+        },
+        {
+          "probability": 0.99,
+          "value": 4.054359251615802
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "composed-wide-histogram",
+      "document": {
+        "impact": {
+          "input": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "model": {
+            "intercept": 0,
+            "kind": "linear",
+            "slope": 1
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "impact": {
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 1
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "object": "distribution",
+          "schema_version": "1.0",
+          "source": {
+            "edges": [
+              -1e+308,
+              1e+308
+            ],
+            "kind": "histogram",
+            "object": "distribution",
+            "probabilities": [
+              1.0
+            ],
+            "schema_version": "1.0"
+          }
+        }
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -1e+308
+        },
+        {
+          "probability": 0.1,
+          "value": -8.000000000000001e+307
+        },
+        {
+          "probability": 0.5,
+          "value": 0.0
+        },
+        {
+          "probability": 0.9,
+          "value": 8.000000000000001e+307
+        },
+        {
+          "probability": 0.99,
+          "value": 9.800000000000001e+307
+        },
+        {
+          "probability": 1,
+          "value": 1e+308
+        }
+      ]
+    },
+    {
+      "name": "wide-tabulated-impact",
+      "document": {
+        "impact": {
+          "input": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "model": {
+            "interpolation": "linear",
+            "kind": "tabulated",
+            "outside_domain": "error",
+            "points": [
+              {
+                "x": -100000000000000001097906362944045541740492309677311846336810682903157585404911491537163328978494688899061249669721172515611590283743140088328307009198146046031271664502933027185697489699588559043338384466165001178426897626212945177628091195786707458122783970171784415105291802893207873272974885715430223118336,
+                "y": -1
+              },
+              {
+                "x": 100000000000000001097906362944045541740492309677311846336810682903157585404911491537163328978494688899061249669721172515611590283743140088328307009198146046031271664502933027185697489699588559043338384466165001178426897626212945177628091195786707458122783970171784415105291802893207873272974885715430223118336,
+                "y": 1
+              }
+            ]
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "edges": [
+            -1e+308,
+            1e+308
+          ],
+          "kind": "histogram",
+          "object": "distribution",
+          "probabilities": [
+            1.0
+          ],
+          "schema_version": "1.0"
+        }
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -1.0
+        },
+        {
+          "probability": 0.1,
+          "value": -0.8
+        },
+        {
+          "probability": 0.5,
+          "value": 0.0
+        },
+        {
+          "probability": 0.9,
+          "value": 0.8
+        },
+        {
+          "probability": 0.99,
+          "value": 0.9800000000000002
+        },
+        {
+          "probability": 1,
+          "value": 1.0
+        }
+      ]
+    },
+    {
       "name": "transformed-discrete-hurdle",
       "document": {
         "impact": {
@@ -2316,6 +2537,38 @@
     }
   ],
   "rejected": [
+    {
+      "name": "boolean-curve-probabilities",
+      "document": {
+        "object": "quantile_curve",
+        "probabilities": [
+          false,
+          0.9
+        ],
+        "schema_version": "1.0",
+        "values": [
+          0.0,
+          1.0
+        ]
+      },
+      "structural": true
+    },
+    {
+      "name": "boolean-curve-values",
+      "document": {
+        "object": "quantile_curve",
+        "probabilities": [
+          0.1,
+          0.9
+        ],
+        "schema_version": "1.0",
+        "values": [
+          0,
+          true
+        ]
+      },
+      "structural": true
+    },
     {
       "name": "sigmoid-hurdle-at-maximum",
       "document": {

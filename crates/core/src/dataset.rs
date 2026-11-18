@@ -22,9 +22,14 @@ fn array(value: &Value) -> Result<&Vec<Value>> {
 }
 
 fn text(value: &Value) -> Result<&str> {
-    let value = value
-        .as_str()
-        .ok_or_else(|| invalid("expected an identifier"))?;
+    identifier(
+        value
+            .as_str()
+            .ok_or_else(|| invalid("expected an identifier"))?,
+    )
+}
+
+fn identifier(value: &str) -> Result<&str> {
     let boundary = |c: char| c.is_whitespace() || ('\u{001c}'..='\u{001f}').contains(&c);
     if value.is_empty()
         || value.chars().next().is_some_and(boundary)
@@ -458,14 +463,13 @@ pub fn validate_fitted_curve(
                 return Err(invalid("curve violates the selected fit maximum_value"));
             }
         }
-        if selected["kind"] == "samples" && constraints["require_sample_support"] == true {
-            let support = &record["evidence_support"];
-            let (first, last) = support[0]
-                .as_f64()
-                .zip(support[1].as_f64())
-                .ok_or_else(|| invalid("fit requires its original sample support"))?;
+        if constraints["require_sample_support"] == true {
+            let (first, last) = fit_interval(&record["value_interval"])?
+                .ok_or_else(|| invalid("fit requires its observed value interval"))?;
             if first < law.quantile(0.0)? || last > law.quantile(1.0)? {
-                return Err(invalid("curve excludes recorded sample support"));
+                return Err(invalid(
+                    "curve excludes the recorded observed value interval",
+                ));
             }
         }
     }
@@ -552,6 +556,18 @@ fn converged_score(attempt: &Value, effective_count: &Value) -> Result<f64> {
     .ok_or_else(|| invalid("a converged attempt requires its selection score"))
 }
 
+fn fit_interval(value: &Value) -> Result<Option<(f64, f64)>> {
+    if value.is_null() {
+        return Ok(None);
+    }
+    value[0]
+        .as_f64()
+        .zip(value[1].as_f64())
+        .filter(|(first, last)| first.is_finite() && last.is_finite() && first <= last)
+        .map(Some)
+        .ok_or_else(|| invalid("invalid fitting interval"))
+}
+
 fn validate_record(record: &Value) -> Result<Option<&Value>> {
     validate_structure("https://climateriskcommons.org/schemas/fitting/1.0", record)?;
     let evidence_count = integer(&record["evidence_count"])?;
@@ -568,33 +584,22 @@ fn validate_record(record: &Value) -> Result<Option<&Value>> {
     let sample_evidence = requested["kind"] == "samples"
         || (requested["kind"] == "model_selection"
             && requested["candidates"][0]["kind"] == "samples");
-    let support = if let Some(support) = record["evidence_support"].as_array() {
-        let [first, last] = support.as_slice() else {
-            return Err(invalid("invalid evidence support"));
-        };
-        Some(
-            first
-                .as_f64()
-                .zip(last.as_f64())
-                .filter(|(a, b)| a.is_finite() && b.is_finite() && a <= b)
-                .ok_or_else(|| invalid("invalid evidence support"))?,
-        )
-    } else {
-        None
-    };
+    let values = fit_interval(&record["value_interval"])?;
+    let probabilities = fit_interval(&record["probability_interval"])?;
     if sample_evidence {
-        if support.is_some() != (count != "0")
-            || (count == "1" && support.is_some_and(|(first, last)| first != last))
+        if probabilities.is_some()
+            || values.is_some() != (count != "0")
+            || (count == "1" && values.is_some_and(|(first, last)| first != last))
         {
             return Err(invalid(
-                "sample evidence requires its actual observed support",
+                "sample evidence requires its actual observed value interval and no probability interval",
             ));
         }
         if !record["weights"].is_null() {
             return Err(invalid("sample fits do not have quantile weights"));
         }
     } else if greater(&json!(2), &evidence_count)
-        || support.is_none_or(|(a, b)| a < 0.0 || a >= b || b > 1.0)
+        || probabilities.is_none_or(|(a, b)| a < 0.0 || a >= b || b > 1.0)
     {
         return Err(invalid(
             "quantile fits require at least two knots and their actual probability interval",
@@ -622,7 +627,7 @@ fn validate_record(record: &Value) -> Result<Option<&Value>> {
             let minimum = integer(spec.get("minimum_samples").unwrap_or(&json!(3)))?;
             (!greater(&minimum, &evidence_count)).then_some(evidence_count.clone())
         } else {
-            eligible_quantile_count(spec, &evidence_count, support.expect("validated"))?
+            eligible_quantile_count(spec, &evidence_count, probabilities.expect("validated"))?
         };
         if effective_count.is_some() {
             last_eligible_spec = Some(spec);
@@ -684,6 +689,11 @@ fn validate_record(record: &Value) -> Result<Option<&Value>> {
     // passed the preflight checks. Attempts rejected at preflight use no knots.
     let expected_spec = selected.or(last_eligible_spec);
     if let Some(specification) = expected_spec {
+        if values.is_none() {
+            return Err(invalid(
+                "quantile fits using knots require their observed value interval",
+            ));
+        }
         let weights = record["weights"]
             .as_array()
             .ok_or_else(|| invalid("quantile fits using knots require effective weights"))?;
@@ -714,7 +724,7 @@ fn validate_record(record: &Value) -> Result<Option<&Value>> {
                 "effective weights contradict the executed specification",
             ));
         }
-    } else if used != "0" || !record["weights"].is_null() {
+    } else if used != "0" || !record["weights"].is_null() || values.is_some() {
         return Err(invalid(
             "no executed quantile attempt used the recorded evidence",
         ));
@@ -928,7 +938,22 @@ fn source_support(row: &Value) -> Result<Option<Geometry>> {
     row.get("geometry").map(geometry).transpose()
 }
 
+fn validate_source(source: &Value) -> Result<()> {
+    let mut uris = BTreeSet::new();
+    for resource in array(&source["resources"])? {
+        if !uris.insert(text(&resource["uri"])?) {
+            return Err(invalid(
+                "resource URIs must be unique within a source identity",
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn validate_report(report: &Value) -> Result<()> {
+    for source in array(&report["source_identities"])? {
+        validate_source(source)?;
+    }
     for diagnostic in array(&report["diagnostics"])? {
         if let Some(record) = diagnostic.get("record") {
             if diagnostic["stage"] != "fitting" {
@@ -1091,6 +1116,10 @@ pub fn validate_dataset(value: &Value) -> Result<()> {
         }
     }
     validate_report(&metadata["report"])?;
+    if let Some(source) = metadata.get("source") {
+        validate_source(source)?;
+    }
+    let mut scenario_ids: BTreeSet<_> = scenarios.keys().cloned().collect();
     let mut measurements = variables
         .iter()
         .map(|(id, v)| {
@@ -1147,27 +1176,18 @@ pub fn validate_dataset(value: &Value) -> Result<()> {
             let mapping = transform["mapping"]
                 .as_object()
                 .ok_or_else(|| invalid("rename mapping must be an object"))?;
-            let targets = mapping
-                .values()
-                .map(text)
-                .collect::<Result<BTreeSet<_>>>()?;
-            if targets.len() != mapping.len() {
+            let inverse = mapping
+                .iter()
+                .map(|(old, new)| Ok((text(new)?, identifier(old)?.to_owned())))
+                .collect::<Result<BTreeMap<_, _>>>()?;
+            if inverse.len() != mapping.len() {
                 return Err(invalid("rename mappings must be injective"));
             }
             if transform["dimension"] == "variable" {
-                let inverse = mapping
-                    .iter()
-                    .map(|(old, new)| Ok((text(new)?.to_owned(), old)))
-                    .collect::<Result<BTreeMap<_, _>>>()?;
                 let before = measurements
                     .iter()
                     .map(|(id, unit)| {
-                        (
-                            inverse
-                                .get(id)
-                                .map_or_else(|| id.clone(), |old| (*old).clone()),
-                            unit.clone(),
-                        )
+                        (inverse.get(id.as_str()).unwrap_or(id).clone(), unit.clone())
                     })
                     .collect::<BTreeMap<_, _>>();
                 if before.len() != measurements.len() {
@@ -1176,6 +1196,17 @@ pub fn validate_dataset(value: &Value) -> Result<()> {
                     ));
                 }
                 measurements = before;
+            } else {
+                let before = scenario_ids
+                    .iter()
+                    .map(|id| inverse.get(id.as_str()).unwrap_or(id).clone())
+                    .collect::<BTreeSet<_>>();
+                if before.len() != scenario_ids.len() {
+                    return Err(invalid(
+                        "rename provenance collides with participating scenarios",
+                    ));
+                }
+                scenario_ids = before;
             }
         }
     }

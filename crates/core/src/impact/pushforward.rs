@@ -1025,8 +1025,10 @@ fn linear_regions(
 
 fn probes(start: f64, end: f64) -> (f64, f64) {
     if start.is_finite() && end.is_finite() {
-        let width = end - start;
-        (start + width * 0.25, start + width * 0.75)
+        (
+            crate::numerical::linear_interpolate(start, end, 0.25),
+            crate::numerical::linear_interpolate(start, end, 0.75),
+        )
     } else if start.is_finite() {
         (start, start + 1.0)
     } else if end.is_finite() {
@@ -1052,24 +1054,18 @@ fn tabulated_linear_regions(
         });
     }
     for pair in points.windows(2) {
-        let (x0, y0) = pair[0];
-        let (x1, y1) = pair[1];
+        let left = pair[0];
+        let right = pair[1];
+        let (x0, y0) = left;
+        let (x1, y1) = right;
         let mut cuts = vec![x0, x1];
-        if y0 != y1 {
-            for limit in [clamp.minimum, clamp.maximum].into_iter().flatten() {
-                let low = y0.min(y1);
-                let high = y0.max(y1);
-                if limit > low && limit < high {
-                    cuts.push(x0 + (x1 - x0) * (limit - y0) / (y1 - y0));
-                }
-            }
-        }
+        super::expectation::push_crossings(x0, y0, x1, y1, clamp, &mut cuts);
         cuts.sort_by(f64::total_cmp);
         cuts.dedup_by(|left, right| *left == *right);
         for window in cuts.windows(2) {
-            let mid = 0.5 * (window[0] + window[1]);
-            let y_mid = apply_clamp(clamp, lerp(x0, y0, x1, y1, mid));
-            let y_left = apply_clamp(clamp, lerp(x0, y0, x1, y1, window[0]));
+            let mid = window[0].midpoint(window[1]);
+            let y_mid = apply_clamp(clamp, kernel::interpolate_segment(left, right, mid));
+            let y_left = apply_clamp(clamp, kernel::interpolate_segment(left, right, window[0]));
             if y_left == y_mid {
                 regions.push(Region {
                     start: window[0],
@@ -1217,14 +1213,6 @@ fn lower_threshold(
         source.survival_at(*threshold, true),
         floor,
     )))
-}
-
-fn lerp(x0: f64, y0: f64, x1: f64, y1: f64, x: f64) -> f64 {
-    if x1 == x0 {
-        y0
-    } else {
-        y0 + (y1 - y0) * (x - x0) / (x1 - x0)
-    }
 }
 
 fn apply_clamp(clamp: &Clamp, mut value: f64) -> f64 {
