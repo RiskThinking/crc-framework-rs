@@ -1271,6 +1271,249 @@
       ]
     },
     {
+      "name": "deep-parametric-hurdle",
+      "document": {
+        "atom_location": 0.0,
+        "atom_probability": 0.25,
+        "base": {
+          "family": "gumbel_r",
+          "kind": "parametric",
+          "location": -1000.0,
+          "scale": 1.0
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 0.1,
+          "value": 0.0
+        },
+        {
+          "probability": 0.5,
+          "value": 0.40546510810816017
+        },
+        {
+          "probability": 0.75,
+          "value": 1.0986122886681642
+        },
+        {
+          "probability": 0.9,
+          "value": 2.014903020542306
+        },
+        {
+          "probability": 0.99,
+          "value": 4.317488113536342
+        },
+        {
+          "probability": 0.999999,
+          "value": 13.527828485483724
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "deep-parametric-hurdle-over-affine-image",
+      "document": {
+        "atom_location": 0.0,
+        "atom_probability": 0.25,
+        "base": {
+          "impact": {
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 2
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "family": "gumbel_r",
+            "kind": "parametric",
+            "location": -1000.0,
+            "object": "distribution",
+            "scale": 1.0,
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 0.1,
+          "value": 0.0
+        },
+        {
+          "probability": 0.5,
+          "value": 0.8109302162163203
+        },
+        {
+          "probability": 0.75,
+          "value": 2.1972245773363284
+        },
+        {
+          "probability": 0.9,
+          "value": 4.029806041084612
+        },
+        {
+          "probability": 0.99,
+          "value": 8.634976227072684
+        },
+        {
+          "probability": 0.999999,
+          "value": 27.055656970967448
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "deep-parametric-hurdle-image",
+      "document": {
+        "impact": {
+          "input": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "model": {
+            "intercept": 0,
+            "kind": "linear",
+            "slope": 2
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "atom_location": 0.0,
+          "atom_probability": 0.25,
+          "base": {
+            "family": "gumbel_r",
+            "kind": "parametric",
+            "location": -1000.0,
+            "scale": 1.0
+          },
+          "kind": "hurdle",
+          "object": "distribution",
+          "schema_version": "1.0"
+        }
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 0.1,
+          "value": 0.0
+        },
+        {
+          "probability": 0.5,
+          "value": 0.8109302162163203
+        },
+        {
+          "probability": 0.75,
+          "value": 2.1972245773363284
+        },
+        {
+          "probability": 0.9,
+          "value": 4.029806041084612
+        },
+        {
+          "probability": 0.99,
+          "value": 8.634976227072684
+        },
+        {
+          "probability": 0.999999,
+          "value": 27.055656970967448
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "deep-skew-normal-hurdle",
+      "document": {
+        "atom_location": 2.0,
+        "atom_probability": 0.25,
+        "base": {
+          "family": "skewnorm",
+          "kind": "parametric",
+          "location": 0.0,
+          "scale": 1.0,
+          "shape": -5.0
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 2.0
+        },
+        {
+          "probability": 0.1,
+          "value": 2.0
+        },
+        {
+          "probability": 0.5,
+          "value": 2.0076401713780223
+        },
+        {
+          "probability": 0.75,
+          "value": 2.0206365859954207
+        },
+        {
+          "probability": 0.9,
+          "value": 2.037694124189093
+        },
+        {
+          "probability": 0.99,
+          "value": 2.0799621793135783
+        },
+        {
+          "probability": 0.999999,
+          "value": 2.2413185249015575
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
       "name": "deep-clamped-affine-hurdle",
       "document": {
         "atom_location": 3.0,

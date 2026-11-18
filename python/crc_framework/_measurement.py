@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import math
-from abc import ABC, abstractmethod
+from abc import ABC, ABCMeta, abstractmethod
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
@@ -1179,7 +1179,14 @@ class ContextValue(Protocol):
     def name(self) -> str: ...
 
 
-class ImpactContext(ABC):
+class _ContextType(ABCMeta):
+    def __repr__(cls) -> str:
+        if cls.__module__ == __name__ and not cls.__name__.startswith("_"):
+            return f"<class 'crc_framework.{cls.__qualname__}'>"
+        return super().__repr__()
+
+
+class ImpactContext(ABC, metaclass=_ContextType):
     _kind: ClassVar[str]
 
     @property

@@ -497,39 +497,52 @@ impl Numerical {
             let base = Box::new(Self::from_value(envelope(&document["base"]))?);
             let probability = number(&document, "atom_probability")?;
             let location = number(&document, "atom_location")?;
-            let surviving_mass = if probability < 1.0 {
-                base.exceedance(location, false)?
-            } else {
-                1.0
-            };
-            if !base.is_distribution() || surviving_mass <= 0.0 {
-                return Err(invalid(
-                    "hurdle requires a complete nonempty conditional tail",
-                ));
-            }
             match base.compiled {
-                Compiled::Law(law) => Compiled::Law(NumericalLaw::Hurdle {
-                    base: Box::new(law),
-                    atom_probability: probability,
-                    atom_location: location,
-                }),
+                Compiled::Law(law) => {
+                    Compiled::Law(NumericalLaw::hurdle(law, probability, location)?)
+                }
                 _ => {
-                    let segments = if probability == 1.0 {
-                        Some(vec![(location, location, 1.0)])
+                    let surviving_mass = if probability < 1.0 {
+                        base.exceedance(location, false)?
                     } else {
-                        base.finite_segments()?.map(|segments| {
-                            condition_segments(segments, probability, location, surviving_mass)
-                        })
+                        1.0
                     };
-                    if segments.as_ref().is_some_and(Vec::is_empty) {
-                        return Err(invalid("hurdle requires a nonempty strict upper tail"));
-                    }
-                    Compiled::Hurdle {
-                        base,
-                        probability,
-                        location,
-                        surviving_mass,
-                        segments,
+                    // Conditioning an affine parametric image can use the
+                    // same logarithmic survival coordinates as its base law.
+                    let affine = if surviving_mass < 2.0 * f64::MIN_POSITIVE / f64::EPSILON {
+                        base.affine_parametric()
+                    } else {
+                        None
+                    };
+                    if let Some(affine) = affine {
+                        Compiled::Law(NumericalLaw::hurdle(
+                            NumericalLaw::Parametric(affine),
+                            probability,
+                            location,
+                        )?)
+                    } else {
+                        if !base.is_distribution() || surviving_mass <= 0.0 {
+                            return Err(invalid(
+                                "hurdle requires a complete nonempty conditional tail",
+                            ));
+                        }
+                        let segments = if probability == 1.0 {
+                            Some(vec![(location, location, 1.0)])
+                        } else {
+                            base.finite_segments()?.map(|segments| {
+                                condition_segments(segments, probability, location, surviving_mass)
+                            })
+                        };
+                        if segments.as_ref().is_some_and(Vec::is_empty) {
+                            return Err(invalid("hurdle requires a nonempty strict upper tail"));
+                        }
+                        Compiled::Hurdle {
+                            base,
+                            probability,
+                            location,
+                            surviving_mass,
+                            segments,
+                        }
                     }
                 }
             }
@@ -543,6 +556,62 @@ impl Numerical {
     pub fn is_distribution(&self) -> bool {
         self.document["object"] == "distribution"
     }
+
+    fn affine_parametric(&self) -> Option<crate::FittedDistribution> {
+        use crate::DistributionFamily as Family;
+        match &self.compiled {
+            Compiled::Law(NumericalLaw::Parametric(law)) => Some(law.clone()),
+            Compiled::Transformed { source, .. } => {
+                let impact = &self.document["impact"];
+                let model = &impact["model"];
+                if model["kind"] != "linear" || impact.get("clamp").is_some() {
+                    return None;
+                }
+                let slope = model["slope"].as_f64()?;
+                let intercept = model["intercept"].as_f64().unwrap_or(0.0);
+                let source = source.affine_parametric()?;
+                let (family, shape) = if slope > 0.0 {
+                    (source.family, source.shape)
+                } else {
+                    match source.family {
+                        Family::GumbelRight => (Family::GumbelLeft, None),
+                        Family::GumbelLeft => (Family::GumbelRight, None),
+                        Family::WeibullMin => (Family::WeibullMax, source.shape),
+                        Family::WeibullMax => (Family::WeibullMin, source.shape),
+                        Family::SkewNormal => (source.family, source.shape.map(|a| -a)),
+                        _ => return None,
+                    }
+                };
+                crate::FittedDistribution::from_parameters(
+                    family,
+                    shape,
+                    slope * source.location + intercept,
+                    slope.abs() * source.scale,
+                )
+                .ok()
+            }
+            _ => None,
+        }
+    }
+
+    pub fn has_prepared_hurdle(&self) -> bool {
+        matches!(self.compiled, Compiled::Law(NumericalLaw::Hurdle { .. }))
+            || self.finite_hurdle_segments().is_some()
+    }
+
+    pub fn hurdle_atoms(&self) -> Result<Vec<(f64, f64)>> {
+        if let Compiled::Law(law @ NumericalLaw::Hurdle { .. }) = &self.compiled {
+            return Ok(law.atoms());
+        }
+        self.finite_hurdle_segments()
+            .map(|segments| {
+                segments
+                    .iter()
+                    .filter_map(|&(a, b, p)| (a == b).then_some((a, p)))
+                    .collect()
+            })
+            .ok_or_else(|| invalid("requires a prepared hurdle"))
+    }
     /// Whether a compound hurdle has exact, prepared interval and atom masses.
     pub fn finite_hurdle_segments(&self) -> Option<&[(f64, f64, f64)]> {
         if let Compiled::Hurdle { segments, .. } = &self.compiled {
@@ -551,13 +620,24 @@ impl Numerical {
             None
         }
     }
-    pub fn finite_hurdle_probability(
+    pub fn hurdle_probability(
         &self,
         lower: f64,
         upper: f64,
         include_lower: bool,
         include_upper: bool,
     ) -> Result<f64> {
+        if let Compiled::Law(law @ NumericalLaw::Hurdle { .. }) = &self.compiled {
+            return Ok(if lower == f64::NEG_INFINITY && !include_lower {
+                law.cdf(upper, include_upper)
+            } else if lower == upper && include_lower && include_upper {
+                law.mass(lower)
+            } else if upper == f64::INFINITY && !include_upper {
+                law.exceedance(lower, include_lower)
+            } else {
+                return Err(invalid("invalid hurdle probability bounds"));
+            });
+        }
         let segments = self
             .finite_hurdle_segments()
             .ok_or_else(|| invalid("requires a finite compound hurdle"))?;
@@ -569,7 +649,7 @@ impl Numerical {
             include_upper,
         ))
     }
-    pub fn finite_hurdle_integral(
+    pub fn hurdle_integral(
         &self,
         lo: f64,
         hi: f64,
@@ -579,6 +659,13 @@ impl Numerical {
     ) -> Result<f64> {
         if !lo.is_finite() || !hi.is_finite() || lo < 0.0 || hi > 1.0 || hi < lo {
             return Err(invalid("invalid integration probability interval"));
+        }
+        if let Compiled::Law(law @ NumericalLaw::Hurdle { .. }) = &self.compiled {
+            return if survival {
+                law.tail_integral(lo, hi, center, square)
+            } else {
+                law.integral(lo, hi, center, square)
+            };
         }
         let segments = self
             .finite_hurdle_segments()

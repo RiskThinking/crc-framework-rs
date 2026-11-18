@@ -9,8 +9,9 @@ from copy import deepcopy
 from enum import Enum
 from pathlib import Path
 from types import ModuleType
-from typing import Any
+from typing import Any, get_type_hints
 
+import crc_framework
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,6 +21,28 @@ SPEC = importlib.util.spec_from_file_location(
 assert SPEC is not None and SPEC.loader is not None
 CHECK = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CHECK)
+
+
+def test_public_class_annotations_are_resolvable() -> None:
+    for name in crc_framework.__all__:
+        value = getattr(crc_framework, name)
+        if isinstance(value, type):
+            get_type_hints(value)
+
+
+@pytest.mark.parametrize(
+    ("workspace", "wheel"),
+    [
+        ("1.0.0", "1.0.0"),
+        ("1.0.0-alpha.1", "1.0.0a1"),
+        ("1.0.0-beta.2", "1.0.0b2"),
+        ("1.0.0-rc.3", "1.0.0rc3"),
+    ],
+)
+def test_python_wheel_version_spelling(workspace: str, wheel: str) -> None:
+    from crc_framework._version import python_version
+
+    assert python_version(workspace) == wheel
 
 
 def test_installed_package_inventory_detects_artifact_drift(tmp_path: Path) -> None:

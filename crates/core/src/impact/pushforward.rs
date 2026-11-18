@@ -6,6 +6,7 @@
 //! as atoms without replacing that quantile rule.
 
 use crate::Interpolation;
+use crate::numerical::{compensated, segment_moment};
 
 use super::definition::{
     Clamp, Interpolation as TableInterpolation, Model, OriginAdjustment, OutsideDomain,
@@ -157,10 +158,12 @@ impl ImpactDistribution {
                 } else {
                     (hi.min(end) - lo.max(start)).max(0.0)
                 };
-                contributions.push(width * power(atom.value));
+                contributions.push(segment_moment(
+                    width, atom.value, atom.value, center, square,
+                ));
                 start = end;
             }
-            return Ok(neumaier(contributions));
+            return Ok(compensated(contributions.into_iter()));
         }
         let decreasing = matches!(self.law, Law::Continuous { decreasing: true });
         let source_atoms: Vec<(f64, f64, f64, f64)> = self
@@ -213,7 +216,8 @@ impl ImpactDistribution {
                 } else {
                     right - left
                 };
-                contributions.push(width * power(kernel::evaluate(&self.model, &self.clamp, x)?));
+                let response = kernel::evaluate(&self.model, &self.clamp, x)?;
+                contributions.push(segment_moment(width, response, response, center, square));
             } else if exact_linear {
                 let width = right - left;
                 let first = self.quantile(left + width * 0.25)? - center;
@@ -238,7 +242,7 @@ impl ImpactDistribution {
             })?;
             contributions.push(integral.value);
         }
-        Ok(neumaier(contributions))
+        Ok(compensated(contributions.into_iter()))
     }
 
     /// Quantile addressed directly by its upper-tail survival probability.
@@ -447,10 +451,12 @@ impl ImpactDistribution {
                 } else {
                     (s_max.min(end) - s_min.max(consumed)).max(0.0)
                 };
-                contributions.push(width * power(atom.value));
+                contributions.push(segment_moment(
+                    width, atom.value, atom.value, center, square,
+                ));
                 consumed = end;
             }
-            return Ok(neumaier(contributions));
+            return Ok(compensated(contributions.into_iter()));
         }
         let decreasing = matches!(self.law, Law::Continuous { decreasing: true });
         let source_atoms: Vec<_> = self
@@ -511,7 +517,8 @@ impl ImpactDistribution {
                 } else {
                     right - left
                 };
-                contributions.push(width * power(kernel::evaluate(&self.model, &self.clamp, x)?));
+                let response = kernel::evaluate(&self.model, &self.clamp, x)?;
+                contributions.push(segment_moment(width, response, response, center, square));
             } else if exact_linear {
                 let width = right - left;
                 let first = self.inverse_survival(left + width * 0.25)? - center;
@@ -542,7 +549,7 @@ impl ImpactDistribution {
                 contributions.push((right - left) * integrated.value);
             }
         }
-        Ok(neumaier(contributions))
+        Ok(compensated(contributions.into_iter()))
     }
 
     /// Explicit approximate quantile table. The interpolation is part of the approximation.

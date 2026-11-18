@@ -591,6 +591,89 @@ impl FittedDistribution {
         .clamp(0.0, 1.0)
     }
 
+    /// Logarithmic upper tail, retaining probabilities smaller than binary64 can store.
+    pub(crate) fn log_survival(&self, x: f64) -> f64 {
+        let z = self.z(x);
+        let shape = self.shape.unwrap_or(0.0);
+        match self.family {
+            DistributionFamily::GumbelRight => log_exponential_complement(-z),
+            DistributionFamily::GumbelLeft => -z.exp(),
+            DistributionFamily::WeibullMin => -z.max(0.0).powf(shape),
+            DistributionFamily::WeibullMax if z < 0.0 => {
+                log_exponential_complement(shape * (-z).ln())
+            }
+            DistributionFamily::WeibullMax => f64::NEG_INFINITY,
+            DistributionFamily::GenPareto if z < 0.0 => 0.0,
+            DistributionFamily::GenPareto if shape.abs() < EPS => -z,
+            DistributionFamily::GenPareto if shape * z <= -1.0 => f64::NEG_INFINITY,
+            DistributionFamily::GenPareto => (shape * z).ln_1p() / -shape,
+            DistributionFamily::GenExtreme if shape.abs() < EPS => log_exponential_complement(-z),
+            DistributionFamily::GenExtreme if 1.0 - shape * z <= 0.0 => {
+                if shape > 0.0 {
+                    f64::NEG_INFINITY
+                } else {
+                    0.0
+                }
+            }
+            DistributionFamily::GenExtreme => {
+                log_exponential_complement((-shape * z).ln_1p() / shape)
+            }
+            DistributionFamily::SkewNormal => skew_normal_log_cdf(-z, -shape),
+        }
+    }
+
+    /// Invert a positive tail even when its linear probability underflows.
+    pub(crate) fn inverse_log_survival(&self, logarithm: f64) -> Result<f64> {
+        if logarithm > f64::MIN_POSITIVE.ln() {
+            return self.isf(logarithm.exp());
+        }
+        let shape = self.shape.unwrap_or(0.0);
+        // Below MIN_POSITIVE, log(-log(1-s)) equals log(s) to binary64 precision.
+        let standardized = match self.family {
+            DistributionFamily::GumbelRight => -logarithm,
+            DistributionFamily::GumbelLeft => (-logarithm).ln(),
+            DistributionFamily::WeibullMin => (-logarithm).powf(1.0 / shape),
+            DistributionFamily::WeibullMax => -(logarithm / shape).exp(),
+            DistributionFamily::GenPareto | DistributionFamily::GenExtreme if shape.abs() < EPS => {
+                -logarithm
+            }
+            DistributionFamily::GenPareto => (-shape * logarithm).exp_m1() / shape,
+            DistributionFamily::GenExtreme => -(shape * logarithm).exp_m1() / shape,
+            DistributionFamily::SkewNormal => {
+                -inverse_by_bisection(|z| skew_normal_log_cdf(z, -shape), logarithm)
+            }
+        };
+        Ok(self.location + self.scale * standardized)
+    }
+
+    fn log_pdf(&self, x: f64) -> f64 {
+        if x.is_infinite() {
+            return f64::NEG_INFINITY;
+        }
+        let z = self.z(x);
+        let shape = self.shape.unwrap_or(0.0);
+        let standardized = match self.family {
+            DistributionFamily::GumbelRight => -z - (-z).exp(),
+            DistributionFamily::GumbelLeft => z - z.exp(),
+            DistributionFamily::WeibullMin => weibull_log_pdf(z, shape),
+            DistributionFamily::WeibullMax => weibull_log_pdf(-z, shape),
+            DistributionFamily::GenPareto if z < 0.0 || shape * z <= -1.0 => f64::NEG_INFINITY,
+            DistributionFamily::GenPareto if shape.abs() < EPS => -z,
+            DistributionFamily::GenPareto => (-1.0 / shape - 1.0) * (shape * z).ln_1p(),
+            DistributionFamily::GenExtreme if shape.abs() < EPS => -z - (-z).exp(),
+            DistributionFamily::GenExtreme if 1.0 - shape * z <= 0.0 => f64::NEG_INFINITY,
+            DistributionFamily::GenExtreme => {
+                let log_power = (-shape * z).ln_1p() / shape;
+                (1.0 - shape) * log_power - log_power.exp()
+            }
+            DistributionFamily::SkewNormal => {
+                (2.0 / PI).sqrt().ln() - 0.5 * z * z
+                    + reference_curve_fitting::log_standard_normal_cdf(shape * z)
+            }
+        };
+        standardized - self.scale.ln()
+    }
+
     /// Inverse of [`Self::sf`]: the value exceeded with probability `survival`.
     ///
     /// The upper-tail counterpart of `ppf`, accurate for survival
@@ -640,7 +723,7 @@ impl FittedDistribution {
                     location: -self.location,
                     ..*self
                 };
-                -inverse_by_bisection(&reflected, survival)
+                -inverse_by_bisection(|x| reflected.cdf(x), survival)
             }
         };
         Ok(value)
@@ -835,7 +918,7 @@ impl Distribution for FittedDistribution {
                     self.location + self.scale * (1.0 - (-q.ln()).powf(c)) / c
                 }
             }
-            DistributionFamily::SkewNormal => inverse_by_bisection(self, q),
+            DistributionFamily::SkewNormal => inverse_by_bisection(|x| self.cdf(x), q),
         };
         Ok(value)
     }
@@ -848,6 +931,7 @@ pub struct HurdleDistribution {
     base: FittedDistribution,
     base_cdf_at_atom: f64,
     base_sf_at_atom: f64,
+    base_log_sf_at_atom: f64,
 }
 
 impl HurdleDistribution {
@@ -868,13 +952,8 @@ impl HurdleDistribution {
         }
         let base_cdf_at_atom = base.cdf(atom_location);
         let base_sf_at_atom = base.sf(atom_location);
-        // Only a tail that is empty (or has underflowed) is rejected: the
-        // conditional tail is evaluated in survival space, so an atom deep in
-        // the base's upper tail remains exact.
-        if !base_cdf_at_atom.is_finite()
-            || !base_sf_at_atom.is_finite()
-            || base_sf_at_atom < f64::MIN_POSITIVE
-        {
+        let base_log_sf_at_atom = base.log_survival(atom_location);
+        if !base_log_sf_at_atom.is_finite() {
             return Err(CrcError::InvalidInput(
                 "hurdle base distribution must have positive probability above the atom".into(),
             ));
@@ -885,6 +964,7 @@ impl HurdleDistribution {
             base,
             base_cdf_at_atom,
             base_sf_at_atom,
+            base_log_sf_at_atom,
         })
     }
 
@@ -907,14 +987,53 @@ impl HurdleDistribution {
             0.0
         }
     }
+
+    pub(crate) fn survival_at(&self, x: f64, inclusive: bool) -> f64 {
+        if x < self.atom_location || (inclusive && x == self.atom_location) {
+            1.0
+        } else {
+            let survival = self.base.sf(x);
+            let conditional =
+                if survival >= f64::MIN_POSITIVE && self.base_sf_at_atom >= f64::MIN_POSITIVE {
+                    survival / self.base_sf_at_atom
+                } else {
+                    (self.base.log_survival(x) - self.base_log_sf_at_atom)
+                        .min(0.0)
+                        .exp()
+                };
+            (1.0 - self.atom_probability) * conditional
+        }
+    }
+
+    pub(crate) fn inverse_survival(&self, survival: f64) -> Result<f64> {
+        let weight = 1.0 - self.atom_probability;
+        if survival >= weight {
+            return Ok(self.atom_location);
+        }
+        if survival == 0.0 {
+            return self.base.ppf(1.0);
+        }
+        let conditional = survival / weight;
+        let target = conditional * self.base_sf_at_atom;
+        let quantile = if target >= f64::MIN_POSITIVE {
+            self.base.isf(target)
+        } else {
+            self.base
+                .inverse_log_survival(conditional.ln() + self.base_log_sf_at_atom)
+        }?;
+        Ok(quantile.max(self.atom_location))
+    }
 }
 
 impl Distribution for HurdleDistribution {
     fn pdf(&self, x: f64) -> f64 {
         if x <= self.atom_location {
             0.0
+        } else if self.base_sf_at_atom < f64::MIN_POSITIVE {
+            ((-self.atom_probability).ln_1p() + self.base.log_pdf(x) - self.base_log_sf_at_atom)
+                .exp()
         } else {
-            (1.0 - self.atom_probability) * self.base.pdf(x) / self.base_sf_at_atom
+            (self.base.pdf(x) / self.base_sf_at_atom) * (1.0 - self.atom_probability)
         }
     }
 
@@ -926,8 +1045,11 @@ impl Distribution for HurdleDistribution {
         } else if x == self.atom_location {
             self.atom_probability
         } else {
-            let conditional =
-                truncated_cdf(&self.base, self.base_cdf_at_atom, self.base_sf_at_atom, x);
+            let conditional = if self.base_sf_at_atom < f64::MIN_POSITIVE {
+                -(self.base.log_survival(x) - self.base_log_sf_at_atom).exp_m1()
+            } else {
+                truncated_cdf(&self.base, self.base_cdf_at_atom, self.base_sf_at_atom, x)
+            };
             (self.atom_probability + (1.0 - self.atom_probability) * conditional)
                 .clamp(self.atom_probability, 1.0)
         }
@@ -946,8 +1068,8 @@ impl Distribution for HurdleDistribution {
         if q <= self.atom_probability {
             return Ok(self.atom_location);
         }
-        if q == 1.0 {
-            return self.base.ppf(1.0);
+        if q >= 0.5 || self.base_sf_at_atom < 0.5 {
+            return self.inverse_survival(1.0 - q);
         }
         let conditional_probability = (q - self.atom_probability) / (1.0 - self.atom_probability);
         truncated_ppf(
@@ -1780,13 +1902,13 @@ fn quantile_diagnostics(
     }
 }
 
-fn inverse_by_bisection(distribution: &dyn Distribution, q: f64) -> f64 {
+fn inverse_by_bisection(cdf: impl Fn(f64) -> f64, q: f64) -> f64 {
     let mut lower = -1.0;
     let mut upper = 1.0;
-    while distribution.cdf(lower) > q {
+    while cdf(lower) > q {
         lower *= 2.0;
     }
-    while distribution.cdf(upper) < q {
+    while cdf(upper) < q {
         upper *= 2.0;
     }
     for _ in 0..120 {
@@ -1796,7 +1918,7 @@ fn inverse_by_bisection(distribution: &dyn Distribution, q: f64) -> f64 {
         if middle == lower || middle == upper {
             break;
         }
-        if distribution.cdf(middle) < q {
+        if cdf(middle) < q {
             lower = middle;
         } else {
             upper = middle;
@@ -1809,6 +1931,18 @@ fn normal_pdf(x: f64) -> f64 {
     (-0.5 * x * x).exp() / (2.0 * PI).sqrt()
 }
 
+fn weibull_log_pdf(x: f64, shape: f64) -> f64 {
+    if x > 0.0 {
+        shape.ln() + (shape - 1.0) * x.ln() - x.powf(shape)
+    } else if x == 0.0 && shape == 1.0 {
+        0.0
+    } else if x == 0.0 && shape < 1.0 {
+        f64::INFINITY
+    } else {
+        f64::NEG_INFINITY
+    }
+}
+
 fn normal_cdf(x: f64) -> f64 {
     reference_curve_fitting::ndtr_cephes(x)
 }
@@ -1818,8 +1952,74 @@ fn skew_normal_cdf(z: f64, alpha: f64) -> f64 {
     if z.is_nan() {
         return f64::NAN;
     }
-    (reference_curve_fitting::ndtr_cephes(z) - 2.0 * reference_curve_fitting::owens_t(z, alpha))
-        .clamp(0.0, 1.0)
+    let normal = reference_curve_fitting::ndtr_cephes(z);
+    let probability = normal - 2.0 * reference_curve_fitting::owens_t(z, alpha);
+    if z <= 0.0 && alpha > 0.0 && probability <= 0.01 * normal {
+        skew_normal_log_tail(-z, alpha).exp()
+    } else {
+        probability.clamp(0.0, 1.0)
+    }
+}
+
+fn log_exponential_complement(log_rate: f64) -> f64 {
+    if log_rate < -37.0 {
+        log_rate
+    } else {
+        (-(-log_rate.exp()).exp_m1()).ln()
+    }
+}
+
+fn skew_normal_log_cdf(z: f64, alpha: f64) -> f64 {
+    if z == f64::NEG_INFINITY {
+        return f64::NEG_INFINITY;
+    }
+    if z == f64::INFINITY {
+        return 0.0;
+    }
+    let normal = reference_curve_fitting::ndtr_cephes(z);
+    let probability = normal - 2.0 * reference_curve_fitting::owens_t(z, alpha);
+    if z <= 0.0 && (probability < f64::MIN_POSITIVE || probability <= 0.01 * normal) {
+        skew_normal_log_tail(-z, alpha)
+    } else {
+        probability.clamp(0.0, 1.0).ln()
+    }
+}
+
+fn skew_normal_log_tail(cutoff: f64, alpha: f64) -> f64 {
+    if cutoff.is_infinite() {
+        return f64::NEG_INFINITY;
+    }
+    // Integrate the positive density φ(t) erfc(αt/√2) for t >= cutoff.
+    // Its natural scale is sqrt(1 + α²) when the skew suppresses this tail.
+    let scale = alpha.max(0.0).hypot(1.0);
+    let start = scale * cutoff;
+    if !start.is_finite() {
+        return f64::NEG_INFINITY;
+    }
+    let width = 1.0 / (1.0 + start);
+    let slope = alpha / scale;
+    let log_normal = reference_curve_fitting::log_standard_normal_cdf;
+    let at_start = log_normal(-slope * start);
+    let log_peak = -0.5 * cutoff * cutoff + at_start;
+    if !log_peak.is_finite() {
+        return f64::NEG_INFINITY;
+    }
+    let options = crate::impact::quadrature::GaussKronrod {
+        absolute_tolerance: 1e-12,
+        relative_tolerance: 1e-11,
+        ..crate::impact::quadrature::GaussKronrod::defaults()
+    };
+    let integral = crate::impact::quadrature::integrate(&[(0.0, 1.0)], &options, |u| {
+        let remaining = 1.0 - u;
+        let step = width * u / remaining;
+        let delta = step / scale;
+        let log_ratio =
+            -delta * (cutoff + 0.5 * delta) + log_normal(-slope * (start + step)) - at_start;
+        Ok((log_ratio - 2.0 * remaining.ln()).exp())
+    });
+    integral.map_or(f64::NEG_INFINITY, |integral| {
+        log_peak + width.ln() - scale.ln() + (2.0 / PI).sqrt().ln() + integral.value.ln()
+    })
 }
 
 #[cfg(test)]
@@ -2304,9 +2504,22 @@ mod tests {
             let expected = -(-conditional).ln_1p();
             assert!((hurdle.ppf(q).unwrap() - expected).abs() < 1.0e-9);
         }
-        let empty =
+        let underflow =
             FittedDistribution::from_parameters(DistributionFamily::GumbelRight, None, -800.0, 1.0)
                 .unwrap();
+        assert_eq!(underflow.sf(0.0), 0.0);
+        let hurdle = HurdleDistribution::new(0.0, 0.25, underflow).unwrap();
+        assert!((hurdle.ppf(0.75).unwrap() - 3.0_f64.ln()).abs() < 1e-12);
+        assert!((hurdle.cdf(1.0) - (1.0 - 0.75 * (-1.0_f64).exp())).abs() < 1e-12);
+        assert!((hurdle.pdf(1.0) - 0.75 * (-1.0_f64).exp()).abs() < 1e-12);
+
+        let empty = FittedDistribution::from_parameters(
+            DistributionFamily::WeibullMax,
+            Some(1.0),
+            0.0,
+            1.0,
+        )
+        .unwrap();
         assert!(HurdleDistribution::new(0.0, 0.25, empty).is_err());
     }
 

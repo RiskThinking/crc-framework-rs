@@ -209,16 +209,6 @@ class Distribution:
             )
             if hydrated._native is None:
                 base = hydrated
-                probability = _finite(
-                    cast(float, data["atom_probability"]), "atom_probability"
-                )
-                atom = _finite(cast(float, data["atom_location"]), "atom_location")
-                if not 0 <= probability <= 1 or (
-                    probability < 1 and cast(float, base.exceedance(atom)) <= 0
-                ):
-                    raise ValueError(
-                        "hurdle requires a probability in [0, 1] and a nonempty strict upper tail"
-                    )
             else:
                 native_data["base"] = hydrated._native_data()
         object.__setattr__(
@@ -235,7 +225,7 @@ class Distribution:
             "_compound",
             None
             if base is None
-            else _core.NativeNumericalDocument.finite_hurdle(result.to_json()),
+            else _core.NativeNumericalDocument.prepared_hurdle(result.to_json()),
         )
         return result
 
@@ -484,11 +474,7 @@ class Distribution:
         if self._transformed is not None:
             return self._transformed.atoms()
         if self._compound is not None:
-            return [
-                (lo, mass)
-                for lo, hi, mass in self._compound.hurdle_segments()
-                if lo == hi
-            ]
+            return self._compound.hurdle_atoms()
         assert self._base is not None
         p = cast(float, self._data["atom_probability"])
         atom = cast(float, self._data["atom_location"])
@@ -707,6 +693,8 @@ class Distribution:
 
     def _source(self) -> _core.NativeImpactSource:
         data = self._data
+        if self._compound is not None:
+            return self._compound.impact_source()
         if self.kind is DistributionKind.DISCRETE:
             return _core.NativeImpactSource.discrete(
                 cast(list[float], data["values"]),
@@ -771,7 +759,12 @@ class Distribution:
     def _segments(self) -> list[tuple[float, float, float]]:
         """Ordered exact uniform intervals and atoms for a finite law."""
         if self._compound is not None:
-            return self._compound.hurdle_segments()
+            segments = self._compound.hurdle_segments()
+            if segments is None:
+                raise TypeError(
+                    "this law has no finite piecewise uniform representation"
+                )
+            return segments
         data = self._data
         if self.kind is DistributionKind.DISCRETE:
             return [

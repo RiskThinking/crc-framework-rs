@@ -812,8 +812,11 @@ def check_runtime(package_root: Path | None = None) -> None:
         else:
             errors.append(f"{name}: removed import path remains available")
     version = release["packages"]["framework"]
-    if importlib.metadata.version("crc-framework") != version:
-        errors.append(f"installed distribution version must be {version}")
+    from crc_framework._version import python_version
+
+    distribution_version = python_version(version)
+    if importlib.metadata.version("crc-framework") != distribution_version:
+        errors.append(f"installed distribution version must be {distribution_version}")
     native = importlib.import_module("crc_framework._core")
     if getattr(native, "__version__", None) != version:
         errors.append(f"native extension version must be {version}")

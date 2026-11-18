@@ -554,16 +554,9 @@ impl ImpactSource {
         }
         match self {
             Self::Fitted(distribution) => distribution.isf(survival).map_err(distribution_error),
-            Self::Hurdle(distribution) => {
-                let weight = 1.0 - distribution.atom_probability();
-                if survival >= weight || weight == 0.0 {
-                    return Ok(distribution.atom_location());
-                }
-                distribution
-                    .base()
-                    .isf(survival / weight * distribution.base().sf(distribution.atom_location()))
-                    .map_err(distribution_error)
-            }
+            Self::Hurdle(distribution) => distribution
+                .inverse_survival(survival)
+                .map_err(distribution_error),
             Self::Histogram(histogram) => Ok(histogram.inverse_survival(survival, false)),
             Self::Tabulated(distribution) => {
                 let mut consumed = 0.0;
@@ -610,16 +603,7 @@ impl ImpactSource {
     pub(crate) fn survival_at(&self, x: f64, inclusive: bool) -> f64 {
         match self {
             Self::Fitted(distribution) => distribution.sf(x),
-            Self::Hurdle(distribution) => {
-                if x < distribution.atom_location()
-                    || inclusive && x == distribution.atom_location()
-                {
-                    1.0
-                } else {
-                    (1.0 - distribution.atom_probability()) * distribution.base().sf(x)
-                        / distribution.base().sf(distribution.atom_location())
-                }
-            }
+            Self::Hurdle(distribution) => distribution.survival_at(x, inclusive),
             Self::Histogram(histogram) => neumaier(
                 histogram
                     .edges
