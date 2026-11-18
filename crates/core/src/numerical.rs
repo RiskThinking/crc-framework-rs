@@ -156,6 +156,24 @@ pub(crate) fn segment_moment(weight: f64, a: f64, b: f64, center: f64, square: b
     mean.powi(2) + deviation.powi(2)
 }
 
+pub(crate) fn affine_segment_moments(
+    segments: &[ProbabilitySegment],
+    slope: f64,
+    intercept: f64,
+) -> (f64, f64) {
+    let mean = compensated(
+        segments
+            .iter()
+            .map(|&(a, b, mass)| segment_moment(mass, slope * a, slope * b, 0.0, false)),
+    );
+    let variance = compensated(
+        segments
+            .iter()
+            .map(|&(a, b, mass)| segment_moment(mass, slope * a, slope * b, mean, true)),
+    );
+    (mean + intercept, variance)
+}
+
 // Local probability coordinates avoid subtracting two cumulative values near
 // one. In particular an uppermost mass smaller than machine epsilon retains
 // its original width instead of becoming a zero-width cumulative interval.
@@ -1301,56 +1319,7 @@ impl NumericalLaw {
 
     pub fn moments(&self) -> Result<(f64, f64)> {
         if let Self::Parametric(d) = self {
-            let (l, s, c) = (d.location, d.scale, d.shape.unwrap_or(0.0));
-            let euler = 0.577_215_664_901_532_9;
-            let pi = std::f64::consts::PI;
-            return Ok(match d.family {
-                DistributionFamily::GumbelRight => (l + s * euler, s * s * pi * pi / 6.0),
-                DistributionFamily::GumbelLeft => (l - s * euler, s * s * pi * pi / 6.0),
-                DistributionFamily::GenExtreme => {
-                    let mean = if c > -1.0 {
-                        l - s * gamma_moments(c).1
-                    } else {
-                        f64::INFINITY
-                    };
-                    let variance = if c > -0.5 {
-                        s * s * gamma_moments(c).2
-                    } else {
-                        f64::INFINITY
-                    };
-                    (mean, variance)
-                }
-                DistributionFamily::GenPareto => (
-                    if c < 1.0 {
-                        l + s / (1.0 - c)
-                    } else {
-                        f64::INFINITY
-                    },
-                    if c < 0.5 {
-                        s * s / ((1.0 - c).powi(2) * (1.0 - 2.0 * c))
-                    } else {
-                        f64::INFINITY
-                    },
-                ),
-                DistributionFamily::WeibullMin | DistributionFamily::WeibullMax => {
-                    let (g, _, scaled_variance) = gamma_moments(1.0 / c);
-                    (
-                        l + if d.family == DistributionFamily::WeibullMin {
-                            s * g
-                        } else {
-                            -s * g
-                        },
-                        (s / c * scaled_variance.sqrt()).powi(2),
-                    )
-                }
-                DistributionFamily::SkewNormal => {
-                    let delta = c / c.hypot(1.0);
-                    (
-                        l + s * delta * (2.0 / pi).sqrt(),
-                        s * s * (1.0 - 2.0 * delta * delta / pi),
-                    )
-                }
-            });
+            return Ok(affine_fitted_moments(d, 1.0, 0.0));
         }
         let mean = self.integral(0.0, 1.0, 0.0, false)?;
         let variance = if mean.is_finite() {
@@ -1359,6 +1328,69 @@ impl NumericalLaw {
             f64::NAN
         };
         Ok((mean, variance))
+    }
+}
+
+pub(crate) fn affine_fitted_moments(
+    d: &FittedDistribution,
+    slope: f64,
+    intercept: f64,
+) -> (f64, f64) {
+    let (l, s, c) = (
+        slope.mul_add(d.location, intercept),
+        d.scale * slope,
+        d.shape.unwrap_or(0.0),
+    );
+    let euler = 0.577_215_664_901_532_9;
+    let pi = std::f64::consts::PI;
+    let gumbel_deviation = pi / 6.0_f64.sqrt();
+    let divergence = f64::INFINITY.copysign(slope);
+    match d.family {
+        DistributionFamily::GumbelRight => (l + s * euler, (s * gumbel_deviation).powi(2)),
+        DistributionFamily::GumbelLeft => (l - s * euler, (s * gumbel_deviation).powi(2)),
+        DistributionFamily::GenExtreme => {
+            let mean = if c > -1.0 {
+                l - s * gamma_moments(c).1
+            } else {
+                divergence
+            };
+            let variance = if c > -0.5 {
+                (s * gamma_moments(c).2.sqrt()).powi(2)
+            } else {
+                f64::INFINITY
+            };
+            (mean, variance)
+        }
+        DistributionFamily::GenPareto => (
+            if c < 1.0 {
+                l + s / (1.0 - c)
+            } else {
+                divergence
+            },
+            if c < 0.5 {
+                (s / (1.0 - c) / (0.5 - c).sqrt() / 2.0_f64.sqrt()).powi(2)
+            } else {
+                f64::INFINITY
+            },
+        ),
+        DistributionFamily::WeibullMin | DistributionFamily::WeibullMax => {
+            let (g, _, scaled_variance) = gamma_moments(1.0 / c);
+            (
+                l + if d.family == DistributionFamily::WeibullMin {
+                    s * g
+                } else {
+                    -s * g
+                },
+                (s / c * scaled_variance.sqrt()).powi(2),
+            )
+        }
+        DistributionFamily::SkewNormal => {
+            let delta = c / c.hypot(1.0);
+            (
+                l + s * delta * (2.0 / pi).sqrt(),
+                (s * (1.0 - 2.0 * delta * delta / pi).sqrt()).powi(2),
+            )
+        }
     }
 }
 

@@ -14,7 +14,13 @@ import numpy as np
 import numpy.typing as npt
 
 from . import _core
-from ._distribution import ArrayLike, Distribution, DistributionFamily, QuantileCurve
+from ._distribution import (
+    ArrayLike,
+    Distribution,
+    DistributionFamily,
+    QuantileCurve,
+    _real_array,
+)
 
 
 class SampleEstimator(str, Enum):
@@ -560,7 +566,7 @@ def fit_samples(
 ) -> FitResult[SampleFitDiagnostic]:
     if not isinstance(specification, (SampleFit, ModelSelection)):
         raise TypeError("sample evidence requires SampleFit or ModelSelection")
-    values = np.asarray(samples, dtype=np.float64)
+    values = _real_array(samples, "samples")
     if values.ndim != 1:
         raise ValueError("samples must be a one-dimensional observation sequence")
     if not np.all(np.isfinite(values)):

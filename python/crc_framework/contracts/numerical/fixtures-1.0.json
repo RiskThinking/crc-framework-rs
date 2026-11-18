@@ -635,6 +635,83 @@
       ]
     },
     {
+      "name": "chained-atomic-impacts",
+      "document": {
+        "impact": {
+          "input": {
+            "kind": "temperature",
+            "unit": "degC"
+          },
+          "model": {
+            "intercept": 0,
+            "kind": "linear",
+            "slope": 2
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "impact": {
+            "input": {
+              "kind": "depth_above_ground",
+              "unit": "m"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 1
+            },
+            "output": {
+              "kind": "temperature",
+              "unit": "degC"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "object": "distribution",
+          "schema_version": "1.0",
+          "source": {
+            "kind": "point_mass",
+            "object": "distribution",
+            "schema_version": "1.0",
+            "value": 5.0
+          }
+        }
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 10.0
+        },
+        {
+          "probability": 0.1,
+          "value": 10.0
+        },
+        {
+          "probability": 0.5,
+          "value": 10.0
+        },
+        {
+          "probability": 0.9,
+          "value": 10.0
+        },
+        {
+          "probability": 0.99,
+          "value": 10.0
+        },
+        {
+          "probability": 1,
+          "value": 10.0
+        }
+      ]
+    },
+    {
       "name": "completed",
       "document": {
         "evidence": {
@@ -2568,6 +2645,173 @@
         ]
       },
       "structural": true
+    },
+    {
+      "name": "incompatible-atomic-impact-chain",
+      "document": {
+        "schema_version": "1.0",
+        "object": "distribution",
+        "kind": "transformed",
+        "source": {
+          "impact": {
+            "input": {
+              "kind": "depth_above_ground",
+              "unit": "m"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 1
+            },
+            "output": {
+              "kind": "temperature",
+              "unit": "degC"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "object": "distribution",
+          "schema_version": "1.0",
+          "source": {
+            "kind": "point_mass",
+            "object": "distribution",
+            "schema_version": "1.0",
+            "value": 5.0
+          }
+        },
+        "impact": {
+          "input": {
+            "kind": "depth_above_ground",
+            "unit": "m"
+          },
+          "model": {
+            "intercept": 0,
+            "kind": "linear",
+            "slope": 2
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        }
+      },
+      "structural": false
+    },
+    {
+      "name": "incompatible-histogram-impact-chain",
+      "document": {
+        "schema_version": "1.0",
+        "object": "distribution",
+        "kind": "transformed",
+        "source": {
+          "impact": {
+            "input": {
+              "kind": "depth_above_ground",
+              "unit": "m"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 1
+            },
+            "output": {
+              "kind": "temperature",
+              "unit": "degC"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "object": "distribution",
+          "schema_version": "1.0",
+          "source": {
+            "edges": [
+              0.0,
+              1.0
+            ],
+            "kind": "histogram",
+            "object": "distribution",
+            "probabilities": [
+              1.0
+            ],
+            "schema_version": "1.0"
+          }
+        },
+        "impact": {
+          "input": {
+            "kind": "depth_above_ground",
+            "unit": "m"
+          },
+          "model": {
+            "intercept": 0,
+            "kind": "linear",
+            "slope": 2
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        }
+      },
+      "structural": false
+    },
+    {
+      "name": "incompatible-hurdle-impact-chain",
+      "document": {
+        "schema_version": "1.0",
+        "object": "distribution",
+        "kind": "transformed",
+        "source": {
+          "atom_location": 0.0,
+          "atom_probability": 0.1,
+          "base": {
+            "impact": {
+              "input": {
+                "kind": "depth_above_ground",
+                "unit": "m"
+              },
+              "model": {
+                "intercept": 0,
+                "kind": "linear",
+                "slope": 1
+              },
+              "output": {
+                "kind": "temperature",
+                "unit": "degC"
+              },
+              "schema_version": "2.0"
+            },
+            "kind": "transformed",
+            "source": {
+              "kind": "point_mass",
+              "object": "distribution",
+              "schema_version": "1.0",
+              "value": 5.0
+            }
+          },
+          "kind": "hurdle",
+          "object": "distribution",
+          "schema_version": "1.0"
+        },
+        "impact": {
+          "input": {
+            "kind": "depth_above_ground",
+            "unit": "m"
+          },
+          "model": {
+            "intercept": 0,
+            "kind": "linear",
+            "slope": 2
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        }
+      },
+      "structural": false
     },
     {
       "name": "sigmoid-hurdle-at-maximum",

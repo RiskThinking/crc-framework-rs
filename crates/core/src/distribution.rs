@@ -207,6 +207,10 @@ impl TabulatedDistribution {
         &self.values
     }
 
+    pub(crate) fn uses_linear_probability(&self) -> bool {
+        self.interpolation == Interpolation::LinearProbability
+    }
+
     fn axis(&self, q: f64) -> f64 {
         match self.interpolation {
             Interpolation::LinearProbability => q,

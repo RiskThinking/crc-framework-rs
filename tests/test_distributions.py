@@ -21,6 +21,16 @@ from crc_framework import (
 )
 
 
+def test_numerical_queries_reject_booleans_before_numeric_promotion() -> None:
+    law = Distribution.point_mass(1)
+    curve = QuantileCurve([0, 1], [0, 1])
+    for query in (law.quantile, law.cdf, law.exceedance, law.mass, curve.quantile):
+        with pytest.raises(TypeError, match="real numbers"):
+            query([False, 0.9])
+        with pytest.raises(TypeError, match="real numbers"):
+            query([np.bool_(True), 0.1])  # type: ignore[list-item]
+
+
 def laws() -> list[Distribution]:
     return [
         Distribution.parametric(DistributionFamily.GUMBEL_RIGHT, location=0, scale=1),

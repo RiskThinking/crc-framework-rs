@@ -58,6 +58,7 @@ class SpeedUnit(Enum):
 class PrecipitationRateUnit(Enum):
     MILLIMETRES_PER_DAY = "mm/day"
     MILLIMETRES_PER_HOUR = "mm/h"
+    KILOGRAMS_PER_SQUARE_METRE_PER_SECOND = "kg m-2 s-1"
 
 
 class DegreeDayUnit(Enum):

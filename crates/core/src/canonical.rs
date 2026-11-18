@@ -923,6 +923,13 @@ impl Numerical {
         function: &ImpactDefinition,
         document: &Value,
     ) -> Result<ImpactDistribution> {
+        if let Some(output) = self.output_measurement()
+            && !scientific_equal(output, &document["input"])
+        {
+            return Err(invalid(
+                "source impact output does not match the next impact input",
+            ));
+        }
         match self.impact_source() {
             Ok(source) => function.pushforward(&source).map_err(invalid),
             Err(error @ CrcError::Unsupported(_)) => {
@@ -936,6 +943,17 @@ impl Numerical {
             }
             Err(error) => Err(error),
         }
+    }
+
+    fn output_measurement(&self) -> Option<&Value> {
+        let mut document = &self.document;
+        while document["kind"] == "hurdle" {
+            document = &document["base"];
+        }
+        if document["kind"] == "transformed" {
+            return document["impact"].get("output");
+        }
+        None
     }
 
     pub fn impact_source(&self) -> Result<ImpactSource> {

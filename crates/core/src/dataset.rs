@@ -42,6 +42,91 @@ fn identifier(value: &str) -> Result<&str> {
     Ok(value)
 }
 
+// Coefficients to a common reference for each physical dimension. Calendar
+// durations are separate from durations measured in seconds. Precipitation
+// mass flux is the standard water-equivalent depth rate (1 kg/m² = 1 mm).
+fn unit_basis(unit: &str) -> Option<(&'static str, f64, f64)> {
+    Some(match unit {
+        "m" => ("length", 1.0, 0.0),
+        "cm" => ("length", 0.01, 0.0),
+        "mm" => ("length", 0.001, 0.0),
+        "ft" => ("length", 0.3048, 0.0),
+        "s" => ("duration", 1.0, 0.0),
+        "h" => ("duration", 3600.0, 0.0),
+        "d" => ("duration", 86400.0, 0.0),
+        "month" => ("calendar_duration", 1.0, 0.0),
+        "yr" => ("calendar_duration", 12.0, 0.0),
+        "1" => ("ratio", 1.0, 0.0),
+        "percent" => ("ratio", 0.01, 0.0),
+        "degC" => ("temperature", 1.0, 273.15),
+        "K" => ("temperature", 1.0, 0.0),
+        "degF" => ("temperature", 5.0 / 9.0, 273.15 - 32.0 * 5.0 / 9.0),
+        "m/s" => ("speed", 1.0, 0.0),
+        "km/h" => ("speed", 1.0 / 3.6, 0.0),
+        "mm/day" => ("precipitation_rate", 1.0 / 86400.0, 0.0),
+        "mm/h" => ("precipitation_rate", 1.0 / 3600.0, 0.0),
+        "kg m-2 s-1" => ("precipitation_rate", 1.0, 0.0),
+        "K.d" | "degC.d" => ("degree_days", 1.0, 0.0),
+        _ => return None,
+    })
+}
+
+/// Return the affine coefficients for a supported conversion of units.
+#[doc(hidden)]
+pub fn unit_conversion(source: &str, target: &str) -> Result<(f64, f64)> {
+    if let (Some((from, from_scale, from_offset)), Some((to, to_scale, to_offset))) =
+        (unit_basis(source), unit_basis(target))
+        && from == to
+    {
+        return Ok((from_scale / to_scale, (from_offset - to_offset) / to_scale));
+    }
+    Err(invalid(format!("cannot convert {source:?} to {target:?}")))
+}
+
+/// Validate a recorded transformation and recover the input measurement.
+#[doc(hidden)]
+pub fn reverse_unit_conversion(
+    measurement: &Value,
+    source: &str,
+    target: &str,
+    scale: f64,
+    offset: f64,
+) -> Result<Value> {
+    if source == target || !scale.is_finite() || scale == 0.0 || !offset.is_finite() {
+        return Err(invalid(
+            "unit conversion requires changed units and finite coefficients with nonzero scale",
+        ));
+    }
+    if measurement["unit"].as_str() != Some(target) {
+        return Err(invalid(
+            "conversion target unit contradicts the variable measurement",
+        ));
+    }
+    let mut input = measurement.clone();
+    input["unit"] = json!(source);
+    validate_structure(
+        "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+        &input,
+    )
+    .map_err(|error| {
+        invalid(format!(
+            "source unit {source:?} contradicts the variable measurement: {error}"
+        ))
+    })?;
+    if unit_basis(source).is_some() || unit_basis(target).is_some() {
+        let (expected_scale, expected_offset) = unit_conversion(source, target)?;
+        let same = |actual: f64, expected: f64| {
+            (actual - expected).abs() <= 32.0 * f64::EPSILON * expected.abs()
+        };
+        if !same(scale, expected_scale) || !same(offset, expected_offset) {
+            return Err(invalid(format!(
+                "unit conversion coefficients for {source:?} to {target:?} must be scale {expected_scale} and offset {expected_offset}"
+            )));
+        }
+    }
+    Ok(input)
+}
+
 pub(crate) fn integer(value: &Value) -> Result<Value> {
     let number = value
         .as_number()
@@ -1133,22 +1218,20 @@ pub fn validate_dataset(value: &Value) -> Result<()> {
     for transform in provenance.iter().rev() {
         if transform["kind"] == "unit_conversion" {
             let id = text(&transform["variable_id"])?;
-            if transform["source_unit"] == transform["target_unit"]
-                || transform["scale"].as_f64() == Some(0.0)
-            {
-                return Err(invalid(
-                    "unit conversion requires changed units and nonzero scale",
-                ));
-            }
             let measurement = measurements
                 .get_mut(id)
                 .ok_or_else(|| invalid("conversion provenance refers to an unknown variable"))?;
-            if measurement.get("unit") != Some(&transform["target_unit"]) {
-                return Err(invalid(
-                    "unit conversion contradicts current variable measurement",
-                ));
-            }
-            measurement["unit"] = transform["source_unit"].clone();
+            *measurement = reverse_unit_conversion(
+                measurement,
+                text(&transform["source_unit"])?,
+                text(&transform["target_unit"])?,
+                transform["scale"]
+                    .as_f64()
+                    .ok_or_else(|| invalid("invalid unit conversion scale"))?,
+                transform["offset"]
+                    .as_f64()
+                    .ok_or_else(|| invalid("invalid unit conversion offset"))?,
+            )?;
         } else if transform["kind"] == "temporal_reduction" {
             validate_reduction(transform)?;
             if let Some(changes) = transform.get("measurements") {
