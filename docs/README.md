@@ -8,6 +8,7 @@ contributors, and runnable quick starts. Then follow the guide for your task:
 3. **Understand shared contracts:** [impact mathematics and identities](impact-contracts.md).
 4. **Change the framework:** [development and contribution](development.md).
 5. **Ship a version:** [versioning and releases](releases.md).
+6. **Upgrade from 0.x:** [migrating to 1.0](migration-v1.md).
 
 ## Ownership and source map
 
