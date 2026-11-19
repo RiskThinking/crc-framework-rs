@@ -19,6 +19,8 @@ Application-specific workflows belong in packages built on this framework.
 
 [Installation](#installation) · [Quick start](#quick-start) · [Guides](#guides-and-next-steps)
 
+Upgrading from 0.x? Start with the [1.0 migration guide](docs/migration-v1.md).
+
 ## Contributors
 
 Thanks to the people who shape this project through code, reviews, research,
@@ -112,6 +114,7 @@ covers Node initialization, array queries, and shared schema validation.
 
 | Task | Read next |
 | --- | --- |
+| Upgrade from 0.x | [Migrating to 1.0](docs/migration-v1.md) |
 | Use distributions, fitting, impacts, rank scenarios, or risk metrics | [Python guide](docs/python.md) |
 | Initialize WASM, prepare collections, or understand canonical inputs and errors | [JavaScript guide](docs/javascript.md) |
 | Pin schemas, validate identities, or record impact provenance | [Impact contracts](docs/impact-contracts.md) |
