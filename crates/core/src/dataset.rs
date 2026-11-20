@@ -1355,8 +1355,11 @@ pub fn validate_dataset(value: &Value) -> Result<()> {
         }
         if let Some(failure) = row.get("failure") {
             failed += 1;
-            if validate_record(&failure["record"])?.is_some() {
-                return Err(invalid("retained failure cannot contain a converged fit"));
+            text(&failure["code"])?;
+            if let Some(record) = failure.get("record") {
+                if validate_record(record)?.is_some() {
+                    return Err(invalid("retained failure cannot contain a converged fit"));
+                }
             }
         }
     }
