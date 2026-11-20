@@ -31,6 +31,7 @@ from crc_framework import (
     TailCompletion,
     Temperature,
     TemperatureUnit,
+    _core,
 )
 
 
@@ -48,6 +49,30 @@ def test_linear_does_not_hide_a_zero_clamp() -> None:
     assert response.evaluate(-2.0) == -4.0
     assert response.expectation(Distribution.discrete([-2, 1], [0.25, 0.75])) == 0.5
     assert not callable(response)
+
+
+def test_discrete_impact_preserves_quantiles_at_cumulative_mass_boundaries() -> None:
+    source = Distribution.discrete([0, 1, 2, 3], [0.05, 0.1, 0.15, 0.7])
+    image = linear(1).pushforward(source)
+    native = _core.NativeNumericalDocument(image.to_json())
+    cutoff = 0.3
+    above_cutoff = math.nextafter(cutoff, 1.0)
+
+    assert image.cdf(2) == cutoff
+    for law in (source, image, native):
+        assert law.quantile(cutoff) == 2
+        assert law.quantile(above_cutoff) == 3
+
+
+def test_discrete_impact_keeps_small_masses_when_merging_atoms() -> None:
+    small = [1e-17] * 10
+    source = Distribution.discrete(list(range(12)), [0.5, *small, 0.5 - 1e-16])
+    image = linear(1, minimum=10).pushforward(source)
+    merged_mass = math.fsum([0.5, *small])
+
+    assert image.mass(10) == merged_mass
+    assert image.quantile(merged_mass) == 10
+    assert image.quantile(math.nextafter(merged_mass, 1.0)) == 11
 
 
 def test_linear_overflow_is_checked_after_intercept_and_clamps() -> None:
