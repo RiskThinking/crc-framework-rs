@@ -44,6 +44,14 @@ def build():
                 Distribution.parametric(family, location=1.2, scale=2, shape=shape),
             )
         )
+    objects.append(
+        (
+            "skew-normal-large-scale",
+            Distribution.parametric(
+                DistributionFamily.SKEW_NORMAL, location=-1e308, scale=1e308, shape=0
+            ),
+        )
+    )
     for name, family, location, shape in [
         ("gev-upper", DistributionFamily.GENERALIZED_EXTREME_VALUE, -1e308, 0.5),
         ("gev-lower", DistributionFamily.GENERALIZED_EXTREME_VALUE, 1e308, -0.5),
@@ -344,6 +352,8 @@ def build():
             coordinates[1:1] = [1e-18, 1e-16]
         if name == "downscaled-clamped-parametric":
             coordinates.insert(-1, 0.99999)
+        if name == DistributionFamily.SKEW_NORMAL.value:
+            coordinates.insert(-1, math.nextafter(1.0, 0.0))
         if (
             name.startswith("deep-parametric-hurdle")
             or name == "deep-skew-normal-hurdle"
@@ -466,6 +476,14 @@ def build():
         },
         False,
     )
+    for law in (Distribution.discrete([2], [1]), Distribution.histogram([1, 2], [1])):
+        document = json.loads(law.to_json())
+        document["probabilities"][0] = 1 + 1e-13
+        bad(f"{law.kind.value}-individual-mass-above-one", document)
+
+    document = json.loads(discrete_hurdle.to_json())
+    document["base"].update(schema_version="1.0", object="distribution")
+    bad("hurdle-base-with-document-envelope", document)
     bad(
         "unordered-knots",
         {

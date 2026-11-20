@@ -718,6 +718,9 @@ class Distribution:
             or data.pop("object", None) != "distribution"
         ):
             raise ValueError("expected numerical distribution schema 1.0")
+        _core.validate_structure(
+            "https://climateriskcommons.org/schemas/numerical/1.0", text
+        )
         has_evidence = "evidence" in data
         record = data.pop("evidence", None)
         if data.get("kind") == "transformed":

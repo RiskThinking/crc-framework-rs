@@ -577,13 +577,22 @@ fn upper_tail(
     order: &ImpactOrder<'_>,
 ) -> Option<(f64, Vec<f64>)> {
     let factors = order.factors;
-    let mut remaining = tail_mass;
+    let mut included = CompensatedSum::default();
     let mut cvar = CompensatedSum::default();
     let mut largest_positive = 0.0_f64;
     let mut largest_negative = 0.0_f64;
     let mut states = Vec::from_iter((0..factors.len()).map(|_| Default::default()));
+    let margin = 64.0 * f64::EPSILON * tail_mass;
     for tied in branches.chunk_by(|a, b| order.compare(a, b).is_eq()).rev() {
         let group_mass = compensated(tied.iter().map(|branch| branch.mass));
+        let remaining = tail_mass - included.total();
+        included.add(group_mass);
+        // A rounded boundary can hide positive mass from the next group,
+        // whose impacts may dominate the tail mean even at very small weight.
+        let difference = tail_mass - included.total();
+        if difference.abs() <= margin {
+            return None;
+        }
         let used = group_mass.min(remaining);
         let weight = used / tail_mass;
         let contribution = tied[0].value * weight;
@@ -598,8 +607,7 @@ fn upper_tail(
                 weight * (branch.mass / group_mass),
             );
         }
-        remaining -= used;
-        if remaining <= 0.0 {
+        if difference < 0.0 {
             break;
         }
     }

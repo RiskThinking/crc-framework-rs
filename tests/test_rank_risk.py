@@ -111,6 +111,23 @@ def test_var_compares_exact_joint_mass_at_rounding_boundary() -> None:
     assert result.at(above).value_at_risk == 10
 
 
+def test_cvar_retains_mass_hidden_by_rounding_at_the_cutoff() -> None:
+    lower = math.nextafter(0.5, 1)
+    outcome = BinaryOutcome(
+        "rounded",
+        lower_rank_mass=lower,
+        lower_impact=-1e308,
+        upper_rank_mass=0.5,
+        upper_impact=0,
+    )
+    result = compute_risk([outcome], levels=[0.5]).at(0.5)
+    expected = -1e308 * (lower - 0.5)
+    assert result.conditional_value_at_risk == pytest.approx(expected, rel=1e-15)
+    assert result.attribution[0].conditional_value_at_risk == (
+        result.conditional_value_at_risk
+    )
+
+
 @pytest.mark.parametrize("q", [1e-20, math.ulp(0.0)])
 def test_cvar_retains_small_excluded_prefix_at_large_impact_scale(q: float) -> None:
     symmetric = BinaryOutcome(
