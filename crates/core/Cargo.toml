@@ -2,7 +2,7 @@
 name = "crc-framework-core"
 version.workspace = true
 edition = "2024"
-rust-version = "1.85"
+rust-version.workspace = true
 description = "Core distribution and climate-risk algorithms for CRC Framework"
 authors = ["Riskthinking.AI"]
 license = "AGPL-3.0-or-later"
