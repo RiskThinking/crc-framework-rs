@@ -308,6 +308,44 @@
       ]
     },
     {
+      "name": "skew-normal-small-shape",
+      "document": {
+        "family": "skewnorm",
+        "kind": "parametric",
+        "location": 0.0,
+        "object": "distribution",
+        "scale": 1e+200,
+        "schema_version": "1.0",
+        "shape": 1e-100
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.1,
+          "value": -1.2815515655446003e+200
+        },
+        {
+          "probability": 0.5,
+          "value": 7.978845608028653e+99
+        },
+        {
+          "probability": 0.9,
+          "value": 1.2815515655446008e+200
+        },
+        {
+          "probability": 0.99,
+          "value": 2.3263478740408407e+200
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
       "name": "finite-gev-upper-endpoint",
       "document": {
         "family": "genextreme",
