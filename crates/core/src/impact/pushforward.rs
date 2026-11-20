@@ -7,8 +7,8 @@
 
 use crate::Interpolation;
 use crate::numerical::{
-    IntegralMoment, NumericalLaw, affine_fitted_mean_deviation, affine_segment_mean_deviation,
-    compensated,
+    CompensatedSum, IntegralMoment, NumericalLaw, ProbabilitySegment, affine_fitted_mean_deviation,
+    affine_segment_mean_deviation, compensated, segment_integral,
 };
 
 use super::definition::{
@@ -73,6 +73,13 @@ impl ImpactDistribution {
         matches!(self.law, Law::Discrete)
     }
 
+    fn atomic_segments(&self) -> Vec<ProbabilitySegment> {
+        self.atoms
+            .iter()
+            .map(|atom| (atom.value, atom.value, atom.probability))
+            .collect()
+    }
+
     /// Apply the affine scale before evaluating moments, so the variance can
     /// be finite even when the unscaled variance exceeds binary64's range.
     pub fn affine_moments(&self) -> ContractResult<Option<(f64, f64)>> {
@@ -87,12 +94,11 @@ impl ImpactDistribution {
     /// Exact moments for finite atomic laws and unclamped affine images.
     pub fn exact_mean_deviation(&self) -> ContractResult<Option<(f64, f64)>> {
         if self.is_discrete() {
-            let atoms: Vec<_> = self
-                .atoms
-                .iter()
-                .map(|atom| (atom.value, atom.value, atom.probability))
-                .collect();
-            return Ok(Some(affine_segment_mean_deviation(&atoms, 1.0, 0.0)));
+            return Ok(Some(affine_segment_mean_deviation(
+                &self.atomic_segments(),
+                1.0,
+                0.0,
+            )));
         }
         let Model::Linear { slope, intercept } = self.model else {
             return Ok(None);
@@ -244,19 +250,13 @@ impl ImpactDistribution {
             return Ok(0.0);
         }
         if matches!(self.law, Law::Discrete) {
-            let mut start = 0.0;
-            let mut contributions = Vec::new();
-            for atom in &self.atoms {
-                let end = start + atom.probability;
-                let width = if lo <= start && hi >= end {
-                    atom.probability
-                } else {
-                    (hi.min(end) - lo.max(start)).max(0.0)
-                };
-                contributions.push(moment.segment(width, atom.value, atom.value));
-                start = end;
-            }
-            return Ok(compensated(contributions.into_iter()));
+            return Ok(segment_integral(
+                &self.atomic_segments(),
+                lo,
+                hi,
+                moment,
+                false,
+            ));
         }
         let decreasing = matches!(self.law, Law::Continuous { decreasing: true });
         let source_atoms: Vec<(f64, f64, f64, f64)> = self
@@ -357,12 +357,12 @@ impl ImpactDistribution {
             }
         }
         if matches!(self.law, Law::Discrete) {
-            let mut consumed = 0.0;
+            let mut suffix = CompensatedSum::default();
             for atom in self.atoms.iter().rev() {
-                if survival < consumed + atom.probability {
+                suffix.add(atom.probability);
+                if survival < suffix.total() {
                     return Ok(atom.value);
                 }
-                consumed += atom.probability;
             }
             return Ok(self.atoms[0].value);
         }
@@ -622,19 +622,13 @@ impl ImpactDistribution {
             return Ok(0.0);
         }
         if matches!(self.law, Law::Discrete) {
-            let mut contributions = Vec::new();
-            let mut consumed = 0.0;
-            for atom in self.atoms.iter().rev() {
-                let end = consumed + atom.probability;
-                let width = if s_min <= consumed && s_max >= end {
-                    atom.probability
-                } else {
-                    (s_max.min(end) - s_min.max(consumed)).max(0.0)
-                };
-                contributions.push(moment.segment(width, atom.value, atom.value));
-                consumed = end;
-            }
-            return Ok(compensated(contributions.into_iter()));
+            return Ok(segment_integral(
+                &self.atomic_segments(),
+                s_min,
+                s_max,
+                moment,
+                true,
+            ));
         }
         let decreasing = matches!(self.law, Law::Continuous { decreasing: true });
         let source_atoms: Vec<_> = self
@@ -969,28 +963,25 @@ fn discrete_quantile(atoms: &[ImpactAtom], probability: f64) -> f64 {
     if probability >= 1.0 {
         return atoms.last().expect("atoms are non-empty").value;
     }
-    let mut cumulative = 0.0;
+    let mut prefix = CompensatedSum::default();
     for atom in atoms {
-        cumulative += atom.probability;
-        if probability <= cumulative {
+        prefix.add(atom.probability);
+        if probability <= prefix.total() {
             return atom.value;
         }
     }
     atoms.last().expect("atoms are non-empty").value
 }
 
-fn merge_atoms(atoms: Vec<ImpactAtom>) -> Vec<ImpactAtom> {
-    let mut ordered = atoms;
-    ordered.sort_by(|left, right| left.value.total_cmp(&right.value));
-    let mut merged: Vec<ImpactAtom> = Vec::new();
-    for atom in ordered {
-        if merged.last().is_some_and(|last| last.value == atom.value) {
-            merged.last_mut().expect("atom group exists").probability += atom.probability;
-        } else {
-            merged.push(atom);
-        }
-    }
-    merged
+fn merge_atoms(mut atoms: Vec<ImpactAtom>) -> Vec<ImpactAtom> {
+    atoms.sort_by(|left, right| left.value.total_cmp(&right.value));
+    atoms
+        .chunk_by(|left, right| left.value == right.value)
+        .map(|group| ImpactAtom {
+            value: group[0].value,
+            probability: compensated(group.iter().map(|atom| atom.probability)),
+        })
+        .collect()
 }
 
 #[derive(Clone, Copy)]
