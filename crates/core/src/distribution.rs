@@ -609,6 +609,19 @@ impl FittedDistribution {
         }
     }
 
+    fn log_abs_z(&self, x: f64, z: f64) -> f64 {
+        if z.is_finite() {
+            return z.abs().ln();
+        }
+        let centered = x - self.location;
+        let log_centered = if centered.is_finite() {
+            centered.abs().ln()
+        } else {
+            (x * 0.5 - self.location * 0.5).abs().ln() + std::f64::consts::LN_2
+        };
+        log_centered - self.scale.ln()
+    }
+
     fn pareto_log_survival(&self, x: f64, z: f64, shape: f64) -> f64 {
         if z < 0.0 {
             return 0.0;
@@ -621,22 +634,27 @@ impl FittedDistribution {
             return f64::NEG_INFINITY;
         }
         let logarithm = if product == f64::INFINITY && x.is_finite() {
-            let log_z = if z.is_finite() {
-                z.ln()
-            } else {
-                let centered = x - self.location;
-                let log_centered = if centered.is_finite() {
-                    centered.ln()
-                } else {
-                    (x * 0.5 - self.location * 0.5).ln() + std::f64::consts::LN_2
-                };
-                log_centered - self.scale.ln()
-            };
-            shape.ln() + log_z
+            shape.ln() + self.log_abs_z(x, z)
         } else {
             product.ln_1p()
         };
         -logarithm / shape
+    }
+
+    fn gev_log_rate(&self, x: f64, z: f64, shape: f64) -> f64 {
+        if shape.abs() < EPS {
+            return -z;
+        }
+        let product = -shape * z;
+        if product <= -1.0 {
+            return f64::INFINITY.copysign(-shape);
+        }
+        let log_support = if product == f64::INFINITY && x.is_finite() {
+            shape.abs().ln() + self.log_abs_z(x, z)
+        } else {
+            product.ln_1p()
+        };
+        log_support / shape
     }
 
     /// Upper-tail probability `P(X > x)`.
@@ -665,19 +683,10 @@ impl FittedDistribution {
             DistributionFamily::GenPareto => self
                 .pareto_log_survival(x, z, self.shape.expect("validated"))
                 .exp(),
-            DistributionFamily::GenExtreme => {
-                let c = self.shape.expect("validated");
-                if c.abs() < EPS {
-                    -(-(-z).exp()).exp_m1()
-                } else {
-                    let support = 1.0 - c * z;
-                    if support <= 0.0 {
-                        if c > 0.0 { 0.0 } else { 1.0 }
-                    } else {
-                        -(-support.powf(1.0 / c)).exp_m1()
-                    }
-                }
-            }
+            DistributionFamily::GenExtreme => -(-self
+                .gev_log_rate(x, z, self.shape.expect("validated"))
+                .exp())
+            .exp_m1(),
             // If X ~ SN(alpha, loc, scale) then -X ~ SN(-alpha, -loc, scale).
             DistributionFamily::SkewNormal => skew_normal_cdf(-z, -self.shape.expect("validated")),
         }
@@ -697,16 +706,8 @@ impl FittedDistribution {
             }
             DistributionFamily::WeibullMax => f64::NEG_INFINITY,
             DistributionFamily::GenPareto => self.pareto_log_survival(x, z, shape),
-            DistributionFamily::GenExtreme if shape.abs() < EPS => log_exponential_complement(-z),
-            DistributionFamily::GenExtreme if 1.0 - shape * z <= 0.0 => {
-                if shape > 0.0 {
-                    f64::NEG_INFINITY
-                } else {
-                    0.0
-                }
-            }
             DistributionFamily::GenExtreme => {
-                log_exponential_complement((-shape * z).ln_1p() / shape)
+                log_exponential_complement(self.gev_log_rate(x, z, shape))
             }
             DistributionFamily::SkewNormal => skew_normal_log_cdf(-z, -shape),
         }
@@ -724,15 +725,7 @@ impl FittedDistribution {
             DistributionFamily::GenPareto => {
                 log_exponential_complement((-self.pareto_log_survival(x, z, shape)).ln())
             }
-            DistributionFamily::GenExtreme if shape.abs() < EPS => -(-z).exp(),
-            DistributionFamily::GenExtreme if 1.0 - shape * z <= 0.0 => {
-                if shape > 0.0 {
-                    0.0
-                } else {
-                    f64::NEG_INFINITY
-                }
-            }
-            DistributionFamily::GenExtreme => -((-shape * z).ln_1p() / shape).exp(),
+            DistributionFamily::GenExtreme => -self.gev_log_rate(x, z, shape).exp(),
             DistributionFamily::SkewNormal => skew_normal_log_cdf(z, shape),
         }
     }
@@ -758,9 +751,7 @@ impl FittedDistribution {
             DistributionFamily::GenExtreme => {
                 return Ok(self.unstandardize_exp_m1(shape * (-logarithm).ln(), -shape));
             }
-            DistributionFamily::SkewNormal => {
-                inverse_by_bisection(|z| skew_normal_log_cdf(z, shape), logarithm)
-            }
+            DistributionFamily::SkewNormal => skew_normal_inverse_log_tail(logarithm, shape),
         };
         Ok(self.unstandardize(standardized))
     }
@@ -794,9 +785,7 @@ impl FittedDistribution {
             DistributionFamily::GenExtreme => {
                 return Ok(self.unstandardize_exp_m1(shape * logarithm, -shape));
             }
-            DistributionFamily::SkewNormal => {
-                -inverse_by_bisection(|z| skew_normal_log_cdf(z, -shape), logarithm)
-            }
+            DistributionFamily::SkewNormal => -skew_normal_inverse_log_tail(logarithm, -shape),
         };
         Ok(self.unstandardize(standardized))
     }
@@ -868,14 +857,10 @@ impl FittedDistribution {
                     self.unstandardize_exp_m1(c * neg_log_cdf.ln(), -c)
                 }
             }
-            DistributionFamily::SkewNormal => {
-                let reflected = Self {
-                    shape: self.shape.map(|alpha| -alpha),
-                    location: -self.location,
-                    ..*self
-                };
-                -inverse_by_bisection(|x| reflected.cdf(x), survival)
-            }
+            DistributionFamily::SkewNormal => self.unstandardize(-skew_normal_quantile(
+                survival,
+                -self.shape.expect("validated"),
+            )),
         };
         Ok(value)
     }
@@ -991,19 +976,10 @@ impl Distribution for FittedDistribution {
             DistributionFamily::GenPareto => -self
                 .pareto_log_survival(x, z, self.shape.expect("validated"))
                 .exp_m1(),
-            DistributionFamily::GenExtreme => {
-                let c = self.shape.expect("validated");
-                if c.abs() < EPS {
-                    (-(-z).exp()).exp()
-                } else {
-                    let support = 1.0 - c * z;
-                    if support <= 0.0 {
-                        if c > 0.0 { 1.0 } else { 0.0 }
-                    } else {
-                        (-support.powf(1.0 / c)).exp()
-                    }
-                }
-            }
+            DistributionFamily::GenExtreme => (-self
+                .gev_log_rate(x, z, self.shape.expect("validated"))
+                .exp())
+            .exp(),
             DistributionFamily::SkewNormal => skew_normal_cdf(z, self.shape.expect("validated")),
         }
         .clamp(0.0, 1.0)
@@ -1040,7 +1016,9 @@ impl Distribution for FittedDistribution {
                     self.unstandardize_exp_m1(c * (-q.ln()).ln(), -c)
                 }
             }
-            DistributionFamily::SkewNormal => inverse_by_bisection(|x| self.cdf(x), q),
+            DistributionFamily::SkewNormal => {
+                self.unstandardize(skew_normal_quantile(q, self.shape.expect("validated")))
+            }
         };
         Ok(value)
     }
@@ -2039,29 +2017,46 @@ fn quantile_diagnostics(
     }
 }
 
-fn inverse_by_bisection(cdf: impl Fn(f64) -> f64, q: f64) -> f64 {
-    let mut lower = -1.0;
-    let mut upper = 1.0;
-    while cdf(lower) > q {
-        lower *= 2.0;
+fn skew_normal_quantile(q: f64, alpha: f64) -> f64 {
+    if q > 0.5 {
+        -skew_normal_inverse_log_tail((-q).ln_1p(), -alpha)
+    } else {
+        skew_normal_inverse_log_tail(q.ln(), alpha)
     }
-    while cdf(upper) < q {
+}
+
+fn skew_normal_inverse_log_tail(logarithm: f64, alpha: f64) -> f64 {
+    let at_zero = skew_normal_log_cdf(0.0, alpha);
+    if logarithm == at_zero {
+        return 0.0;
+    }
+    let direction = if logarithm < at_zero { -1.0 } else { 1.0 };
+    let reached = |magnitude: f64| {
+        let probability = skew_normal_log_cdf(direction * magnitude, alpha);
+        if direction < 0.0 {
+            probability <= logarithm
+        } else {
+            probability >= logarithm
+        }
+    };
+    let mut lower = 0.0_f64;
+    let mut upper = 1.0_f64;
+    while !reached(upper) {
+        lower = upper;
         upper *= 2.0;
     }
-    for _ in 0..120 {
-        let middle = (lower + upper) * 0.5;
-        // Once the bounds are adjacent f64 values, further CDF integrations
-        // cannot refine the quantile. This preserves the converged result.
-        if middle == lower || middle == upper {
-            break;
-        }
-        if cdf(middle) < q {
-            lower = middle;
+    // For nonnegative floats, bit order matches numeric order. Bisect
+    // representable magnitudes to resolve even a root very close to zero.
+    let (mut lo, mut hi) = (lower.to_bits(), upper.to_bits());
+    while hi - lo > 1 {
+        let mid = lo + (hi - lo) / 2;
+        if reached(f64::from_bits(mid)) {
+            hi = mid;
         } else {
-            upper = middle;
+            lo = mid;
         }
     }
-    (lower + upper) * 0.5
+    direction * f64::from_bits(lo).midpoint(f64::from_bits(hi))
 }
 
 fn normal_pdf(x: f64) -> f64 {
@@ -2091,8 +2086,8 @@ fn skew_normal_cdf(z: f64, alpha: f64) -> f64 {
     }
     let normal = reference_curve_fitting::ndtr_cephes(z);
     let probability = normal - 2.0 * reference_curve_fitting::owens_t(z, alpha);
-    if z <= 0.0 && alpha > 0.0 && probability <= 0.01 * normal {
-        skew_normal_log_tail(-z, alpha).exp()
+    if probability < f64::MIN_POSITIVE || (alpha > 0.0 && probability <= 0.01 * normal) {
+        skew_normal_log_cdf(z, alpha).exp()
     } else {
         probability.clamp(0.0, 1.0)
     }
@@ -2118,10 +2113,22 @@ fn skew_normal_log_cdf(z: f64, alpha: f64) -> f64 {
     if z == f64::INFINITY {
         return 0.0;
     }
+    if z == 0.0 && alpha > 0.0 {
+        return ((1.0 / alpha).atan() / PI).ln();
+    }
+    if alpha == 0.0 {
+        return reference_curve_fitting::log_standard_normal_cdf(z);
+    }
     let normal = reference_curve_fitting::ndtr_cephes(z);
     let probability = normal - 2.0 * reference_curve_fitting::owens_t(z, alpha);
     if z <= 0.0 && (probability < f64::MIN_POSITIVE || probability <= 0.01 * normal) {
         skew_normal_log_tail(-z, alpha)
+    } else if z > 0.0 && alpha > 0.0 && probability <= 0.01 * normal {
+        // The skew-normal densities with opposite shapes sum to twice the
+        // standard normal density. Reflect the small contribution to compute
+        // F(z) = erf(z/sqrt(2)) + F(-z) without cancellation near zero.
+        let half_normal = reference_curve_fitting::erf(z / std::f64::consts::SQRT_2);
+        (half_normal + skew_normal_log_tail(z, alpha).exp()).ln()
     } else {
         probability.clamp(0.0, 1.0).ln()
     }

@@ -1246,7 +1246,7 @@ fn erfc(a: f64) -> f64 {
     if a < 0.0 { 2.0 - y } else { y }
 }
 
-fn erf(x: f64) -> f64 {
+pub(crate) fn erf(x: f64) -> f64 {
     if x.is_nan() {
         return f64::NAN;
     }

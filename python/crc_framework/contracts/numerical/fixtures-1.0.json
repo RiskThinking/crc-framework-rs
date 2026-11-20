@@ -133,7 +133,7 @@
         },
         {
           "probability": 0.1,
-          "value": 0.6779839882920253
+          "value": 0.677983988292026
         },
         {
           "probability": 0.5,
@@ -141,11 +141,15 @@
         },
         {
           "probability": 0.9,
-          "value": 4.487530446158395
+          "value": 4.487530446158396
         },
         {
           "probability": 0.99,
-          "value": 6.351646275385638
+          "value": 6.351646275385645
+        },
+        {
+          "probability": 0.9999999999999999,
+          "value": 17.78472215162719
         },
         {
           "probability": 1,
@@ -258,6 +262,44 @@
         {
           "probability": 0.99,
           "value": 14.470164199585055
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "skew-normal-large-scale",
+      "document": {
+        "family": "skewnorm",
+        "kind": "parametric",
+        "location": -1e+308,
+        "object": "distribution",
+        "scale": 1e+308,
+        "schema_version": "1.0",
+        "shape": 0.0
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.1,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.5,
+          "value": -1e+308
+        },
+        {
+          "probability": 0.9,
+          "value": 2.815515655446009e+307
+        },
+        {
+          "probability": 0.99,
+          "value": 1.3263478740408408e+308
         },
         {
           "probability": 1,
@@ -2256,7 +2298,7 @@
         },
         {
           "probability": 0.9,
-          "value": 2.037694124189093
+          "value": 2.037694124189092
         },
         {
           "probability": 0.99,
@@ -3826,6 +3868,63 @@
         ]
       },
       "structural": false
+    },
+    {
+      "name": "discrete-individual-mass-above-one",
+      "document": {
+        "kind": "discrete",
+        "object": "distribution",
+        "probabilities": [
+          1.0000000000001
+        ],
+        "schema_version": "1.0",
+        "values": [
+          2.0
+        ]
+      },
+      "structural": true
+    },
+    {
+      "name": "histogram-individual-mass-above-one",
+      "document": {
+        "edges": [
+          1.0,
+          2.0
+        ],
+        "kind": "histogram",
+        "object": "distribution",
+        "probabilities": [
+          1.0000000000001
+        ],
+        "schema_version": "1.0"
+      },
+      "structural": true
+    },
+    {
+      "name": "hurdle-base-with-document-envelope",
+      "document": {
+        "atom_location": 0.0,
+        "atom_probability": 0.2,
+        "base": {
+          "kind": "discrete",
+          "probabilities": [
+            0.5,
+            0.1,
+            0.4
+          ],
+          "values": [
+            -1.0,
+            2.0,
+            3.0
+          ],
+          "schema_version": "1.0",
+          "object": "distribution"
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "structural": true
     },
     {
       "name": "unordered-knots",

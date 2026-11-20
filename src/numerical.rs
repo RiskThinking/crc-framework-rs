@@ -11,6 +11,13 @@ fn validate_document(py: Python<'_>, schema: &str, text: &str) -> PyResult<()> {
 }
 
 #[pyfunction]
+fn validate_structure(py: Python<'_>, schema: &str, text: &str) -> PyResult<()> {
+    use crc_framework_core::canonical::{parse_document, validate_structure};
+    py.detach(|| validate_structure(schema, &parse_document(text)?))
+        .map_err(error)
+}
+
+#[pyfunction]
 fn unit_conversion(source: &str, target: &str) -> PyResult<(f64, f64)> {
     crc_framework_core::dataset::unit_conversion(source, target).map_err(error)
 }
@@ -246,6 +253,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyNumericalLaw>()?;
     module.add_class::<PyNumericalDocument>()?;
     module.add_function(wrap_pyfunction!(validate_document, module)?)?;
+    module.add_function(wrap_pyfunction!(validate_structure, module)?)?;
     module.add_function(wrap_pyfunction!(unit_conversion, module)?)?;
     module.add_function(wrap_pyfunction!(validate_unit_conversion, module)?)?;
     module.add_function(wrap_pyfunction!(validate_fitted_curve, module)?)?;
