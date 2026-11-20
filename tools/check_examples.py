@@ -15,6 +15,7 @@ GUIDES = (
     "docs/measurements.md",
     "docs/impact-contracts.md",
     "docs/javascript.md",
+    "docs/migration-v1.md",
 )
 
 

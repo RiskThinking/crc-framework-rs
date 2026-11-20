@@ -14,7 +14,8 @@ in Node and browsers, and validates the shared scientific and data contracts.
 The framework supports numerical and fitting format `1.0`, impact format
 `2.0`, and typed measurement and context format `1.0`. Dataset schema `2.0`
 and taxonomy schema `1.0` are shared with CRC-SDK. See the [Python guide](python.md)
-and the [JavaScript guide](javascript.md) for runnable workflows.
+and the [JavaScript guide](javascript.md) for runnable workflows. To upgrade existing code, follow the
+[1.0 migration guide](migration-v1.md).
 
 ## Release contract
 
