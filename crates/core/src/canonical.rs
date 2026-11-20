@@ -938,8 +938,9 @@ impl Numerical {
         function: &ImpactDefinition,
         document: &Value,
     ) -> Result<ImpactDistribution> {
-        if let Some(output) = self.output_measurement()
-            && !scientific_equal(output, &document["input"])
+        if self
+            .output_measurement()
+            .is_some_and(|output| !scientific_equal(output, &document["input"]))
         {
             return Err(invalid(
                 "source impact output does not match the next impact input",

@@ -13,7 +13,7 @@ members = ["crates/core", "crates/wasm"]
 
 [workspace.package]
 version = "1.0.0"
-rust-version = "1.88"
+rust-version = "1.87"
 
 [lib]
 name = "_core"

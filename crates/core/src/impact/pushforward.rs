@@ -447,9 +447,9 @@ impl ImpactDistribution {
                 if logarithmic && inclusive && atom_mass < f64::MIN_POSITIVE {
                     // A flat at the endpoint can retain positive mass even
                     // when the unconditioned atom cannot be stored linearly.
-                    if let Some((cut, increasing)) = self.inverse_cut(value)
-                        && (self.clamp.maximum == Some(value) || self.clamp.minimum == Some(value))
-                    {
+                    if let Some((cut, increasing)) = self.inverse_cut(value).filter(|_| {
+                        self.clamp.maximum == Some(value) || self.clamp.minimum == Some(value)
+                    }) {
                         return Ok(self.source.log_tail_at(cut, true, increasing != exceedance));
                     }
                     for region in constant_regions(&self.model, &self.clamp)? {

@@ -58,7 +58,7 @@ python -m pip install --upgrade --pre crc-framework
 ```
 
 Python 3.11 or later is required. Compatible prebuilt wheels need no Rust
-toolchain. Building from source requires Rust 1.88 or later and a C compiler
+toolchain. Building from source requires Rust 1.87 or later and a C compiler
 suitable for Python extensions.
 
 ### JavaScript / WebAssembly
