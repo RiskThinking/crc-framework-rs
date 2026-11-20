@@ -535,11 +535,11 @@ def main():
     args = parser.parse_args()
     data = json.dumps(build(), ensure_ascii=False, indent=2, allow_nan=False) + "\n"
     if args.check:
-        if not OUTPUT.exists() or OUTPUT.read_text() != data:
+        if not OUTPUT.exists() or OUTPUT.read_bytes() != data.encode("utf-8"):
             raise SystemExit(f"{OUTPUT} is stale")
     else:
         OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-        OUTPUT.write_text(data)
+        OUTPUT.write_text(data, encoding="utf-8", newline="\n")
 
 
 if __name__ == "__main__":
