@@ -340,10 +340,10 @@ def main():
         data = json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
         path = OUTPUT / name
         if args.check:
-            if not path.exists() or path.read_text() != data:
+            if not path.exists() or path.read_bytes() != data.encode("utf-8"):
                 raise SystemExit(f"{path} is stale")
         else:
-            path.write_text(data)
+            path.write_text(data, encoding="utf-8", newline="\n")
 
 
 if __name__ == "__main__":
