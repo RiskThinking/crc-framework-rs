@@ -52,6 +52,14 @@ def build():
             ),
         )
     )
+    objects.append(
+        (
+            "skew-normal-small-shape",
+            Distribution.parametric(
+                DistributionFamily.SKEW_NORMAL, location=0, scale=1e200, shape=1e-100
+            ),
+        )
+    )
     for name, family, location, shape in [
         ("gev-upper", DistributionFamily.GENERALIZED_EXTREME_VALUE, -1e308, 0.5),
         ("gev-lower", DistributionFamily.GENERALIZED_EXTREME_VALUE, 1e308, -0.5),

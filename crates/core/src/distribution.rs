@@ -2018,7 +2018,17 @@ fn quantile_diagnostics(
 }
 
 fn skew_normal_quantile(q: f64, alpha: f64) -> f64 {
-    if q > 0.5 {
+    if (0.25..=0.75).contains(&q) {
+        // Invert F(z) - 1/2 directly so a small but nonzero median (or
+        // shifted center rank) is not erased by rounding the CDF to 1/2.
+        invert_skew_normal_cdf(
+            |z| {
+                0.5 * reference_curve_fitting::erf(z / std::f64::consts::SQRT_2)
+                    - 2.0 * reference_curve_fitting::owens_t(z, alpha)
+            },
+            q - 0.5,
+        )
+    } else if q > 0.5 {
         -skew_normal_inverse_log_tail((-q).ln_1p(), -alpha)
     } else {
         skew_normal_inverse_log_tail(q.ln(), alpha)
@@ -2026,17 +2036,21 @@ fn skew_normal_quantile(q: f64, alpha: f64) -> f64 {
 }
 
 fn skew_normal_inverse_log_tail(logarithm: f64, alpha: f64) -> f64 {
-    let at_zero = skew_normal_log_cdf(0.0, alpha);
-    if logarithm == at_zero {
+    invert_skew_normal_cdf(|z| skew_normal_log_cdf(z, alpha), logarithm)
+}
+
+fn invert_skew_normal_cdf(cdf: impl Fn(f64) -> f64, target: f64) -> f64 {
+    let at_zero = cdf(0.0);
+    if target == at_zero {
         return 0.0;
     }
-    let direction = if logarithm < at_zero { -1.0 } else { 1.0 };
+    let direction = if target < at_zero { -1.0 } else { 1.0 };
     let reached = |magnitude: f64| {
-        let probability = skew_normal_log_cdf(direction * magnitude, alpha);
+        let probability = cdf(direction * magnitude);
         if direction < 0.0 {
-            probability <= logarithm
+            probability <= target
         } else {
-            probability >= logarithm
+            probability >= target
         }
     };
     let mut lower = 0.0_f64;

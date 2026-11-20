@@ -82,6 +82,23 @@ fn skew_normal_inverse_retains_rare_upper_and_near_zero_ranks() {
 }
 
 #[test]
+fn skew_normal_median_preserves_very_small_nonzero_skew() {
+    for shape in [-1e-100, 1e-100] {
+        let law = FittedDistribution::from_parameters(
+            DistributionFamily::SkewNormal,
+            Some(shape),
+            0.0,
+            1e200,
+        )
+        .unwrap();
+        // The standard skew-normal median is sqrt(2/pi) * shape + O(shape^3).
+        let expected = (2.0 / std::f64::consts::PI).sqrt() * shape * 1e200;
+        assert!(relative_error(law.ppf(0.5).unwrap(), expected) < 1e-14);
+        assert!(relative_error(law.isf(0.5).unwrap(), expected) < 1e-14);
+    }
+}
+
+#[test]
 fn gev_cdf_and_survival_match_inverse_ranks_at_small_shapes() {
     for shape in [-1e-12, 1e-12] {
         let law = fitted(DistributionFamily::GenExtreme, Some(shape));
