@@ -74,13 +74,12 @@ fn unit_basis(unit: &str) -> Option<(&'static str, f64, f64)> {
 /// Return the affine coefficients for a supported conversion of units.
 #[doc(hidden)]
 pub fn unit_conversion(source: &str, target: &str) -> Result<(f64, f64)> {
-    if let (Some((from, from_scale, from_offset)), Some((to, to_scale, to_offset))) =
-        (unit_basis(source), unit_basis(target))
-        && from == to
-    {
-        return Ok((from_scale / to_scale, (from_offset - to_offset) / to_scale));
+    match (unit_basis(source), unit_basis(target)) {
+        (Some((from, from_scale, from_offset)), Some((to, to_scale, to_offset))) if from == to => {
+            Ok((from_scale / to_scale, (from_offset - to_offset) / to_scale))
+        }
+        _ => Err(invalid(format!("cannot convert {source:?} to {target:?}"))),
     }
-    Err(invalid(format!("cannot convert {source:?} to {target:?}")))
 }
 
 /// Validate a recorded transformation and recover the input measurement.
@@ -301,12 +300,14 @@ fn fit_specification(value: &Value) -> Result<Value> {
         {
             return Err(invalid("selection cannot mix sample and quantile evidence"));
         }
-        if let Some(censor) = candidates
+        if candidates
             .iter()
             .find_map(|candidate| candidate["censor_location"].as_f64())
-            && candidates
-                .iter()
-                .any(|candidate| candidate["censor_location"].as_f64() != Some(censor))
+            .is_some_and(|censor| {
+                candidates
+                    .iter()
+                    .any(|candidate| candidate["censor_location"].as_f64() != Some(censor))
+            })
         {
             return Err(invalid(
                 "censored model selection requires every candidate to use the same censor_location",
