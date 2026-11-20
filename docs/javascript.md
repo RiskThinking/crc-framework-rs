@@ -48,9 +48,9 @@ memory; `free()` is idempotent and further queries fail.
 
 Partial evidence is queried only on its actual interval. Invalid coordinates,
 malformed documents, historical records, and out-of-support queries fail.
-Mathematical infinite endpoints remain JavaScript infinities. Missing data is a
-retained dataset failure, never a fictional numerical distribution or a silent
-null result.
+Mathematical infinite endpoints remain JavaScript infinities. Dataset failures
+distinguish source unavailability (`kind: "source_unavailable"`) from failed
+fits with an execution record.
 
 Use shared structural and scientific validation without guessing schema URIs:
 
