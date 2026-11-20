@@ -22,6 +22,11 @@ jobs:
           cargo clippy --workspace --all-targets --locked -- -D warnings
           pip install numpy mypy jsonschema types-jsonschema
           python -m mypy
+      - name: Check the declared minimum Rust version
+        run: |
+          rust_version=$(python -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["rust-version"])')
+          rustup toolchain install "$rust_version" --profile minimal
+          cargo +"$rust_version" check --workspace --all-targets --locked
   python-contracts:
     runs-on: ubuntu-latest
     steps:
