@@ -1,0 +1,4149 @@
+{
+  "schema_version": "1.0",
+  "accepted": [
+    {
+      "name": "genextreme",
+      "document": {
+        "family": "genextreme",
+        "kind": "parametric",
+        "location": 1.2,
+        "object": "distribution",
+        "scale": 2.0,
+        "schema_version": "1.0",
+        "shape": 0.1
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.1,
+          "value": -0.5396007786912065
+        },
+        {
+          "probability": 0.5,
+          "value": 1.9197552906442052
+        },
+        {
+          "probability": 0.9,
+          "value": 5.230262247671425
+        },
+        {
+          "probability": 0.99,
+          "value": 8.574515497302757
+        },
+        {
+          "probability": 1,
+          "value": 21.2
+        }
+      ]
+    },
+    {
+      "name": "weibull_min",
+      "document": {
+        "family": "weibull_min",
+        "kind": "parametric",
+        "location": 1.2,
+        "object": "distribution",
+        "scale": 2.0,
+        "schema_version": "1.0",
+        "shape": 2.2
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 1.2
+        },
+        {
+          "probability": 0.1,
+          "value": 1.9191056016282806
+        },
+        {
+          "probability": 0.5,
+          "value": 2.8930817659619894
+        },
+        {
+          "probability": 0.9,
+          "value": 4.121954779952228
+        },
+        {
+          "probability": 0.99,
+          "value": 5.204103610015208
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "weibull_max",
+      "document": {
+        "family": "weibull_max",
+        "kind": "parametric",
+        "location": 1.2,
+        "object": "distribution",
+        "scale": 2.0,
+        "schema_version": "1.0",
+        "shape": 1.7
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.1,
+          "value": -2.066615721063627
+        },
+        {
+          "probability": 0.5,
+          "value": -0.4121220343718417
+        },
+        {
+          "probability": 0.9,
+          "value": 0.6677267566065074
+        },
+        {
+          "probability": 0.99,
+          "value": 1.0663890356605608
+        },
+        {
+          "probability": 1,
+          "value": 1.2
+        }
+      ]
+    },
+    {
+      "name": "skewnorm",
+      "document": {
+        "family": "skewnorm",
+        "kind": "parametric",
+        "location": 1.2,
+        "object": "distribution",
+        "scale": 2.0,
+        "schema_version": "1.0",
+        "shape": 1.5
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.1,
+          "value": 0.677983988292026
+        },
+        {
+          "probability": 0.5,
+          "value": 2.4486238775053044
+        },
+        {
+          "probability": 0.9,
+          "value": 4.487530446158396
+        },
+        {
+          "probability": 0.99,
+          "value": 6.351646275385645
+        },
+        {
+          "probability": 0.9999999999999999,
+          "value": 17.78472215162719
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "gumbel_r",
+      "document": {
+        "family": "gumbel_r",
+        "kind": "parametric",
+        "location": 1.2,
+        "object": "distribution",
+        "scale": 2.0,
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.1,
+          "value": -0.4680648904959115
+        },
+        {
+          "probability": 0.5,
+          "value": 1.9330258411633285
+        },
+        {
+          "probability": 0.9,
+          "value": 5.700734654624891
+        },
+        {
+          "probability": 0.99,
+          "value": 10.400298453553157
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "gumbel_l",
+      "document": {
+        "family": "gumbel_l",
+        "kind": "parametric",
+        "location": 1.2,
+        "object": "distribution",
+        "scale": 2.0,
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.1,
+          "value": -3.3007346546248906
+        },
+        {
+          "probability": 0.5,
+          "value": 0.46697415883667126
+        },
+        {
+          "probability": 0.9,
+          "value": 2.868064890495912
+        },
+        {
+          "probability": 0.99,
+          "value": 4.254359251615802
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "genpareto",
+      "document": {
+        "family": "genpareto",
+        "kind": "parametric",
+        "location": 1.2,
+        "object": "distribution",
+        "scale": 2.0,
+        "schema_version": "1.0",
+        "shape": 0.15
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 1.2
+        },
+        {
+          "probability": 0.1,
+          "value": 1.412394963747813
+        },
+        {
+          "probability": 0.5,
+          "value": 2.6609262942379335
+        },
+        {
+          "probability": 0.9,
+          "value": 6.700500594970058
+        },
+        {
+          "probability": 0.99,
+          "value": 14.470164199585055
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "skew-normal-large-scale",
+      "document": {
+        "family": "skewnorm",
+        "kind": "parametric",
+        "location": -1e+308,
+        "object": "distribution",
+        "scale": 1e+308,
+        "schema_version": "1.0",
+        "shape": 0.0
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.1,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.5,
+          "value": -1e+308
+        },
+        {
+          "probability": 0.9,
+          "value": 2.815515655446009e+307
+        },
+        {
+          "probability": 0.99,
+          "value": 1.3263478740408408e+308
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "skew-normal-small-shape",
+      "document": {
+        "family": "skewnorm",
+        "kind": "parametric",
+        "location": 0.0,
+        "object": "distribution",
+        "scale": 1e+200,
+        "schema_version": "1.0",
+        "shape": 1e-100
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.1,
+          "value": -1.2815515655446003e+200
+        },
+        {
+          "probability": 0.5,
+          "value": 7.978845608028653e+99
+        },
+        {
+          "probability": 0.9,
+          "value": 1.2815515655446008e+200
+        },
+        {
+          "probability": 0.99,
+          "value": 2.3263478740408407e+200
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "finite-gev-upper-endpoint",
+      "document": {
+        "family": "genextreme",
+        "kind": "parametric",
+        "location": -1e+308,
+        "object": "distribution",
+        "scale": 1e+308,
+        "schema_version": "1.0",
+        "shape": 0.5
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.1,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.5,
+          "value": -6.651092223153956e+307
+        },
+        {
+          "probability": 0.9,
+          "value": 3.508143080509976e+307
+        },
+        {
+          "probability": 0.99,
+          "value": 7.994972733003219e+307
+        },
+        {
+          "probability": 1,
+          "value": 1e+308
+        }
+      ]
+    },
+    {
+      "name": "finite-gev-lower-endpoint",
+      "document": {
+        "family": "genextreme",
+        "kind": "parametric",
+        "location": 1e+308,
+        "object": "distribution",
+        "scale": 1e+308,
+        "schema_version": "1.0",
+        "shape": -0.5
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -1e+308
+        },
+        {
+          "probability": 0.1,
+          "value": 3.1802045796452164e+307
+        },
+        {
+          "probability": 0.5,
+          "value": 1.4022448175728995e+308
+        },
+        {
+          "probability": 0.9,
+          "outcome": "positive_infinity"
+        },
+        {
+          "probability": 0.99,
+          "outcome": "positive_infinity"
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "finite-pareto-upper-endpoint",
+      "document": {
+        "family": "genpareto",
+        "kind": "parametric",
+        "location": -1e+308,
+        "object": "distribution",
+        "scale": 1e+308,
+        "schema_version": "1.0",
+        "shape": -0.5
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -1e+308
+        },
+        {
+          "probability": 0.1,
+          "value": -8.973665961010276e+307
+        },
+        {
+          "probability": 0.5,
+          "value": -4.14213562373095e+307
+        },
+        {
+          "probability": 0.9,
+          "value": 3.675444679663242e+307
+        },
+        {
+          "probability": 0.99,
+          "value": 7.999999999999998e+307
+        },
+        {
+          "probability": 1,
+          "value": 1e+308
+        }
+      ]
+    },
+    {
+      "name": "point",
+      "document": {
+        "kind": "point_mass",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "value": -0.0
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -0.0
+        },
+        {
+          "probability": 0.1,
+          "value": -0.0
+        },
+        {
+          "probability": 0.5,
+          "value": -0.0
+        },
+        {
+          "probability": 0.9,
+          "value": -0.0
+        },
+        {
+          "probability": 0.99,
+          "value": -0.0
+        },
+        {
+          "probability": 1,
+          "value": -0.0
+        }
+      ]
+    },
+    {
+      "name": "empirical",
+      "document": {
+        "kind": "discrete",
+        "object": "distribution",
+        "probabilities": [
+          0.5,
+          0.25,
+          0.25
+        ],
+        "schema_version": "1.0",
+        "values": [
+          0.0,
+          2.0,
+          10.0
+        ]
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 0.1,
+          "value": 0.0
+        },
+        {
+          "probability": 0.5,
+          "value": 0.0
+        },
+        {
+          "probability": 0.9,
+          "value": 10.0
+        },
+        {
+          "probability": 0.99,
+          "value": 10.0
+        },
+        {
+          "probability": 1,
+          "value": 10.0
+        }
+      ]
+    },
+    {
+      "name": "empirical-median-at-gap",
+      "document": {
+        "kind": "discrete",
+        "object": "distribution",
+        "probabilities": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333
+        ],
+        "schema_version": "1.0",
+        "values": [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          1000000.0,
+          1000001.0,
+          1000002.0,
+          1000003.0,
+          1000004.0,
+          1000005.0
+        ]
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 0.1,
+          "value": 1.0
+        },
+        {
+          "probability": 0.49999999999999994,
+          "value": 5.0
+        },
+        {
+          "probability": 0.5,
+          "value": 5.0
+        },
+        {
+          "probability": 0.5000000000000001,
+          "value": 1000000.0
+        },
+        {
+          "probability": 0.9,
+          "value": 1000004.0
+        },
+        {
+          "probability": 0.99,
+          "value": 1000005.0
+        },
+        {
+          "probability": 1,
+          "value": 1000005.0
+        }
+      ]
+    },
+    {
+      "name": "empirical-p90-at-gap",
+      "document": {
+        "kind": "discrete",
+        "object": "distribution",
+        "probabilities": [
+          0.1,
+          0.1,
+          0.1,
+          0.1,
+          0.1,
+          0.1,
+          0.1,
+          0.1,
+          0.1,
+          0.1
+        ],
+        "schema_version": "1.0",
+        "values": [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          1000000.0
+        ]
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 0.1,
+          "value": 0.0
+        },
+        {
+          "probability": 0.5,
+          "value": 4.0
+        },
+        {
+          "probability": 0.9,
+          "value": 8.0
+        },
+        {
+          "probability": 0.99,
+          "value": 1000000.0
+        },
+        {
+          "probability": 1,
+          "value": 1000000.0
+        }
+      ]
+    },
+    {
+      "name": "discrete",
+      "document": {
+        "kind": "discrete",
+        "object": "distribution",
+        "probabilities": [
+          0.999999,
+          1e-06
+        ],
+        "schema_version": "1.0",
+        "values": [
+          0.0,
+          1000000.0
+        ]
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 0.1,
+          "value": 0.0
+        },
+        {
+          "probability": 0.5,
+          "value": 0.0
+        },
+        {
+          "probability": 0.9,
+          "value": 0.0
+        },
+        {
+          "probability": 0.99,
+          "value": 0.0
+        },
+        {
+          "probability": 1,
+          "value": 1000000.0
+        }
+      ]
+    },
+    {
+      "name": "histogram",
+      "document": {
+        "edges": [
+          0.0,
+          1.0,
+          2.0,
+          3.0
+        ],
+        "kind": "histogram",
+        "object": "distribution",
+        "probabilities": [
+          0.5,
+          0.0,
+          0.5
+        ],
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 0.1,
+          "value": 0.2
+        },
+        {
+          "probability": 0.5,
+          "value": 1.0
+        },
+        {
+          "probability": 0.9,
+          "value": 2.8
+        },
+        {
+          "probability": 0.99,
+          "value": 2.98
+        },
+        {
+          "probability": 1,
+          "value": 3.0
+        }
+      ]
+    },
+    {
+      "name": "histogram-median-at-gap",
+      "document": {
+        "edges": [
+          0.0,
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          1000000.0,
+          1000001.0,
+          1000002.0,
+          1000003.0,
+          1000004.0,
+          1000005.0,
+          1000006.0
+        ],
+        "kind": "histogram",
+        "object": "distribution",
+        "probabilities": [
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.0,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333,
+          0.08333333333333333
+        ],
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 0.1,
+          "value": 1.2000000000000002
+        },
+        {
+          "probability": 0.49999999999999994,
+          "value": 5.999999999999999
+        },
+        {
+          "probability": 0.5,
+          "value": 6.0
+        },
+        {
+          "probability": 0.5000000000000001,
+          "value": 1000000.0
+        },
+        {
+          "probability": 0.9,
+          "value": 1000004.8
+        },
+        {
+          "probability": 0.99,
+          "value": 1000005.88
+        },
+        {
+          "probability": 1,
+          "value": 1000006.0
+        }
+      ]
+    },
+    {
+      "name": "reflected-histogram-median-at-gap",
+      "document": {
+        "impact": {
+          "input": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "model": {
+            "intercept": 0,
+            "kind": "linear",
+            "slope": -1
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "edges": [
+            0.0,
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            1000000.0,
+            1000001.0,
+            1000002.0,
+            1000003.0,
+            1000004.0,
+            1000005.0,
+            1000006.0
+          ],
+          "kind": "histogram",
+          "object": "distribution",
+          "probabilities": [
+            0.08333333333333333,
+            0.08333333333333333,
+            0.08333333333333333,
+            0.08333333333333333,
+            0.08333333333333333,
+            0.08333333333333333,
+            0.0,
+            0.08333333333333333,
+            0.08333333333333333,
+            0.08333333333333333,
+            0.08333333333333333,
+            0.08333333333333333,
+            0.08333333333333333
+          ],
+          "schema_version": "1.0"
+        }
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -1000006.0
+        },
+        {
+          "probability": 0.1,
+          "value": -1000004.8
+        },
+        {
+          "probability": 0.49999999999999994,
+          "value": -1000000.0
+        },
+        {
+          "probability": 0.5,
+          "value": -1000000.0
+        },
+        {
+          "probability": 0.5000000000000001,
+          "value": -5.999999999999998
+        },
+        {
+          "probability": 0.9,
+          "value": -1.1999999999999988
+        },
+        {
+          "probability": 0.99,
+          "value": -0.11999999999999966
+        },
+        {
+          "probability": 1,
+          "value": 0.0
+        }
+      ]
+    },
+    {
+      "name": "partial",
+      "document": {
+        "object": "quantile_curve",
+        "probabilities": [
+          0.9,
+          0.99
+        ],
+        "schema_version": "1.0",
+        "values": [
+          0.5,
+          2.0
+        ]
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "outcome": "out_of_support"
+        },
+        {
+          "probability": 0.1,
+          "outcome": "out_of_support"
+        },
+        {
+          "probability": 0.5,
+          "outcome": "out_of_support"
+        },
+        {
+          "probability": 0.9,
+          "value": 0.5
+        },
+        {
+          "probability": 0.99,
+          "value": 2.0
+        },
+        {
+          "probability": 1,
+          "outcome": "out_of_support"
+        }
+      ]
+    },
+    {
+      "name": "plateau",
+      "document": {
+        "object": "quantile_curve",
+        "probabilities": [
+          0.0,
+          0.2,
+          0.5,
+          0.9,
+          1.0
+        ],
+        "schema_version": "1.0",
+        "values": [
+          0.0,
+          1.0,
+          1.0,
+          8.0,
+          10.0
+        ]
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 0.1,
+          "value": 0.5
+        },
+        {
+          "probability": 0.5,
+          "value": 1.0
+        },
+        {
+          "probability": 0.9,
+          "value": 8.0
+        },
+        {
+          "probability": 0.99,
+          "value": 9.8
+        },
+        {
+          "probability": 1,
+          "value": 10.0
+        }
+      ]
+    },
+    {
+      "name": "subnormal-probability-curve",
+      "document": {
+        "object": "quantile_curve",
+        "probabilities": [
+          0.0,
+          8.691694759794e-311
+        ],
+        "schema_version": "1.0",
+        "values": [
+          0.0,
+          1.0
+        ]
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 4.345847379897e-311,
+          "value": 0.5
+        },
+        {
+          "probability": 8.691694759794e-311,
+          "value": 1.0
+        },
+        {
+          "probability": 0.1,
+          "outcome": "out_of_support"
+        }
+      ]
+    },
+    {
+      "name": "wide-curve",
+      "document": {
+        "object": "quantile_curve",
+        "probabilities": [
+          0.0,
+          1.0
+        ],
+        "schema_version": "1.0",
+        "values": [
+          -1e+308,
+          1e+308
+        ]
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -1e+308
+        },
+        {
+          "probability": 0.1,
+          "value": -8.000000000000001e+307
+        },
+        {
+          "probability": 0.5,
+          "value": 0.0
+        },
+        {
+          "probability": 0.9,
+          "value": 8.000000000000001e+307
+        },
+        {
+          "probability": 0.99,
+          "value": 9.800000000000001e+307
+        },
+        {
+          "probability": 1,
+          "value": 1e+308
+        }
+      ]
+    },
+    {
+      "name": "wide-histogram",
+      "document": {
+        "edges": [
+          -1e+308,
+          1e+308
+        ],
+        "kind": "histogram",
+        "object": "distribution",
+        "probabilities": [
+          1.0
+        ],
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -1e+308
+        },
+        {
+          "probability": 0.1,
+          "value": -8.000000000000001e+307
+        },
+        {
+          "probability": 0.5,
+          "value": 0.0
+        },
+        {
+          "probability": 0.9,
+          "value": 8.000000000000001e+307
+        },
+        {
+          "probability": 0.99,
+          "value": 9.800000000000001e+307
+        },
+        {
+          "probability": 1,
+          "value": 1e+308
+        }
+      ]
+    },
+    {
+      "name": "chained-atomic-impacts",
+      "document": {
+        "impact": {
+          "input": {
+            "kind": "temperature",
+            "unit": "degC"
+          },
+          "model": {
+            "intercept": 0,
+            "kind": "linear",
+            "slope": 2
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "impact": {
+            "input": {
+              "kind": "depth_above_ground",
+              "unit": "m"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 1
+            },
+            "output": {
+              "kind": "temperature",
+              "unit": "degC"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "object": "distribution",
+          "schema_version": "1.0",
+          "source": {
+            "kind": "point_mass",
+            "object": "distribution",
+            "schema_version": "1.0",
+            "value": 5.0
+          }
+        }
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 10.0
+        },
+        {
+          "probability": 0.1,
+          "value": 10.0
+        },
+        {
+          "probability": 0.5,
+          "value": 10.0
+        },
+        {
+          "probability": 0.9,
+          "value": 10.0
+        },
+        {
+          "probability": 0.99,
+          "value": 10.0
+        },
+        {
+          "probability": 1,
+          "value": 10.0
+        }
+      ]
+    },
+    {
+      "name": "equivalent-scientific-numbers",
+      "document": {
+        "impact": {
+          "input": {
+            "fields": {
+              "value": 9007199254740994.0
+            },
+            "kind": "measurement",
+            "quantity": "custom:depth",
+            "unit": "m"
+          },
+          "model": {
+            "intercept": 0,
+            "kind": "linear",
+            "slope": 1
+          },
+          "output": {
+            "fields": {
+              "value": 9007199254740994
+            },
+            "kind": "measurement",
+            "quantity": "custom:depth",
+            "unit": "m"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "impact": {
+            "input": {
+              "fields": {
+                "value": 9007199254740994
+              },
+              "kind": "measurement",
+              "quantity": "custom:depth",
+              "unit": "m"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 1
+            },
+            "output": {
+              "fields": {
+                "value": 9007199254740994
+              },
+              "kind": "measurement",
+              "quantity": "custom:depth",
+              "unit": "m"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "object": "distribution",
+          "schema_version": "1.0",
+          "source": {
+            "kind": "point_mass",
+            "object": "distribution",
+            "schema_version": "1.0",
+            "value": 5.0
+          }
+        }
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 5.0
+        },
+        {
+          "probability": 0.1,
+          "value": 5.0
+        },
+        {
+          "probability": 0.5,
+          "value": 5.0
+        },
+        {
+          "probability": 0.9,
+          "value": 5.0
+        },
+        {
+          "probability": 0.99,
+          "value": 5.0
+        },
+        {
+          "probability": 1,
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "name": "completed",
+      "document": {
+        "evidence": {
+          "operation": "complete",
+          "policy": {
+            "lower": -1,
+            "name": "finite_endpoints",
+            "upper": 4
+          },
+          "source": {
+            "object": "quantile_curve",
+            "probabilities": [
+              0.1,
+              0.5,
+              0.9
+            ],
+            "schema_version": "1.0",
+            "values": [
+              0.0,
+              1.0,
+              3.0
+            ]
+          }
+        },
+        "kind": "quantile",
+        "object": "distribution",
+        "probabilities": [
+          0.0,
+          0.1,
+          0.5,
+          0.9,
+          1.0
+        ],
+        "schema_version": "1.0",
+        "values": [
+          -1,
+          0.0,
+          1.0,
+          3.0,
+          4
+        ]
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -1.0
+        },
+        {
+          "probability": 0.1,
+          "value": 0.0
+        },
+        {
+          "probability": 0.5,
+          "value": 1.0
+        },
+        {
+          "probability": 0.9,
+          "value": 3.0
+        },
+        {
+          "probability": 0.99,
+          "value": 3.9
+        },
+        {
+          "probability": 1,
+          "value": 4.0
+        }
+      ]
+    },
+    {
+      "name": "conditioned",
+      "document": {
+        "evidence": {
+          "operation": "condition",
+          "q_max": 0.8,
+          "q_min": 0.2,
+          "source": {
+            "object": "quantile_curve",
+            "probabilities": [
+              0.1,
+              0.5,
+              0.9
+            ],
+            "schema_version": "1.0",
+            "values": [
+              0.0,
+              1.0,
+              3.0
+            ]
+          }
+        },
+        "kind": "quantile",
+        "object": "distribution",
+        "probabilities": [
+          0.0,
+          0.4999999999999999,
+          1.0
+        ],
+        "schema_version": "1.0",
+        "values": [
+          0.25,
+          1.0,
+          2.5
+        ]
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.25
+        },
+        {
+          "probability": 0.1,
+          "value": 0.4
+        },
+        {
+          "probability": 0.5,
+          "value": 1.0000000000000002
+        },
+        {
+          "probability": 0.9,
+          "value": 2.2
+        },
+        {
+          "probability": 0.99,
+          "value": 2.4699999999999998
+        },
+        {
+          "probability": 1,
+          "value": 2.5
+        }
+      ]
+    },
+    {
+      "name": "conditioned-interpolated-endpoints",
+      "document": {
+        "evidence": {
+          "operation": "condition",
+          "q_max": 0.6,
+          "q_min": 0.2,
+          "source": {
+            "object": "quantile_curve",
+            "probabilities": [
+              0.1,
+              0.4,
+              0.7,
+              0.9
+            ],
+            "schema_version": "1.0",
+            "values": [
+              -50.0,
+              -31.0,
+              7.0,
+              11.0
+            ]
+          }
+        },
+        "kind": "quantile",
+        "object": "distribution",
+        "probabilities": [
+          0.0,
+          0.5000000000000001,
+          1.0
+        ],
+        "schema_version": "1.0",
+        "values": [
+          -43.666666666666664,
+          -31.0,
+          -5.666666666666668
+        ]
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -43.666666666666664
+        },
+        {
+          "probability": 0.1,
+          "value": -41.13333333333333
+        },
+        {
+          "probability": 0.5,
+          "value": -31.000000000000004
+        },
+        {
+          "probability": 0.9,
+          "value": -10.733333333333334
+        },
+        {
+          "probability": 0.99,
+          "value": -6.173333333333336
+        },
+        {
+          "probability": 1,
+          "value": -5.666666666666668
+        }
+      ]
+    },
+    {
+      "name": "hurdle",
+      "document": {
+        "atom_location": 0.0,
+        "atom_probability": 0.3,
+        "base": {
+          "family": "gumbel_r",
+          "kind": "parametric",
+          "location": 0.0,
+          "scale": 1.0
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 0.1,
+          "value": 0.0
+        },
+        {
+          "probability": 0.5,
+          "value": 0.5098348274013419
+        },
+        {
+          "probability": 0.9,
+          "value": 2.357636675969092
+        },
+        {
+          "probability": 0.99,
+          "value": 4.7026381591633
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "discrete-hurdle",
+      "document": {
+        "atom_location": 0.0,
+        "atom_probability": 0.2,
+        "base": {
+          "kind": "discrete",
+          "probabilities": [
+            0.5,
+            0.1,
+            0.4
+          ],
+          "values": [
+            -1.0,
+            2.0,
+            3.0
+          ]
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 0.1,
+          "value": 0.0
+        },
+        {
+          "probability": 0.2,
+          "value": 0.0
+        },
+        {
+          "probability": 0.20000000000000004,
+          "value": 2.0
+        },
+        {
+          "probability": 0.5,
+          "value": 3.0
+        },
+        {
+          "probability": 0.9,
+          "value": 3.0
+        },
+        {
+          "probability": 0.99,
+          "value": 3.0
+        },
+        {
+          "probability": 1,
+          "value": 3.0
+        }
+      ]
+    },
+    {
+      "name": "conditioned-discrete-law",
+      "document": {
+        "atom_location": 0.0,
+        "atom_probability": 0.0,
+        "base": {
+          "kind": "discrete",
+          "probabilities": [
+            0.5,
+            0.1,
+            0.4
+          ],
+          "values": [
+            -1.0,
+            2.0,
+            3.0
+          ]
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 2.0
+        },
+        {
+          "probability": 0.1,
+          "value": 2.0
+        },
+        {
+          "probability": 0.5,
+          "value": 3.0
+        },
+        {
+          "probability": 0.9,
+          "value": 3.0
+        },
+        {
+          "probability": 0.99,
+          "value": 3.0
+        },
+        {
+          "probability": 1,
+          "value": 3.0
+        }
+      ]
+    },
+    {
+      "name": "conditioned-transformed-histogram",
+      "document": {
+        "atom_location": 4.0,
+        "atom_probability": 0.0,
+        "base": {
+          "impact": {
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 3
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "edges": [
+              0.0,
+              1.0,
+              2.0,
+              3.0
+            ],
+            "kind": "histogram",
+            "object": "distribution",
+            "probabilities": [
+              0.5,
+              0.0,
+              0.5
+            ],
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 6.0
+        },
+        {
+          "probability": 0.1,
+          "value": 6.3
+        },
+        {
+          "probability": 0.5,
+          "value": 7.5
+        },
+        {
+          "probability": 0.9,
+          "value": 8.7
+        },
+        {
+          "probability": 0.99,
+          "value": 8.969999999999999
+        },
+        {
+          "probability": 1,
+          "value": 9.0
+        }
+      ]
+    },
+    {
+      "name": "transformed-histogram-hurdle",
+      "document": {
+        "atom_location": 4.0,
+        "atom_probability": 0.2,
+        "base": {
+          "impact": {
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 3
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "edges": [
+              0.0,
+              1.0,
+              2.0,
+              3.0
+            ],
+            "kind": "histogram",
+            "object": "distribution",
+            "probabilities": [
+              0.5,
+              0.0,
+              0.5
+            ],
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 4.0
+        },
+        {
+          "probability": 0.1,
+          "value": 4.0
+        },
+        {
+          "probability": 0.2,
+          "value": 4.0
+        },
+        {
+          "probability": 0.20000000000000004,
+          "value": 6.0
+        },
+        {
+          "probability": 0.5,
+          "value": 7.125
+        },
+        {
+          "probability": 0.9,
+          "value": 8.625
+        },
+        {
+          "probability": 0.99,
+          "value": 8.9625
+        },
+        {
+          "probability": 1,
+          "value": 9.0
+        }
+      ]
+    },
+    {
+      "name": "subnormal-transformed-histogram-hurdle",
+      "document": {
+        "atom_location": 4.0,
+        "atom_probability": 0.25,
+        "base": {
+          "impact": {
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 3
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "edges": [
+              0.0,
+              1.0,
+              2.0,
+              3.0
+            ],
+            "kind": "histogram",
+            "object": "distribution",
+            "probabilities": [
+              1.0,
+              0.0,
+              5e-324
+            ],
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 4.0
+        },
+        {
+          "probability": 0.1,
+          "value": 4.0
+        },
+        {
+          "probability": 0.5,
+          "value": 7.0
+        },
+        {
+          "probability": 0.9,
+          "value": 8.6
+        },
+        {
+          "probability": 0.99,
+          "value": 8.96
+        },
+        {
+          "probability": 1,
+          "value": 9.0
+        }
+      ]
+    },
+    {
+      "name": "deep-sigmoid-hurdle",
+      "document": {
+        "atom_location": 0.5,
+        "atom_probability": 0.25,
+        "base": {
+          "impact": {
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "amplitude": 1,
+              "kind": "sigmoid",
+              "midpoint": 0,
+              "offset": 0,
+              "steepness": 1
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "family": "gumbel_r",
+            "kind": "parametric",
+            "location": -50.0,
+            "object": "distribution",
+            "scale": 1.0,
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.5
+        },
+        {
+          "probability": 0.1,
+          "value": 0.5
+        },
+        {
+          "probability": 0.5,
+          "value": 0.6000000000000006
+        },
+        {
+          "probability": 0.75,
+          "value": 0.7499999999999996
+        },
+        {
+          "probability": 0.9,
+          "value": 0.8823529411764705
+        },
+        {
+          "probability": 0.99,
+          "value": 0.9868421052631581
+        },
+        {
+          "probability": 1,
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "name": "deep-sigmoid-hurdle-subnormal",
+      "document": {
+        "atom_location": 0.5,
+        "atom_probability": 0.25,
+        "base": {
+          "impact": {
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "amplitude": 1,
+              "kind": "sigmoid",
+              "midpoint": 0,
+              "offset": 0,
+              "steepness": 1
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "family": "gumbel_r",
+            "kind": "parametric",
+            "location": -740.0,
+            "object": "distribution",
+            "scale": 1.0,
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.5
+        },
+        {
+          "probability": 0.1,
+          "value": 0.5
+        },
+        {
+          "probability": 0.5,
+          "value": 0.599999999999999
+        },
+        {
+          "probability": 0.75,
+          "value": 0.7500000000000102
+        },
+        {
+          "probability": 0.9,
+          "value": 0.8823529411764749
+        },
+        {
+          "probability": 0.99,
+          "value": 0.9868421052631583
+        },
+        {
+          "probability": 1,
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "name": "deep-sigmoid-hurdle-underflow",
+      "document": {
+        "atom_location": 0.5,
+        "atom_probability": 0.25,
+        "base": {
+          "impact": {
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "amplitude": 1,
+              "kind": "sigmoid",
+              "midpoint": 0,
+              "offset": 0,
+              "steepness": 1
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "family": "gumbel_r",
+            "kind": "parametric",
+            "location": -1000.0,
+            "object": "distribution",
+            "scale": 1.0,
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.5
+        },
+        {
+          "probability": 0.1,
+          "value": 0.5
+        },
+        {
+          "probability": 0.5,
+          "value": 0.599999999999999
+        },
+        {
+          "probability": 0.75,
+          "value": 0.7500000000000102
+        },
+        {
+          "probability": 0.9,
+          "value": 0.8823529411764749
+        },
+        {
+          "probability": 0.99,
+          "value": 0.9868421052631583
+        },
+        {
+          "probability": 1,
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "name": "pareto-interior-near-lower-bound",
+      "document": {
+        "family": "genpareto",
+        "kind": "parametric",
+        "location": 0.0,
+        "object": "distribution",
+        "scale": 1e+20,
+        "schema_version": "1.0",
+        "shape": 0.5
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 1e-20,
+          "value": 1.0
+        },
+        {
+          "probability": 0.1,
+          "value": 1.0818510677891955e+19
+        },
+        {
+          "probability": 0.5,
+          "value": 8.2842712474619e+19
+        },
+        {
+          "probability": 0.9,
+          "value": 4.324555320336759e+20
+        },
+        {
+          "probability": 0.99,
+          "value": 1.7999999999999987e+21
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "deep-parametric-hurdle",
+      "document": {
+        "atom_location": 0.0,
+        "atom_probability": 0.25,
+        "base": {
+          "family": "gumbel_r",
+          "kind": "parametric",
+          "location": -1000.0,
+          "scale": 1.0
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 0.1,
+          "value": 0.0
+        },
+        {
+          "probability": 0.5,
+          "value": 0.40546510810816017
+        },
+        {
+          "probability": 0.75,
+          "value": 1.0986122886681642
+        },
+        {
+          "probability": 0.9,
+          "value": 2.014903020542306
+        },
+        {
+          "probability": 0.99,
+          "value": 4.317488113536342
+        },
+        {
+          "probability": 0.999999,
+          "value": 13.527828485483724
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "deep-parametric-hurdle-over-affine-image",
+      "document": {
+        "atom_location": 0.0,
+        "atom_probability": 0.25,
+        "base": {
+          "impact": {
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 2
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "family": "gumbel_r",
+            "kind": "parametric",
+            "location": -1000.0,
+            "object": "distribution",
+            "scale": 1.0,
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 0.1,
+          "value": 0.0
+        },
+        {
+          "probability": 0.5,
+          "value": 0.8109302162163203
+        },
+        {
+          "probability": 0.75,
+          "value": 2.1972245773363284
+        },
+        {
+          "probability": 0.9,
+          "value": 4.029806041084612
+        },
+        {
+          "probability": 0.99,
+          "value": 8.634976227072684
+        },
+        {
+          "probability": 0.999999,
+          "value": 27.055656970967448
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "deep-parametric-hurdle-image",
+      "document": {
+        "impact": {
+          "input": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "model": {
+            "intercept": 0,
+            "kind": "linear",
+            "slope": 2
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "atom_location": 0.0,
+          "atom_probability": 0.25,
+          "base": {
+            "family": "gumbel_r",
+            "kind": "parametric",
+            "location": -1000.0,
+            "scale": 1.0
+          },
+          "kind": "hurdle",
+          "object": "distribution",
+          "schema_version": "1.0"
+        }
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 0.1,
+          "value": 0.0
+        },
+        {
+          "probability": 0.5,
+          "value": 0.8109302162163203
+        },
+        {
+          "probability": 0.75,
+          "value": 2.1972245773363284
+        },
+        {
+          "probability": 0.9,
+          "value": 4.029806041084612
+        },
+        {
+          "probability": 0.99,
+          "value": 8.634976227072684
+        },
+        {
+          "probability": 0.999999,
+          "value": 27.055656970967448
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "deep-skew-normal-hurdle",
+      "document": {
+        "atom_location": 2.0,
+        "atom_probability": 0.25,
+        "base": {
+          "family": "skewnorm",
+          "kind": "parametric",
+          "location": 0.0,
+          "scale": 1.0,
+          "shape": -5.0
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 2.0
+        },
+        {
+          "probability": 0.1,
+          "value": 2.0
+        },
+        {
+          "probability": 0.5,
+          "value": 2.0076401713780223
+        },
+        {
+          "probability": 0.75,
+          "value": 2.0206365859954207
+        },
+        {
+          "probability": 0.9,
+          "value": 2.037694124189092
+        },
+        {
+          "probability": 0.99,
+          "value": 2.0799621793135783
+        },
+        {
+          "probability": 0.999999,
+          "value": 2.2413185249015575
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "deep-clamped-affine-hurdle",
+      "document": {
+        "atom_location": 3.0,
+        "atom_probability": 0.25,
+        "base": {
+          "impact": {
+            "clamp": {
+              "maximum": 6
+            },
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "intercept": 3,
+              "kind": "linear",
+              "slope": 0.5
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "family": "gumbel_r",
+            "kind": "parametric",
+            "location": -50.0,
+            "object": "distribution",
+            "scale": 1.0,
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 3.0
+        },
+        {
+          "probability": 0.1,
+          "value": 3.0
+        },
+        {
+          "probability": 0.5,
+          "value": 3.2027325540540836
+        },
+        {
+          "probability": 0.75,
+          "value": 3.5493061443340537
+        },
+        {
+          "probability": 0.9,
+          "value": 4.007451510271132
+        },
+        {
+          "probability": 0.99,
+          "value": 5.158744056768157
+        },
+        {
+          "probability": 1,
+          "value": 6.0
+        }
+      ]
+    },
+    {
+      "name": "deep-tabulated-hurdle",
+      "document": {
+        "atom_location": 0.5,
+        "atom_probability": 0.25,
+        "base": {
+          "impact": {
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "interpolation": "linear",
+              "kind": "tabulated",
+              "outside_domain": "clamp",
+              "points": [
+                {
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "x": 3,
+                  "y": 3
+                }
+              ]
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "family": "gumbel_r",
+            "kind": "parametric",
+            "location": -50.0,
+            "object": "distribution",
+            "scale": 1.0,
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.5
+        },
+        {
+          "probability": 0.1,
+          "value": 0.5
+        },
+        {
+          "probability": 0.5,
+          "value": 0.9054651081081744
+        },
+        {
+          "probability": 0.75,
+          "value": 1.5986122886681144
+        },
+        {
+          "probability": 0.9,
+          "value": 2.5149030205422704
+        },
+        {
+          "probability": 0.99,
+          "value": 3.0
+        },
+        {
+          "probability": 1,
+          "value": 3.0
+        }
+      ]
+    },
+    {
+      "name": "deep-hurdle-at-clamp-minimum",
+      "document": {
+        "atom_location": 0.0,
+        "atom_probability": 0.25,
+        "base": {
+          "impact": {
+            "clamp": {
+              "minimum": 0
+            },
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 1
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "family": "gumbel_r",
+            "kind": "parametric",
+            "location": -50.0,
+            "object": "distribution",
+            "scale": 1.0,
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 0.1,
+          "value": 0.0
+        },
+        {
+          "probability": 0.5,
+          "value": 0.40546510810816727
+        },
+        {
+          "probability": 0.75,
+          "value": 1.0986122886681073
+        },
+        {
+          "probability": 0.9,
+          "value": 2.0149030205422633
+        },
+        {
+          "probability": 0.99,
+          "value": 4.317488113536314
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "hurdle-completed",
+      "document": {
+        "atom_location": 0.0,
+        "atom_probability": 0.2,
+        "base": {
+          "evidence": {
+            "operation": "complete",
+            "policy": {
+              "lower": -1,
+              "name": "finite_endpoints",
+              "upper": 4
+            },
+            "source": {
+              "object": "quantile_curve",
+              "probabilities": [
+                0.1,
+                0.5,
+                0.9
+              ],
+              "schema_version": "1.0",
+              "values": [
+                0.0,
+                1.0,
+                3.0
+              ]
+            }
+          },
+          "kind": "quantile",
+          "probabilities": [
+            0.0,
+            0.1,
+            0.5,
+            0.9,
+            1.0
+          ],
+          "values": [
+            -1,
+            0.0,
+            1.0,
+            3.0,
+            4
+          ]
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.0
+        },
+        {
+          "probability": 0.1,
+          "value": 0.0
+        },
+        {
+          "probability": 0.5,
+          "value": 0.8437499999999998
+        },
+        {
+          "probability": 0.9,
+          "value": 2.9374999999999996
+        },
+        {
+          "probability": 0.99,
+          "value": 3.8874999999999993
+        },
+        {
+          "probability": 1,
+          "value": 4.0
+        }
+      ]
+    },
+    {
+      "name": "decreasing",
+      "document": {
+        "impact": {
+          "input": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "model": {
+            "intercept": 1,
+            "kind": "linear",
+            "slope": -2
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "family": "genextreme",
+          "kind": "parametric",
+          "location": 1.2,
+          "object": "distribution",
+          "scale": 2.0,
+          "schema_version": "1.0",
+          "shape": 0.1
+        }
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -41.4
+        },
+        {
+          "probability": 0.1,
+          "value": -9.46052449534285
+        },
+        {
+          "probability": 0.5,
+          "value": -2.8395105812884105
+        },
+        {
+          "probability": 0.9,
+          "value": 2.0792015573824134
+        },
+        {
+          "probability": 0.99,
+          "value": 5.199854401469139
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "decreasing-parametric-deep-ranks",
+      "document": {
+        "impact": {
+          "input": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "model": {
+            "intercept": 1,
+            "kind": "linear",
+            "slope": -2
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "family": "gumbel_r",
+          "kind": "parametric",
+          "location": 0.0,
+          "object": "distribution",
+          "scale": 1.0,
+          "schema_version": "1.0"
+        }
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 1e-18,
+          "value": -81.89306334778564
+        },
+        {
+          "probability": 1e-16,
+          "value": -72.68272297580947
+        },
+        {
+          "probability": 0.1,
+          "value": -3.5007346546248908
+        },
+        {
+          "probability": 0.5,
+          "value": 0.2669741588366713
+        },
+        {
+          "probability": 0.9,
+          "value": 2.668064890495912
+        },
+        {
+          "probability": 0.99,
+          "value": 4.054359251615802
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "composed-wide-histogram",
+      "document": {
+        "impact": {
+          "input": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "model": {
+            "intercept": 0,
+            "kind": "linear",
+            "slope": 1
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "impact": {
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 1
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "object": "distribution",
+          "schema_version": "1.0",
+          "source": {
+            "edges": [
+              -1e+308,
+              1e+308
+            ],
+            "kind": "histogram",
+            "object": "distribution",
+            "probabilities": [
+              1.0
+            ],
+            "schema_version": "1.0"
+          }
+        }
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -1e+308
+        },
+        {
+          "probability": 0.1,
+          "value": -8.000000000000001e+307
+        },
+        {
+          "probability": 0.5,
+          "value": 0.0
+        },
+        {
+          "probability": 0.9,
+          "value": 8.000000000000001e+307
+        },
+        {
+          "probability": 0.99,
+          "value": 9.800000000000001e+307
+        },
+        {
+          "probability": 1,
+          "value": 1e+308
+        }
+      ]
+    },
+    {
+      "name": "wide-tabulated-impact",
+      "document": {
+        "impact": {
+          "input": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "model": {
+            "interpolation": "linear",
+            "kind": "tabulated",
+            "outside_domain": "error",
+            "points": [
+              {
+                "x": -100000000000000001097906362944045541740492309677311846336810682903157585404911491537163328978494688899061249669721172515611590283743140088328307009198146046031271664502933027185697489699588559043338384466165001178426897626212945177628091195786707458122783970171784415105291802893207873272974885715430223118336,
+                "y": -1
+              },
+              {
+                "x": 100000000000000001097906362944045541740492309677311846336810682903157585404911491537163328978494688899061249669721172515611590283743140088328307009198146046031271664502933027185697489699588559043338384466165001178426897626212945177628091195786707458122783970171784415105291802893207873272974885715430223118336,
+                "y": 1
+              }
+            ]
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "edges": [
+            -1e+308,
+            1e+308
+          ],
+          "kind": "histogram",
+          "object": "distribution",
+          "probabilities": [
+            1.0
+          ],
+          "schema_version": "1.0"
+        }
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -1.0
+        },
+        {
+          "probability": 0.1,
+          "value": -0.8
+        },
+        {
+          "probability": 0.5,
+          "value": 0.0
+        },
+        {
+          "probability": 0.9,
+          "value": 0.8
+        },
+        {
+          "probability": 0.99,
+          "value": 0.9800000000000002
+        },
+        {
+          "probability": 1,
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "name": "transformed-discrete-hurdle",
+      "document": {
+        "impact": {
+          "input": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "model": {
+            "intercept": 1,
+            "kind": "linear",
+            "slope": -2
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "atom_location": 0.0,
+          "atom_probability": 0.2,
+          "base": {
+            "kind": "discrete",
+            "probabilities": [
+              0.5,
+              0.1,
+              0.4
+            ],
+            "values": [
+              -1.0,
+              2.0,
+              3.0
+            ]
+          },
+          "kind": "hurdle",
+          "object": "distribution",
+          "schema_version": "1.0"
+        }
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -5.0
+        },
+        {
+          "probability": 0.1,
+          "value": -5.0
+        },
+        {
+          "probability": 0.5,
+          "value": -5.0
+        },
+        {
+          "probability": 0.9,
+          "value": 1.0
+        },
+        {
+          "probability": 0.99,
+          "value": 1.0
+        },
+        {
+          "probability": 1,
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "name": "composed-clamped-affine",
+      "document": {
+        "impact": {
+          "input": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "model": {
+            "intercept": 1,
+            "kind": "linear",
+            "slope": -2
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "impact": {
+            "clamp": {
+              "maximum": 6
+            },
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "intercept": 3,
+              "kind": "linear",
+              "slope": 0.5
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "object": "distribution",
+          "schema_version": "1.0",
+          "source": {
+            "family": "genextreme",
+            "kind": "parametric",
+            "location": 1.2,
+            "object": "distribution",
+            "scale": 2.0,
+            "schema_version": "1.0",
+            "shape": 0.1
+          }
+        }
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -11.0
+        },
+        {
+          "probability": 0.1,
+          "value": -10.230262247671426
+        },
+        {
+          "probability": 0.5,
+          "value": -6.919755290644206
+        },
+        {
+          "probability": 0.9,
+          "value": -4.460399221308793
+        },
+        {
+          "probability": 0.99,
+          "value": -2.9000727992654305
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "downscaled-clamped-parametric",
+      "document": {
+        "impact": {
+          "clamp": {
+            "maximum": 10
+          },
+          "input": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "model": {
+            "intercept": 0,
+            "kind": "linear",
+            "slope": 1e-308
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "family": "gumbel_r",
+          "kind": "parametric",
+          "location": 1e+308,
+          "object": "distribution",
+          "scale": 1e+308,
+          "schema_version": "1.0"
+        }
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.1,
+          "value": 0.16596755475204428
+        },
+        {
+          "probability": 0.5,
+          "value": 1.3665129205816642
+        },
+        {
+          "probability": 0.9,
+          "value": 3.250367327312445
+        },
+        {
+          "probability": 0.99,
+          "value": 5.600149226776578
+        },
+        {
+          "probability": 0.99999,
+          "value": 10.0
+        },
+        {
+          "probability": 1,
+          "value": 10.0
+        }
+      ]
+    },
+    {
+      "name": "parametric-location-cancellation",
+      "document": {
+        "family": "gumbel_r",
+        "kind": "parametric",
+        "location": -1e+308,
+        "object": "distribution",
+        "scale": 1e+308,
+        "schema_version": "1.0"
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.1,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.5,
+          "value": -6.334870794183356e+307
+        },
+        {
+          "probability": 0.9,
+          "value": 1.2503673273124453e+308
+        },
+        {
+          "probability": 0.99,
+          "outcome": "positive_infinity"
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "composed-piecewise-affine",
+      "document": {
+        "impact": {
+          "input": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "model": {
+            "amplitude": 1,
+            "kind": "sigmoid",
+            "midpoint": 0,
+            "offset": 0,
+            "steepness": 1
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "impact": {
+            "clamp": {
+              "maximum": 6
+            },
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "intercept": 3,
+              "kind": "linear",
+              "slope": 0.5
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "object": "distribution",
+          "schema_version": "1.0",
+          "source": {
+            "evidence": {
+              "operation": "complete",
+              "policy": {
+                "lower": -1,
+                "name": "finite_endpoints",
+                "upper": 4
+              },
+              "source": {
+                "object": "quantile_curve",
+                "probabilities": [
+                  0.1,
+                  0.5,
+                  0.9
+                ],
+                "schema_version": "1.0",
+                "values": [
+                  0.0,
+                  1.0,
+                  3.0
+                ]
+              }
+            },
+            "kind": "quantile",
+            "object": "distribution",
+            "probabilities": [
+              0.0,
+              0.1,
+              0.5,
+              0.9,
+              1.0
+            ],
+            "schema_version": "1.0",
+            "values": [
+              -1,
+              0.0,
+              1.0,
+              3.0,
+              4
+            ]
+          }
+        }
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": 0.9241418199787566
+        },
+        {
+          "probability": 0.1,
+          "value": 0.9525741268224334
+        },
+        {
+          "probability": 0.5,
+          "value": 0.9706877692486436
+        },
+        {
+          "probability": 0.9,
+          "value": 0.9890130573694068
+        },
+        {
+          "probability": 0.99,
+          "value": 0.9929664128450049
+        },
+        {
+          "probability": 1,
+          "value": 0.9933071490757153
+        }
+      ]
+    },
+    {
+      "name": "parametric-location-cancellation-genextreme",
+      "document": {
+        "family": "genextreme",
+        "kind": "parametric",
+        "location": -1e+308,
+        "object": "distribution",
+        "scale": 1e+308,
+        "schema_version": "1.0",
+        "shape": 0.0
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.1,
+          "outcome": "negative_infinity"
+        },
+        {
+          "probability": 0.5,
+          "value": -6.334870794183356e+307
+        },
+        {
+          "probability": 0.9,
+          "value": 1.2503673273124453e+308
+        },
+        {
+          "probability": 0.99,
+          "outcome": "positive_infinity"
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "parametric-location-cancellation-genpareto",
+      "document": {
+        "family": "genpareto",
+        "kind": "parametric",
+        "location": -1e+308,
+        "object": "distribution",
+        "scale": 1e+308,
+        "schema_version": "1.0",
+        "shape": 0.0
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -1e+308
+        },
+        {
+          "probability": 0.1,
+          "value": -8.946394843421737e+307
+        },
+        {
+          "probability": 0.5,
+          "value": -3.0685281944005477e+307
+        },
+        {
+          "probability": 0.9,
+          "value": 1.302585092994046e+308
+        },
+        {
+          "probability": 0.99,
+          "outcome": "positive_infinity"
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    },
+    {
+      "name": "parametric-location-cancellation-weibull_min",
+      "document": {
+        "family": "weibull_min",
+        "kind": "parametric",
+        "location": -1e+308,
+        "object": "distribution",
+        "scale": 1e+308,
+        "schema_version": "1.0",
+        "shape": 1.0
+      },
+      "queries": [
+        {
+          "probability": 0,
+          "value": -1e+308
+        },
+        {
+          "probability": 0.1,
+          "value": -8.946394843421737e+307
+        },
+        {
+          "probability": 0.5,
+          "value": -3.0685281944005477e+307
+        },
+        {
+          "probability": 0.9,
+          "value": 1.302585092994046e+308
+        },
+        {
+          "probability": 0.99,
+          "outcome": "positive_infinity"
+        },
+        {
+          "probability": 1,
+          "outcome": "positive_infinity"
+        }
+      ]
+    }
+  ],
+  "rejected": [
+    {
+      "name": "scientific-number-rounding-alias-integer",
+      "document": {
+        "impact": {
+          "input": {
+            "fields": {
+              "value": 9007199254740992
+            },
+            "kind": "measurement",
+            "quantity": "custom:depth",
+            "unit": "m"
+          },
+          "model": {
+            "intercept": 0,
+            "kind": "linear",
+            "slope": 1
+          },
+          "output": {
+            "fields": {
+              "value": 9007199254740994
+            },
+            "kind": "measurement",
+            "quantity": "custom:depth",
+            "unit": "m"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "impact": {
+            "input": {
+              "fields": {
+                "value": 9007199254740994
+              },
+              "kind": "measurement",
+              "quantity": "custom:depth",
+              "unit": "m"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 1
+            },
+            "output": {
+              "fields": {
+                "value": 9007199254740993
+              },
+              "kind": "measurement",
+              "quantity": "custom:depth",
+              "unit": "m"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "object": "distribution",
+          "schema_version": "1.0",
+          "source": {
+            "kind": "point_mass",
+            "object": "distribution",
+            "schema_version": "1.0",
+            "value": 5.0
+          }
+        }
+      },
+      "structural": false
+    },
+    {
+      "name": "scientific-number-rounding-alias-decimal",
+      "document": {
+        "impact": {
+          "input": {
+            "fields": {
+              "value": 9007199254740992.0
+            },
+            "kind": "measurement",
+            "quantity": "custom:depth",
+            "unit": "m"
+          },
+          "model": {
+            "intercept": 0,
+            "kind": "linear",
+            "slope": 1
+          },
+          "output": {
+            "fields": {
+              "value": 9007199254740994
+            },
+            "kind": "measurement",
+            "quantity": "custom:depth",
+            "unit": "m"
+          },
+          "schema_version": "2.0"
+        },
+        "kind": "transformed",
+        "object": "distribution",
+        "schema_version": "1.0",
+        "source": {
+          "impact": {
+            "input": {
+              "fields": {
+                "value": 9007199254740994
+              },
+              "kind": "measurement",
+              "quantity": "custom:depth",
+              "unit": "m"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 1
+            },
+            "output": {
+              "fields": {
+                "value": 9007199254740993
+              },
+              "kind": "measurement",
+              "quantity": "custom:depth",
+              "unit": "m"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "object": "distribution",
+          "schema_version": "1.0",
+          "source": {
+            "kind": "point_mass",
+            "object": "distribution",
+            "schema_version": "1.0",
+            "value": 5.0
+          }
+        }
+      },
+      "structural": false
+    },
+    {
+      "name": "boolean-curve-probabilities",
+      "document": {
+        "object": "quantile_curve",
+        "probabilities": [
+          false,
+          0.9
+        ],
+        "schema_version": "1.0",
+        "values": [
+          0.0,
+          1.0
+        ]
+      },
+      "structural": true
+    },
+    {
+      "name": "boolean-curve-values",
+      "document": {
+        "object": "quantile_curve",
+        "probabilities": [
+          0.1,
+          0.9
+        ],
+        "schema_version": "1.0",
+        "values": [
+          0,
+          true
+        ]
+      },
+      "structural": true
+    },
+    {
+      "name": "incompatible-atomic-impact-chain",
+      "document": {
+        "schema_version": "1.0",
+        "object": "distribution",
+        "kind": "transformed",
+        "source": {
+          "impact": {
+            "input": {
+              "kind": "depth_above_ground",
+              "unit": "m"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 1
+            },
+            "output": {
+              "kind": "temperature",
+              "unit": "degC"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "object": "distribution",
+          "schema_version": "1.0",
+          "source": {
+            "kind": "point_mass",
+            "object": "distribution",
+            "schema_version": "1.0",
+            "value": 5.0
+          }
+        },
+        "impact": {
+          "input": {
+            "kind": "depth_above_ground",
+            "unit": "m"
+          },
+          "model": {
+            "intercept": 0,
+            "kind": "linear",
+            "slope": 2
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        }
+      },
+      "structural": false
+    },
+    {
+      "name": "incompatible-histogram-impact-chain",
+      "document": {
+        "schema_version": "1.0",
+        "object": "distribution",
+        "kind": "transformed",
+        "source": {
+          "impact": {
+            "input": {
+              "kind": "depth_above_ground",
+              "unit": "m"
+            },
+            "model": {
+              "intercept": 0,
+              "kind": "linear",
+              "slope": 1
+            },
+            "output": {
+              "kind": "temperature",
+              "unit": "degC"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "object": "distribution",
+          "schema_version": "1.0",
+          "source": {
+            "edges": [
+              0.0,
+              1.0
+            ],
+            "kind": "histogram",
+            "object": "distribution",
+            "probabilities": [
+              1.0
+            ],
+            "schema_version": "1.0"
+          }
+        },
+        "impact": {
+          "input": {
+            "kind": "depth_above_ground",
+            "unit": "m"
+          },
+          "model": {
+            "intercept": 0,
+            "kind": "linear",
+            "slope": 2
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        }
+      },
+      "structural": false
+    },
+    {
+      "name": "incompatible-hurdle-impact-chain",
+      "document": {
+        "schema_version": "1.0",
+        "object": "distribution",
+        "kind": "transformed",
+        "source": {
+          "atom_location": 0.0,
+          "atom_probability": 0.1,
+          "base": {
+            "impact": {
+              "input": {
+                "kind": "depth_above_ground",
+                "unit": "m"
+              },
+              "model": {
+                "intercept": 0,
+                "kind": "linear",
+                "slope": 1
+              },
+              "output": {
+                "kind": "temperature",
+                "unit": "degC"
+              },
+              "schema_version": "2.0"
+            },
+            "kind": "transformed",
+            "source": {
+              "kind": "point_mass",
+              "object": "distribution",
+              "schema_version": "1.0",
+              "value": 5.0
+            }
+          },
+          "kind": "hurdle",
+          "object": "distribution",
+          "schema_version": "1.0"
+        },
+        "impact": {
+          "input": {
+            "kind": "depth_above_ground",
+            "unit": "m"
+          },
+          "model": {
+            "intercept": 0,
+            "kind": "linear",
+            "slope": 2
+          },
+          "output": {
+            "kind": "ratio",
+            "unit": "1"
+          },
+          "schema_version": "2.0"
+        }
+      },
+      "structural": false
+    },
+    {
+      "name": "sigmoid-hurdle-at-maximum",
+      "document": {
+        "atom_location": 1,
+        "atom_probability": 0.25,
+        "base": {
+          "impact": {
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "amplitude": 1,
+              "kind": "sigmoid",
+              "midpoint": 0,
+              "offset": 0,
+              "steepness": 1
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "family": "gumbel_r",
+            "kind": "parametric",
+            "location": -50.0,
+            "object": "distribution",
+            "scale": 1.0,
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "structural": false
+    },
+    {
+      "name": "sigmoid-hurdle-above-maximum",
+      "document": {
+        "atom_location": 2,
+        "atom_probability": 0.25,
+        "base": {
+          "impact": {
+            "input": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "model": {
+              "amplitude": 1,
+              "kind": "sigmoid",
+              "midpoint": 0,
+              "offset": 0,
+              "steepness": 1
+            },
+            "output": {
+              "kind": "ratio",
+              "unit": "1"
+            },
+            "schema_version": "2.0"
+          },
+          "kind": "transformed",
+          "source": {
+            "family": "gumbel_r",
+            "kind": "parametric",
+            "location": -50.0,
+            "object": "distribution",
+            "scale": 1.0,
+            "schema_version": "1.0"
+          }
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "structural": false
+    },
+    {
+      "name": "old-curve-fields",
+      "document": {
+        "curve_kind": "point_mass",
+        "curve_type": "point_mass",
+        "curve_location": 1
+      },
+      "structural": true
+    },
+    {
+      "name": "old-abbreviated-point",
+      "document": {
+        "kind": "point_mass",
+        "value": 1
+      },
+      "structural": true
+    },
+    {
+      "name": "unknown-version",
+      "document": {
+        "schema_version": "0.6",
+        "object": "distribution",
+        "kind": "point_mass",
+        "value": 1
+      },
+      "structural": true
+    },
+    {
+      "name": "point-dead-fields",
+      "document": {
+        "schema_version": "1.0",
+        "object": "distribution",
+        "kind": "point_mass",
+        "value": 1,
+        "scale": 0
+      },
+      "structural": true
+    },
+    {
+      "name": "gumbel-unused-shape",
+      "document": {
+        "schema_version": "1.0",
+        "object": "distribution",
+        "kind": "parametric",
+        "family": "gumbel_r",
+        "location": 0,
+        "scale": 1,
+        "shape": null
+      },
+      "structural": true
+    },
+    {
+      "name": "negative-scale",
+      "document": {
+        "schema_version": "1.0",
+        "object": "distribution",
+        "kind": "parametric",
+        "family": "gumbel_r",
+        "location": 0,
+        "scale": 0
+      },
+      "structural": true
+    },
+    {
+      "name": "invalid-masses",
+      "document": {
+        "schema_version": "1.0",
+        "object": "distribution",
+        "kind": "discrete",
+        "values": [
+          0,
+          1
+        ],
+        "probabilities": [
+          0.2,
+          0.3
+        ]
+      },
+      "structural": false
+    },
+    {
+      "name": "discrete-individual-mass-above-one",
+      "document": {
+        "kind": "discrete",
+        "object": "distribution",
+        "probabilities": [
+          1.0000000000001
+        ],
+        "schema_version": "1.0",
+        "values": [
+          2.0
+        ]
+      },
+      "structural": true
+    },
+    {
+      "name": "histogram-individual-mass-above-one",
+      "document": {
+        "edges": [
+          1.0,
+          2.0
+        ],
+        "kind": "histogram",
+        "object": "distribution",
+        "probabilities": [
+          1.0000000000001
+        ],
+        "schema_version": "1.0"
+      },
+      "structural": true
+    },
+    {
+      "name": "hurdle-base-with-document-envelope",
+      "document": {
+        "atom_location": 0.0,
+        "atom_probability": 0.2,
+        "base": {
+          "kind": "discrete",
+          "probabilities": [
+            0.5,
+            0.1,
+            0.4
+          ],
+          "values": [
+            -1.0,
+            2.0,
+            3.0
+          ],
+          "schema_version": "1.0",
+          "object": "distribution"
+        },
+        "kind": "hurdle",
+        "object": "distribution",
+        "schema_version": "1.0"
+      },
+      "structural": true
+    },
+    {
+      "name": "unordered-knots",
+      "document": {
+        "schema_version": "1.0",
+        "object": "quantile_curve",
+        "probabilities": [
+          0.9,
+          0.1
+        ],
+        "values": [
+          0,
+          1
+        ]
+      },
+      "structural": false
+    },
+    {
+      "name": "curve-lengths",
+      "document": {
+        "schema_version": "1.0",
+        "object": "quantile_curve",
+        "probabilities": [
+          0.1,
+          0.9
+        ],
+        "values": [
+          0,
+          1,
+          2
+        ]
+      },
+      "structural": false
+    },
+    {
+      "name": "decreasing-values",
+      "document": {
+        "schema_version": "1.0",
+        "object": "quantile_curve",
+        "probabilities": [
+          0.1,
+          0.9
+        ],
+        "values": [
+          1,
+          0
+        ]
+      },
+      "structural": false
+    },
+    {
+      "name": "law-partial-support",
+      "document": {
+        "schema_version": "1.0",
+        "object": "distribution",
+        "kind": "quantile",
+        "probabilities": [
+          0.1,
+          0.9
+        ],
+        "values": [
+          0,
+          1
+        ]
+      },
+      "structural": false
+    },
+    {
+      "name": "forged-completion",
+      "document": {
+        "evidence": {
+          "operation": "complete",
+          "policy": {
+            "lower": -1,
+            "name": "finite_endpoints",
+            "upper": 4
+          },
+          "source": {
+            "object": "quantile_curve",
+            "probabilities": [
+              0.1,
+              0.5,
+              0.9
+            ],
+            "schema_version": "1.0",
+            "values": [
+              0.0,
+              1.0,
+              3.0
+            ]
+          }
+        },
+        "kind": "quantile",
+        "object": "distribution",
+        "probabilities": [
+          0.0,
+          0.1,
+          0.5,
+          0.9,
+          1.0
+        ],
+        "schema_version": "1.0",
+        "values": [
+          -1,
+          0.2,
+          1.0,
+          3.0,
+          4
+        ]
+      },
+      "structural": false
+    },
+    {
+      "name": "forged-conditioning",
+      "document": {
+        "evidence": {
+          "operation": "condition",
+          "q_max": 0.6,
+          "q_min": 0.2,
+          "source": {
+            "object": "quantile_curve",
+            "probabilities": [
+              0.1,
+              0.4,
+              0.7,
+              0.9
+            ],
+            "schema_version": "1.0",
+            "values": [
+              -50.0,
+              -31.0,
+              7.0,
+              11.0
+            ]
+          }
+        },
+        "kind": "quantile",
+        "object": "distribution",
+        "probabilities": [
+          0.0,
+          0.5000000000000001,
+          1.0
+        ],
+        "schema_version": "1.0",
+        "values": [
+          -43.666666666666664,
+          -31.0,
+          -4.666666666666668
+        ]
+      },
+      "structural": false
+    },
+    {
+      "name": "null-modelling-record",
+      "document": {
+        "evidence": null,
+        "kind": "quantile",
+        "object": "distribution",
+        "probabilities": [
+          0.0,
+          0.1,
+          0.5,
+          0.9,
+          1.0
+        ],
+        "schema_version": "1.0",
+        "values": [
+          -1,
+          0.0,
+          1.0,
+          3.0,
+          4
+        ]
+      },
+      "structural": true
+    }
+  ],
+  "rejected_text": [
+    {
+      "name": "duplicate-key",
+      "text": "{\"schema_version\":\"1.0\",\"object\":\"distribution\",\"kind\":\"point_mass\",\"value\":1,\"value\":2}"
+    }
+  ]
+}

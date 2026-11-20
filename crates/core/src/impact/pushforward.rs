@@ -6,8 +6,14 @@
 //! as atoms without replacing that quantile rule.
 
 use crate::Interpolation;
+use crate::numerical::{
+    CompensatedSum, IntegralMoment, NumericalLaw, ProbabilitySegment, affine_fitted_mean_deviation,
+    affine_segment_mean_deviation, compensated, segment_integral,
+};
 
-use super::definition::{Clamp, Interpolation as TableInterpolation, Model, OutsideDomain};
+use super::definition::{
+    Clamp, Interpolation as TableInterpolation, Model, OriginAdjustment, OutsideDomain,
+};
 use super::error::{ContractResult, fail};
 use super::kernel;
 use super::quadrature::neumaier;
@@ -33,6 +39,7 @@ enum Law {
     /// Response is `floor` on `(-inf, threshold)` and the continuous branch after it.
     LowerThreshold {
         cut: f64,
+        survival_cut: f64,
         floor: f64,
         decreasing: bool,
     },
@@ -62,6 +69,95 @@ impl ImpactDistribution {
         &self.atoms
     }
 
+    pub(crate) fn is_discrete(&self) -> bool {
+        matches!(self.law, Law::Discrete)
+    }
+
+    fn atomic_segments(&self) -> Vec<ProbabilitySegment> {
+        self.atoms
+            .iter()
+            .map(|atom| (atom.value, atom.value, atom.probability))
+            .collect()
+    }
+
+    /// Apply the affine scale before evaluating moments, so the variance can
+    /// be finite even when the unscaled variance exceeds binary64's range.
+    pub fn affine_moments(&self) -> ContractResult<Option<(f64, f64)>> {
+        if !matches!(self.model, Model::Linear { .. }) {
+            return Ok(None);
+        }
+        Ok(self
+            .exact_mean_deviation()?
+            .map(|(mean, deviation)| (mean, deviation.powi(2))))
+    }
+
+    /// Exact moments for finite atomic laws and unclamped affine images.
+    pub fn exact_mean_deviation(&self) -> ContractResult<Option<(f64, f64)>> {
+        if self.is_discrete() {
+            return Ok(Some(affine_segment_mean_deviation(
+                &self.atomic_segments(),
+                1.0,
+                0.0,
+            )));
+        }
+        let Model::Linear { slope, intercept } = self.model else {
+            return Ok(None);
+        };
+        if slope == 0.0 {
+            return Ok(Some((
+                kernel::evaluate(&self.model, &self.clamp, 0.0)?,
+                0.0,
+            )));
+        }
+        if self.clamp.minimum.is_some() || self.clamp.maximum.is_some() {
+            return Ok(None);
+        }
+        if let Some(segments) = self.source.weighted_segments() {
+            return Ok(Some(affine_segment_mean_deviation(
+                &segments, slope, intercept,
+            )));
+        }
+        match &self.source {
+            ImpactSource::Fitted(d) => Ok(Some(affine_fitted_mean_deviation(d, slope, intercept))),
+            ImpactSource::Tabulated(d) if d.uses_linear_probability() => {
+                let segments: Vec<_> = d
+                    .values()
+                    .windows(2)
+                    .zip(d.probabilities().windows(2))
+                    .map(|(x, q)| (x[0], x[1], q[1] - q[0]))
+                    .collect();
+                Ok(Some(affine_segment_mean_deviation(
+                    &segments, slope, intercept,
+                )))
+            }
+            ImpactSource::Hurdle(d) => {
+                let scale = slope.abs();
+                let mut base = d.base().clone();
+                base.location *= scale;
+                base.scale *= scale;
+                let atom_location = d.atom_location() * scale;
+                if !base.location.is_finite()
+                    || !base.scale.is_finite()
+                    || base.scale == 0.0
+                    || !atom_location.is_finite()
+                {
+                    return Ok(None);
+                }
+                let law = NumericalLaw::hurdle(
+                    NumericalLaw::Parametric(base),
+                    d.atom_probability(),
+                    atom_location,
+                )
+                .map_err(|error| fail("numerical_failure", "", error.to_string()))?;
+                let (mean, deviation) = law
+                    .mean_deviation()
+                    .map_err(|error| fail("numerical_failure", "", error.to_string()))?;
+                Ok(Some((mean * slope.signum() + intercept, deviation)))
+            }
+            _ => Ok(None),
+        }
+    }
+
     pub fn quantile(&self, probability: f64) -> ContractResult<f64> {
         if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
             return Err(fail(
@@ -83,7 +179,7 @@ impl ImpactDistribution {
                 // with the upper source quantile, so a zero-mass gap in the
                 // source resolves to the lower response value.
                 let exposure = if *decreasing {
-                    self.source.upper_quantile(1.0 - probability)?
+                    self.source.upper_quantile_from_survival(probability)?
                 } else {
                     self.source.quantile(probability)?
                 };
@@ -111,6 +207,515 @@ impl ImpactDistribution {
             .iter()
             .map(|probability| self.quantile(*probability))
             .collect()
+    }
+
+    /// Integrate the quantile law, keeping exact atomic slabs and all
+    /// source/response breakpoints. Used for moments and rank-tail statistics.
+    pub fn integral(&self, lo: f64, hi: f64, center: f64, square: bool) -> ContractResult<f64> {
+        self.scaled_integral(lo, hi, center, square, false, 1.0)
+    }
+
+    pub fn scaled_integral(
+        &self,
+        lo: f64,
+        hi: f64,
+        center: f64,
+        square: bool,
+        survival: bool,
+        scale: f64,
+    ) -> ContractResult<f64> {
+        let moment = IntegralMoment::new(center, square, scale);
+        if survival {
+            self.tail_integral_moment(lo, hi, moment)
+        } else {
+            self.integral_moment(lo, hi, moment)
+        }
+    }
+
+    fn integral_moment(&self, lo: f64, hi: f64, moment: IntegralMoment) -> ContractResult<f64> {
+        if !lo.is_finite()
+            || !hi.is_finite()
+            || lo < 0.0
+            || hi > 1.0
+            || lo > hi
+            || !moment.center.is_finite()
+        {
+            return Err(fail(
+                "invalid_value",
+                "",
+                "invalid quantile integration interval",
+            ));
+        }
+        if lo == hi {
+            return Ok(0.0);
+        }
+        if matches!(self.law, Law::Discrete) {
+            return Ok(segment_integral(
+                &self.atomic_segments(),
+                lo,
+                hi,
+                moment,
+                false,
+            ));
+        }
+        let decreasing = matches!(self.law, Law::Continuous { decreasing: true });
+        let source_atoms: Vec<(f64, f64, f64, f64)> = self
+            .source
+            .point_atoms()
+            .into_iter()
+            .map(|(x, mass)| {
+                let (left, right) = (self.source.cdf_below(x), self.source.cdf(x));
+                if decreasing {
+                    (1.0 - right, 1.0 - left, mass, x)
+                } else {
+                    (left, right, mass, x)
+                }
+            })
+            .collect();
+        let reflect = |q| if decreasing { 1.0 - q } else { q };
+        let mut breaks = vec![lo, hi];
+        breaks.extend(self.source.probability_knots().into_iter().map(reflect));
+        for exposure in super::expectation::response_breakpoints(&self.model, &self.clamp) {
+            breaks.push(reflect(self.source.cdf(exposure)));
+            breaks.push(reflect(self.source.cdf_below(exposure)));
+        }
+        for &(left, right, _, _) in &source_atoms {
+            breaks.extend([left, right]);
+        }
+        breaks.retain(|q| q.is_finite() && *q >= lo && *q <= hi);
+        breaks.sort_by(f64::total_cmp);
+        breaks.dedup();
+        let exact_linear = self.source.has_piecewise_linear_quantile()
+            && matches!(
+                self.model,
+                Model::Linear { .. }
+                    | Model::Tabulated { .. }
+                    | Model::Binned { .. }
+                    | Model::Cooling { .. }
+            );
+        let mut contributions = Vec::new();
+        let mut numerical = Vec::new();
+        for pair in breaks.windows(2) {
+            let (left, right) = (pair[0], pair[1]);
+            if right <= left {
+                continue;
+            }
+            if let Some(&(atom_left, atom_right, mass, x)) = source_atoms
+                .iter()
+                .find(|&&(a, b, _, _)| a <= left && b >= right)
+            {
+                let width = if left == atom_left && right == atom_right {
+                    mass
+                } else {
+                    right - left
+                };
+                let response = kernel::evaluate(&self.model, &self.clamp, x)?;
+                contributions.push(moment.segment(width, response, response));
+            } else if exact_linear {
+                let width = right - left;
+                let first = self.quantile(left + width * 0.25)?;
+                let third = self.quantile(left + width * 0.75)?;
+                contributions.push(moment.linear_quartiles(width, first, third));
+            } else {
+                numerical.push((left, right));
+            }
+        }
+        if !numerical.is_empty() {
+            let options = super::quadrature::GaussKronrod::defaults();
+            let integral = super::quadrature::integrate(&numerical, &options, |q| {
+                let value = self.quantile(q)?;
+                Ok(moment.segment(1.0, value, value))
+            })?;
+            contributions.push(integral.value);
+        }
+        Ok(compensated(contributions.into_iter()))
+    }
+
+    /// Quantile addressed directly by its upper-tail survival probability.
+    pub fn inverse_survival(&self, survival: f64) -> ContractResult<f64> {
+        if !survival.is_finite() || !(0.0..=1.0).contains(&survival) {
+            return Err(fail(
+                "invalid_value",
+                "",
+                "survival must be finite and in [0,1]",
+            ));
+        }
+        if survival == 0.0 {
+            return self.essential(false);
+        }
+        if survival == 1.0 {
+            return self.essential(true);
+        }
+        if let Law::LowerThreshold {
+            survival_cut,
+            floor,
+            ..
+        } = self.law
+        {
+            if survival >= survival_cut {
+                return Ok(floor);
+            }
+        }
+        if matches!(self.law, Law::Discrete) {
+            let mut suffix = CompensatedSum::default();
+            for atom in self.atoms.iter().rev() {
+                suffix.add(atom.probability);
+                if survival < suffix.total() {
+                    return Ok(atom.value);
+                }
+            }
+            return Ok(self.atoms[0].value);
+        }
+        let decreasing = matches!(self.law, Law::Continuous { decreasing: true });
+        let exposure = if decreasing {
+            self.source.upper_quantile(survival)?
+        } else {
+            self.source.inverse_survival(survival)?
+        };
+        kernel::evaluate(&self.model, &self.clamp, exposure)
+    }
+
+    pub(crate) fn inverse_log_survival(&self, logarithm: f64) -> ContractResult<f64> {
+        if logarithm >= f64::MIN_POSITIVE.ln()
+            || logarithm == f64::NEG_INFINITY
+            || self.is_discrete()
+        {
+            return self.inverse_survival(logarithm.exp());
+        }
+        let decreasing = matches!(self.law, Law::Continuous { decreasing: true });
+        let exposure = self.source.inverse_log_tail(logarithm, decreasing)?;
+        if exposure.is_infinite() {
+            return Ok(limit_at_infinity(&self.model, &self.clamp, exposure > 0.0));
+        }
+        kernel::evaluate(&self.model, &self.clamp, exposure)
+    }
+
+    /// Query the lower or upper tail directly, with explicit treatment of atoms.
+    #[doc(hidden)]
+    pub fn threshold_probability(
+        &self,
+        value: f64,
+        inclusive: bool,
+        exceedance: bool,
+    ) -> ContractResult<f64> {
+        self.threshold(value, inclusive, exceedance, false)
+    }
+
+    pub(crate) fn log_exceedance(&self, value: f64, inclusive: bool) -> ContractResult<f64> {
+        self.threshold(value, inclusive, true, true)
+    }
+
+    fn threshold(
+        &self,
+        value: f64,
+        inclusive: bool,
+        exceedance: bool,
+        logarithmic: bool,
+    ) -> ContractResult<f64> {
+        let coordinate = |mass: f64| if logarithmic { mass.ln() } else { mass };
+        let matches = |response: f64| match (exceedance, inclusive) {
+            (true, true) => response >= value,
+            (true, false) => response > value,
+            (false, true) => response <= value,
+            (false, false) => response < value,
+        };
+        if self.is_discrete() {
+            return Ok(coordinate(neumaier(
+                self.atoms
+                    .iter()
+                    .filter(|atom| matches(atom.value))
+                    .map(|atom| atom.probability),
+            )));
+        }
+        let (lower, upper) = (self.essential(true)?, self.essential(false)?);
+        if lower == upper || value < lower || value > upper {
+            return Ok(coordinate(f64::from(matches(lower))));
+        }
+        let atom_mass = self
+            .atoms
+            .iter()
+            .find(|atom| atom.value == value)
+            .map_or(0.0, |atom| atom.probability);
+        let at_bound = value == lower || value == upper;
+        if at_bound {
+            let outside_tail = if exceedance {
+                value == upper
+            } else {
+                value == lower
+            };
+            if outside_tail {
+                if logarithmic && inclusive && atom_mass < f64::MIN_POSITIVE {
+                    // A flat at the endpoint can retain positive mass even
+                    // when the unconditioned atom cannot be stored linearly.
+                    if let Some((cut, increasing)) = self.inverse_cut(value).filter(|_| {
+                        self.clamp.maximum == Some(value) || self.clamp.minimum == Some(value)
+                    }) {
+                        return Ok(self.source.log_tail_at(cut, true, increasing != exceedance));
+                    }
+                    for region in constant_regions(&self.model, &self.clamp)? {
+                        if region.y != value {
+                            continue;
+                        }
+                        if region.start == f64::NEG_INFINITY {
+                            return Ok(self.source.log_tail_at(
+                                region.end,
+                                region.end_closed,
+                                true,
+                            ));
+                        }
+                        if region.end == f64::INFINITY {
+                            return Ok(self.source.log_tail_at(
+                                region.start,
+                                region.start_closed,
+                                false,
+                            ));
+                        }
+                    }
+                }
+                return Ok(coordinate(if inclusive { atom_mass } else { 0.0 }));
+            }
+            if inclusive || atom_mass == 0.0 {
+                // A rounded-to-zero atom cannot have a small complement.
+                return Ok(coordinate(1.0));
+            }
+            // A boundary atom can round to one even when its complementary
+            // tail is positive. Measure the strict tail in source coordinates.
+        }
+
+        if let Some((mut threshold, increasing)) = self.inverse_cut(value) {
+            let lower_tail = increasing != exceedance;
+            if atom_mass > 0.0 {
+                // A rounded response can invert to either side of an exact source atom.
+                let endpoint = if lower_tail == inclusive {
+                    f64::max
+                } else {
+                    f64::min
+                };
+                let mut boundary = None;
+                for (location, _) in self.source.point_atoms() {
+                    if kernel::evaluate(&self.model, &self.clamp, location)? == value {
+                        boundary = Some(boundary.map_or(location, |x| endpoint(x, location)));
+                    }
+                }
+                if let Some(location) = boundary {
+                    threshold = if at_bound {
+                        // A clamp can place many source atoms on the bound.
+                        // Keep the inverse cut unless an atom extends it.
+                        endpoint(threshold, location)
+                    } else {
+                        location
+                    };
+                }
+            }
+            if logarithmic {
+                return Ok(self.source.log_tail_at(threshold, inclusive, lower_tail));
+            }
+            return Ok(match (lower_tail, inclusive) {
+                (true, true) => self.source.cdf(threshold),
+                (true, false) => self.source.cdf_below(threshold),
+                (false, _) => self.source.survival_at(threshold, inclusive),
+            });
+        }
+
+        if logarithmic {
+            debug_assert!(exceedance);
+            // Invert in log-probability space, including tails too small for
+            // the ordinary quantile search to reach.
+            let (mut left, mut right) = (-1.0, 0.0);
+            while !matches(self.inverse_log_survival(left)?) {
+                right = left;
+                left *= 2.0;
+                if !left.is_finite() {
+                    return Ok(f64::NEG_INFINITY);
+                }
+            }
+            for _ in 0..64 {
+                let mid = left.midpoint(right);
+                if mid == left || mid == right {
+                    break;
+                }
+                if matches(self.inverse_log_survival(mid)?) {
+                    left = mid;
+                } else {
+                    right = mid;
+                }
+            }
+            return Ok(left);
+        }
+
+        // Positive binary64 bit patterns are ordered by value. Searching them
+        // keeps even subnormal tails reachable without subtracting from one.
+        let (mut left, mut right) = (0, 1.0f64.to_bits());
+        while right - left > 1 {
+            let mid = left + (right - left) / 2;
+            let probability = f64::from_bits(mid);
+            let response = if exceedance {
+                self.inverse_survival(probability)?
+            } else {
+                self.quantile(probability)?
+            };
+            if matches(response) {
+                left = mid;
+            } else {
+                right = mid;
+            }
+        }
+        Ok(f64::from_bits(left))
+    }
+
+    fn inverse_cut(&self, value: f64) -> Option<(f64, bool)> {
+        match self.model {
+            Model::Linear { slope, intercept } if slope != 0.0 => {
+                Some(((value - intercept) / slope, slope > 0.0))
+            }
+            Model::Sigmoid {
+                midpoint,
+                steepness,
+                offset,
+                amplitude,
+                origin_adjustment: OriginAdjustment::None,
+                zero_below: None,
+            } if amplitude != 0.0 && steepness != 0.0 => {
+                let fraction = (value - offset) / amplitude;
+                (fraction > 0.0 && fraction < 1.0).then(|| {
+                    (
+                        midpoint + (fraction.ln() - (-fraction).ln_1p()) / steepness,
+                        (amplitude > 0.0) == (steepness > 0.0),
+                    )
+                })
+            }
+            _ => None,
+        }
+    }
+
+    /// Quantile integration in direct survival coordinates.
+    pub fn tail_integral(
+        &self,
+        s_min: f64,
+        s_max: f64,
+        center: f64,
+        square: bool,
+    ) -> ContractResult<f64> {
+        self.scaled_integral(s_min, s_max, center, square, true, 1.0)
+    }
+
+    fn tail_integral_moment(
+        &self,
+        s_min: f64,
+        s_max: f64,
+        moment: IntegralMoment,
+    ) -> ContractResult<f64> {
+        if !s_min.is_finite()
+            || !s_max.is_finite()
+            || s_min < 0.0
+            || s_max > 1.0
+            || s_min > s_max
+            || !moment.center.is_finite()
+        {
+            return Err(fail(
+                "invalid_value",
+                "",
+                "invalid survival integration interval",
+            ));
+        }
+        if s_min == s_max {
+            return Ok(0.0);
+        }
+        if matches!(self.law, Law::Discrete) {
+            return Ok(segment_integral(
+                &self.atomic_segments(),
+                s_min,
+                s_max,
+                moment,
+                true,
+            ));
+        }
+        let decreasing = matches!(self.law, Law::Continuous { decreasing: true });
+        let source_atoms: Vec<_> = self
+            .source
+            .point_atoms()
+            .into_iter()
+            .map(|(x, mass)| {
+                let start = if decreasing {
+                    self.source.cdf_below(x)
+                } else {
+                    self.source.survival_at(x, false)
+                };
+                (start, start + mass, mass, x)
+            })
+            .collect();
+        let mut breaks = vec![s_min, s_max];
+        for q in self.source.probability_knots() {
+            breaks.push(if decreasing { q } else { 1.0 - q });
+        }
+        for x in super::expectation::response_breakpoints(&self.model, &self.clamp) {
+            breaks.push(if decreasing {
+                self.source.cdf(x)
+            } else {
+                self.source.survival_at(x, false)
+            });
+            breaks.push(if decreasing {
+                self.source.cdf_below(x)
+            } else {
+                self.source.survival_at(x, true)
+            });
+        }
+        for &(a, b, _, _) in &source_atoms {
+            breaks.extend([a, b]);
+        }
+        breaks.retain(|s| s.is_finite() && *s >= s_min && *s <= s_max);
+        breaks.sort_by(f64::total_cmp);
+        breaks.dedup();
+        let exact_linear = self.source.has_piecewise_linear_quantile()
+            && matches!(
+                self.model,
+                Model::Linear { .. }
+                    | Model::Tabulated { .. }
+                    | Model::Binned { .. }
+                    | Model::Cooling { .. }
+            );
+        let mut contributions = Vec::new();
+        for pair in breaks.windows(2) {
+            let (left, right) = (pair[0], pair[1]);
+            if right <= left {
+                continue;
+            }
+            if let Some(&(a, b, mass, x)) = source_atoms
+                .iter()
+                .find(|&&(a, b, _, _)| a <= left && b >= right)
+            {
+                let width = if left == a && right == b {
+                    mass
+                } else {
+                    right - left
+                };
+                let response = kernel::evaluate(&self.model, &self.clamp, x)?;
+                contributions.push(moment.segment(width, response, response));
+            } else if exact_linear {
+                let width = right - left;
+                let first = self.inverse_survival(left + width * 0.25)?;
+                let third = self.inverse_survival(left + width * 0.75)?;
+                contributions.push(moment.linear_quartiles(width, first, third));
+            } else {
+                let width = right - left;
+                let mut options = super::quadrature::GaussKronrod::defaults();
+                // The integrand includes the interval mass before squaring.
+                // Apply absolute error control to the conditional interval.
+                options.absolute_tolerance =
+                    (width * options.absolute_tolerance).max(f64::from_bits(1));
+                let integrated = super::quadrature::integrate(&[(0.0, 1.0)], &options, |t| {
+                    let (s, jac) = if left == 0.0 {
+                        (width * t.powi(4), 4.0 * t.powi(3))
+                    } else {
+                        (left + width * t, 1.0)
+                    };
+                    let value = self.inverse_survival(s)?;
+                    Ok(moment.segment(width * jac, value, value))
+                })?;
+                contributions.push(integrated.value);
+            }
+        }
+        Ok(compensated(contributions.into_iter()))
     }
 
     /// Explicit approximate quantile table. The interpolation is part of the approximation.
@@ -188,11 +793,71 @@ pub(crate) fn transform(
             "distribution transformation requires a full probability distribution",
         ));
     }
+    // Put fitted laws in response units before taking a quantile. The
+    // unscaled quantile can overflow even when its affine image is finite.
+    // Keep the reflection separate so every fitted family stays supported.
+    let adjusted = match (source, model) {
+        (ImpactSource::Fitted(d), Model::Linear { slope, intercept })
+            if *slope != 0.0 && (slope.abs() != 1.0 || *intercept != 0.0) =>
+        {
+            let direction = slope.signum();
+            let adjusted = crate::FittedDistribution::from_parameters(
+                d.family,
+                d.shape,
+                slope.abs().mul_add(d.location, direction * intercept),
+                slope.abs() * d.scale,
+            );
+            adjusted.ok().map(|d| {
+                (
+                    ImpactSource::Fitted(d),
+                    Model::Linear {
+                        slope: direction,
+                        intercept: 0.0,
+                    },
+                )
+            })
+        }
+        _ => None,
+    };
+    let (source, model) = adjusted.as_ref().map_or((source, model), |(s, m)| (s, m));
+    // Any finite atomic source has an exact image, including under a
+    // non-monotone response. Preserve every positive atom rather than sampling
+    // the quantile law or discarding small probabilities.
+    if source.has_piecewise_constant_quantile() {
+        let mut atoms = Vec::new();
+        for (location, probability) in source.point_atoms() {
+            if probability > 0.0 {
+                atoms.push(ImpactAtom {
+                    value: kernel::evaluate(model, clamp, location)?,
+                    probability,
+                });
+            }
+        }
+        return Ok(ImpactDistribution {
+            definition_hash: definition_hash.to_string(),
+            model: model.clone(),
+            clamp: clamp.clone(),
+            source: source.clone(),
+            atoms: merge_atoms(atoms),
+            law: Law::Discrete,
+        });
+    }
+    // A piecewise-constant response also has an exact finite image; its bin
+    // order need not be monotone.
+    let piecewise_constant = matches!(
+        model,
+        Model::Binned { .. }
+            | Model::Tabulated {
+                interpolation: TableInterpolation::StepLeft | TableInterpolation::StepRight,
+                ..
+            }
+    );
     let direction = kernel::monotonicity(model, clamp);
     let decreasing = match direction {
         "constant" => false,
         "non_decreasing" => false,
         "non_increasing" => true,
+        "non_monotone" if piecewise_constant => false,
         "non_monotone" | "unknown" => {
             return Err(fail(
                 "monotonicity_required",
@@ -228,7 +893,7 @@ pub(crate) fn transform(
     let mut atoms = Vec::new();
     for region in &regions {
         let mass = region.probability(source);
-        if mass > 1e-15 {
+        if mass > 0.0 {
             atoms.push(ImpactAtom {
                 value: region.y,
                 probability: mass,
@@ -236,7 +901,7 @@ pub(crate) fn transform(
         }
     }
     for (location, mass) in source.point_atoms() {
-        if mass <= 1e-15 || regions.iter().any(|region| region.contains(location)) {
+        if mass <= 0.0 || regions.iter().any(|region| region.contains(location)) {
             continue;
         }
         atoms.push(ImpactAtom {
@@ -253,14 +918,6 @@ pub(crate) fn transform(
             "pushforward atoms carry more than the total probability",
         ));
     }
-    let piecewise_constant = matches!(
-        model,
-        Model::Binned { .. }
-            | Model::Tabulated {
-                interpolation: TableInterpolation::StepLeft | TableInterpolation::StepRight,
-                ..
-            }
-    );
     if piecewise_constant && covered < 1.0 - MASS_COVER {
         return Err(fail(
             "out_of_domain",
@@ -268,12 +925,15 @@ pub(crate) fn transform(
             "the source support leaves a piecewise-constant table domain",
         ));
     }
-    let law = if covered >= 1.0 - MASS_COVER {
+    // Nearly complete atom coverage is not complete coverage. A tiny remaining
+    // continuous tail is scientifically meaningful and keeps its quantile law.
+    let law = if piecewise_constant {
         Law::Discrete
-    } else if let Some((cut, floor)) = lower_threshold(model, clamp, source)? {
+    } else if let Some((cut, survival_cut, floor)) = lower_threshold(model, clamp, source)? {
         if direction == "non_decreasing" {
             Law::LowerThreshold {
                 cut,
+                survival_cut,
                 floor,
                 decreasing,
             }
@@ -300,28 +960,28 @@ fn discrete_quantile(atoms: &[ImpactAtom], probability: f64) -> f64 {
     if probability <= 0.0 {
         return atoms[0].value;
     }
-    let mut cumulative = 0.0;
+    if probability >= 1.0 {
+        return atoms.last().expect("atoms are non-empty").value;
+    }
+    let mut prefix = CompensatedSum::default();
     for atom in atoms {
-        cumulative += atom.probability;
-        if probability <= cumulative {
+        prefix.add(atom.probability);
+        if probability <= prefix.total() {
             return atom.value;
         }
     }
     atoms.last().expect("atoms are non-empty").value
 }
 
-fn merge_atoms(atoms: Vec<ImpactAtom>) -> Vec<ImpactAtom> {
-    let mut ordered = atoms;
-    ordered.sort_by(|left, right| left.value.total_cmp(&right.value));
-    let mut merged: Vec<ImpactAtom> = Vec::new();
-    for atom in ordered {
-        if merged.last().is_some_and(|last| last.value == atom.value) {
-            merged.last_mut().expect("atom group exists").probability += atom.probability;
-        } else {
-            merged.push(atom);
-        }
-    }
-    merged
+fn merge_atoms(mut atoms: Vec<ImpactAtom>) -> Vec<ImpactAtom> {
+    atoms.sort_by(|left, right| left.value.total_cmp(&right.value));
+    atoms
+        .chunk_by(|left, right| left.value == right.value)
+        .map(|group| ImpactAtom {
+            value: group[0].value,
+            probability: compensated(group.iter().map(|atom| atom.probability)),
+        })
+        .collect()
 }
 
 #[derive(Clone, Copy)]
@@ -353,21 +1013,7 @@ impl Region {
     }
 
     fn probability(self, source: &ImpactSource) -> f64 {
-        let right = if self.end.is_infinite() && self.end.is_sign_positive() {
-            1.0
-        } else if self.end_closed {
-            source.cdf(self.end)
-        } else {
-            source.cdf_below(self.end)
-        };
-        let left = if self.start.is_infinite() && self.start.is_sign_negative() {
-            0.0
-        } else if self.start_closed {
-            source.cdf_below(self.start)
-        } else {
-            source.cdf(self.start)
-        };
-        (right - left).max(0.0)
+        source.interval_probability(self.start, self.end, self.start_closed, self.end_closed)
     }
 }
 
@@ -480,8 +1126,10 @@ fn linear_regions(
 
 fn probes(start: f64, end: f64) -> (f64, f64) {
     if start.is_finite() && end.is_finite() {
-        let width = end - start;
-        (start + width * 0.25, start + width * 0.75)
+        (
+            crate::numerical::linear_interpolate(start, end, 0.25),
+            crate::numerical::linear_interpolate(start, end, 0.75),
+        )
     } else if start.is_finite() {
         (start, start + 1.0)
     } else if end.is_finite() {
@@ -507,24 +1155,18 @@ fn tabulated_linear_regions(
         });
     }
     for pair in points.windows(2) {
-        let (x0, y0) = pair[0];
-        let (x1, y1) = pair[1];
+        let left = pair[0];
+        let right = pair[1];
+        let (x0, y0) = left;
+        let (x1, y1) = right;
         let mut cuts = vec![x0, x1];
-        if y0 != y1 {
-            for limit in [clamp.minimum, clamp.maximum].into_iter().flatten() {
-                let low = y0.min(y1);
-                let high = y0.max(y1);
-                if limit > low && limit < high {
-                    cuts.push(x0 + (x1 - x0) * (limit - y0) / (y1 - y0));
-                }
-            }
-        }
+        super::expectation::push_crossings(x0, y0, x1, y1, clamp, &mut cuts);
         cuts.sort_by(f64::total_cmp);
         cuts.dedup_by(|left, right| *left == *right);
         for window in cuts.windows(2) {
-            let mid = 0.5 * (window[0] + window[1]);
-            let y_mid = apply_clamp(clamp, lerp(x0, y0, x1, y1, mid));
-            let y_left = apply_clamp(clamp, lerp(x0, y0, x1, y1, window[0]));
+            let mid = window[0].midpoint(window[1]);
+            let y_mid = apply_clamp(clamp, kernel::interpolate_segment(left, right, mid));
+            let y_left = apply_clamp(clamp, kernel::interpolate_segment(left, right, window[0]));
             if y_left == y_mid {
                 regions.push(Region {
                     start: window[0],
@@ -654,7 +1296,7 @@ fn lower_threshold(
     model: &Model,
     clamp: &Clamp,
     source: &ImpactSource,
-) -> ContractResult<Option<(f64, f64)>> {
+) -> ContractResult<Option<(f64, f64, f64)>> {
     let Model::Sigmoid {
         zero_below: Some(threshold),
         ..
@@ -667,15 +1309,11 @@ fn lower_threshold(
     if floor == at_threshold {
         return Ok(None);
     }
-    Ok(Some((source.cdf_below(*threshold), floor)))
-}
-
-fn lerp(x0: f64, y0: f64, x1: f64, y1: f64, x: f64) -> f64 {
-    if x1 == x0 {
-        y0
-    } else {
-        y0 + (y1 - y0) * (x - x0) / (x1 - x0)
-    }
+    Ok(Some((
+        source.cdf_below(*threshold),
+        source.survival_at(*threshold, true),
+        floor,
+    )))
 }
 
 fn apply_clamp(clamp: &Clamp, mut value: f64) -> f64 {

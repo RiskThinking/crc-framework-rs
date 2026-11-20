@@ -70,50 +70,17 @@ pub const FLOOD_PARAMS: phf::Map<&'static str, FloodParams> = phf_map! {
     },
 };
 
-pub fn continent_to_flood_params(continent: &str) -> &FloodParams {
-    match continent {
-        "Europe" => &FLOOD_PARAMS["Europe"],
-        "North America" => &FLOOD_PARAMS["North America"],
-        "South America" => &FLOOD_PARAMS["South America"],
-        "Asia" => &FLOOD_PARAMS["Asia"],
-        "Africa" => &FLOOD_PARAMS["Africa"],
-        "Oceania" => &FLOOD_PARAMS["Oceania"],
-        "Global" => &FLOOD_PARAMS["Global"],
-        _ => &FLOOD_PARAMS["Global"],
-    }
-}
-
-// Returns the index of the flood level in the flood params array
-pub fn _flood_level_to_index(flood_level: f32) -> usize {
-    if flood_level > 6.0 {
-        8
-    } else if flood_level > 5.0 {
-        7
-    } else if flood_level > 4.0 {
-        6
-    } else if flood_level > 3.0 {
-        5
-    } else if flood_level > 2.0 {
-        4
-    } else if flood_level > 1.5 {
-        3
-    } else if flood_level > 1.0 {
-        2
-    } else if flood_level > 0.5 {
-        1
-    } else {
-        0
-    }
-}
-
-pub fn building_type_to_damage(building_type: &str, flood_params: &FloodParams) -> [f32; 9] {
+pub fn building_type_to_damage(
+    building_type: &str,
+    flood_params: &FloodParams,
+) -> Option<[f32; 9]> {
     match building_type {
-        "Residential buildings" => flood_params.residential_damage,
-        "Commercial buildings" => flood_params.commercial_damage,
-        "Industrial buildings" => flood_params.industrial_damage,
-        "Transport" => flood_params.transport_damage,
-        "Infrastructure - roads" => flood_params.infrastructure_damage,
-        "Agriculture" => flood_params.agriculture_damage,
-        _ => [0.0; 9],
+        "Residential buildings" => Some(flood_params.residential_damage),
+        "Commercial buildings" => Some(flood_params.commercial_damage),
+        "Industrial buildings" => Some(flood_params.industrial_damage),
+        "Transport" => Some(flood_params.transport_damage),
+        "Infrastructure - roads" => Some(flood_params.infrastructure_damage),
+        "Agriculture" => Some(flood_params.agriculture_damage),
+        _ => None,
     }
 }

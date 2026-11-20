@@ -30,7 +30,6 @@ const CONTEXT_FIELDS: [&str; 5] = [
     "building_type",
     "historic_mean",
 ];
-const FALLBACK_POLICIES: [&str; 2] = ["error", "legacy_defaults"];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ModelKind {
@@ -730,33 +729,16 @@ fn registry_origin(value: &Json, path: &str) -> ContractResult<Json> {
         "factor",
         "context",
         "overrides",
-        "fallback_policy",
         "lookups",
     ];
     let fields = read_fields(value, path, &names, &[])?;
     let identity = registry_identity(&fields, path)?;
     let factor = factor(fields.require("factor")?, &pointer(path, "factor"))?;
-    let policy = choice(
-        fields.require("fallback_policy")?,
-        &pointer(path, "fallback_policy"),
-        &FALLBACK_POLICIES,
-    )?;
     let lookups_path = pointer(path, "lookups");
     let raw_lookups = array(fields.require("lookups")?, &lookups_path, 0)?;
     let mut lookups = Vec::with_capacity(raw_lookups.len());
     for (index, item) in raw_lookups.iter().enumerate() {
         lookups.push(lookup(item, &pointer_index(&lookups_path, index))?);
-    }
-    if policy == "error" {
-        for (index, lookup) in lookups.iter().enumerate() {
-            if lookup.status == "fallback" {
-                return Err(fail(
-                    "invalid_value",
-                    pointer(&pointer_index(&lookups_path, index), "status"),
-                    "fallback lookups require fallback_policy legacy_defaults",
-                ));
-            }
-        }
     }
     let context = context(fields.require("context")?, &pointer(path, "context"))?;
     let overrides = overrides(
@@ -776,54 +758,23 @@ fn registry_origin(value: &Json, path: &str) -> ContractResult<Json> {
         ("factor".to_string(), Json::String(factor)),
         ("context".to_string(), context),
         ("overrides".to_string(), overrides),
-        ("fallback_policy".to_string(), Json::String(policy)),
-        (
-            "lookups".to_string(),
-            Json::Array(lookups.into_iter().map(|item| item.json).collect()),
-        ),
+        ("lookups".to_string(), Json::Array(lookups)),
     ]))
 }
 
-struct Lookup {
-    status: String,
-    json: Json,
-}
-
-fn lookup(value: &Json, path: &str) -> ContractResult<Lookup> {
-    let names = [
-        "table_id",
-        "table_sha256",
-        "requested_key",
-        "resolved_key",
-        "status",
-    ];
-    let fields = read_fields(value, path, &names, &[])?;
+fn lookup(value: &Json, path: &str) -> ContractResult<Json> {
+    let fields = read_fields(value, path, &["table_id", "table_sha256", "key"], &[])?;
     let table_id = identifier(fields.require("table_id")?, &pointer(path, "table_id"))?;
     let digest = sha256_text(
         fields.require("table_sha256")?,
         &pointer(path, "table_sha256"),
     )?;
-    let requested = lookup_key(
-        fields.require("requested_key")?,
-        &pointer(path, "requested_key"),
-    )?;
-    let resolved = lookup_key(
-        fields.require("resolved_key")?,
-        &pointer(path, "resolved_key"),
-    )?;
-    let status = choice(
-        fields.require("status")?,
-        &pointer(path, "status"),
-        &["exact", "fallback"],
-    )?;
-    let json = Json::object([
+    let key = lookup_key(fields.require("key")?, &pointer(path, "key"))?;
+    Ok(Json::object([
         ("table_id", Json::String(table_id)),
         ("table_sha256", Json::String(digest)),
-        ("requested_key", requested),
-        ("resolved_key", resolved),
-        ("status", Json::String(status.clone())),
-    ]);
-    Ok(Lookup { status, json })
+        ("key", key),
+    ]))
 }
 
 fn lookup_key(value: &Json, path: &str) -> ContractResult<Json> {

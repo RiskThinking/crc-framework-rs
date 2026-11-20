@@ -1,5 +1,6 @@
 use super::definition::{Clamp, Interpolation, Model, OriginAdjustment, OutsideDomain};
 use super::error::{ContractResult, fail};
+use crate::numerical::{interval_fraction, linear_interpolate};
 
 const CROPS: usize = 3;
 
@@ -89,21 +90,23 @@ fn tabulated_response(
         return Ok(points[upper].1);
     }
     let lower = upper - 1;
-    let (x0, y0) = points[lower];
-    let (x1, y1) = points[upper];
+    let left = points[lower];
+    let right = points[upper];
     Ok(match interpolation {
-        Interpolation::StepLeft => y0,
-        Interpolation::StepRight => y1,
-        Interpolation::Linear => {
-            let weight = (value - x0) / (x1 - x0);
-            y0 + weight * (y1 - y0)
-        }
+        Interpolation::StepLeft => left.1,
+        Interpolation::StepRight => right.1,
+        Interpolation::Linear => interpolate_segment(left, right, value),
     })
+}
+
+pub(super) fn interpolate_segment(left: (f64, f64), right: (f64, f64), value: f64) -> f64 {
+    let fraction = interval_fraction(left.0, right.0, left.0, value);
+    linear_interpolate(left.1, right.1, fraction)
 }
 
 pub(crate) fn raw_response(model: &Model, value: f64) -> ContractResult<f64> {
     match model {
-        Model::Linear { slope, intercept } => Ok(slope * value + intercept),
+        Model::Linear { slope, intercept } => Ok(slope.mul_add(value, *intercept)),
         Model::Sigmoid {
             midpoint,
             steepness,
@@ -189,7 +192,14 @@ pub(crate) fn evaluate(model: &Model, clamp: &Clamp, value: f64) -> ContractResu
             "exposure values must be finite",
         ));
     }
-    let result = raw_response(model, value)?;
+    let raw = raw_response(model, value)?;
+    // An overflowing affine value can still be clipped to a finite result.
+    // Other non-finite responses can arise from an invalid intermediate.
+    let result = if raw.is_finite() || raw.is_infinite() && matches!(model, Model::Linear { .. }) {
+        apply_clamp(clamp, raw)
+    } else {
+        raw
+    };
     if !result.is_finite() {
         return Err(fail(
             "non_finite_result",
@@ -197,7 +207,7 @@ pub(crate) fn evaluate(model: &Model, clamp: &Clamp, value: f64) -> ContractResu
             "impact evaluation produced a non-finite response",
         ));
     }
-    Ok(apply_clamp(clamp, result))
+    Ok(result)
 }
 
 fn sequence_class(values: &[f64]) -> &'static str {

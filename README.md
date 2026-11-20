@@ -2,12 +2,12 @@
 
 CRC Framework provides a shared Rust computation core with official Python and
 JavaScript/WebAssembly bindings for climate-risk calculations. It turns hazard
-distributions into comparable impact microscores, scenario branches, and
+distributions into explicit impact laws, rank scenarios, and
 portfolio-level VaR/CVaR risk metrics.
 
 | Interface | Package | Scope |
 | --- | --- | --- |
-| Python | `crc-framework` on PyPI; import `crc_framework` | Distributions, fitting, impacts, microscores, risk aggregation, and geography |
+| Python | `crc-framework` on PyPI; import `crc_framework` | Distributions, quantile evidence, fitting, impacts, risk aggregation, and geography |
 | JavaScript / WASM | `@climateriskcommons/crc-framework` on npm | Canonical CRC curve consumption: quantile evaluation, batches, prepared handles, and TypeScript declarations |
 | Rust | `crates/core` | Shared algorithms and reference data used by both bindings |
 
@@ -58,7 +58,7 @@ python -m pip install --upgrade --pre crc-framework
 ```
 
 Python 3.11 or later is required. Compatible prebuilt wheels need no Rust
-toolchain. Building from source requires Rust 1.85 or later and a C compiler
+toolchain. Building from source requires Rust 1.87 or later and a C compiler
 suitable for Python extensions.
 
 ### JavaScript / WebAssembly
@@ -77,45 +77,43 @@ and SSR setup, canonical input rules, and prepared collection APIs.
 ### Python: evaluate a return-period curve
 
 ```python
-from crc_framework import TabulatedDistribution
+from crc_framework import QuantileCurve
 
-exposure = TabulatedDistribution.from_return_periods(
-    periods=[10, 20, 50, 100, 200, 500],
+exposure = QuantileCurve(
+    probabilities=[0.9, 0.95, 0.98, 0.99, 0.995, 0.998],
     values=[0.1, 0.2, 0.5, 0.9, 1.4, 2.0],
-    tail="upper",
 )
-print(exposure.ppf(0.99))  # 100-year return level: 0.9
+print(exposure.quantile(0.99))  # 100-year upper-tail return level: 0.9
 ```
 
-### JavaScript: consume a canonical curve
+### JavaScript: consume a numerical document
 
-```js
-import init, { evaluateCurve } from '@climateriskcommons/crc-framework';
+```javascript
+import init, { prepareNumerical } from "@climateriskcommons/crc-framework";
 
-await init(); // initialize once at client startup
-const properties = {
-  curve_kind: 'fitted',
-  curve_type: 'gumbel_r',
-  curve_location: 1,
-  curve_scale: 2,
-};
-const value = evaluateCurve(properties, 0.99);
+await init();
+const text = await (await fetch("/depth.numerical.json")).text();
+const curve = prepareNumerical(text);
+try {
+  console.log(curve.quantile(0.99));
+} finally {
+  curve.free();
+}
 ```
 
-Evaluation is synchronous after initialization. Imports are SSR-safe; initialize
-in the client, or load WASM bytes explicitly for Node evaluation. For repeated
-viewport or percentile queries, use `prepareCurves` to validate and transfer a
-collection once, then call `evaluate(q)` and free the handle when finished.
+Create `depth.numerical.json` with Python's `QuantileCurve.to_json()` or use an
+existing current numerical document. The [JavaScript guide](docs/javascript.md)
+covers Node initialization, array queries, and shared schema validation.
 
 ## Guides and next steps
 
 | Task | Read next |
 | --- | --- |
-| Use distributions, fitting, impacts, microscores, or risk metrics | [Python guide](docs/python.md) |
+| Use distributions, fitting, impacts, rank scenarios, or risk metrics | [Python guide](docs/python.md) |
 | Initialize WASM, prepare collections, or understand canonical inputs and errors | [JavaScript guide](docs/javascript.md) |
 | Pin schemas, validate identities, or record impact provenance | [Impact contracts](docs/impact-contracts.md) |
 | Set up the repository, run checks, or update contributor credits | [Development](docs/development.md) |
-| Bump versions, migrate the npm scope, or publish a release | [Releases](docs/releases.md) |
+| Check release contracts or publish a release | [Releases](docs/releases.md) |
 
 Start with the [documentation index](docs/README.md) for the reading order and
 repository boundaries.

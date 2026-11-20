@@ -240,6 +240,141 @@ struct SimplexResult {
     evaluations: usize,
 }
 
+/// Strict multi-start maximum likelihood for one requested family. Moment and
+/// quantile estimates initialize the search but can never be returned as MLE.
+pub(crate) fn fit_sample_likelihood(
+    kind: DistributionKind,
+    samples: &[f64],
+    bounds: crate::distribution::FitBounds,
+) -> Option<QuantileOptimization> {
+    let mut sorted = samples.to_vec();
+    sorted.sort_by(f64::total_cmp);
+    let origin = sorted[sorted.len() / 2];
+    let span = sorted.last()? - sorted.first()?;
+    if !span.is_finite() || span <= 0.0 {
+        return None;
+    }
+    let normalized: Vec<f64> = sorted.iter().map(|x| (x - origin) / span).collect();
+    let probabilities: Vec<f64> = (0..sorted.len())
+        .map(|i| (i as f64 + 0.5) / sorted.len() as f64)
+        .collect();
+    let weights = vec![1.0; sorted.len()];
+    let starts = quantile_starts(kind, &probabilities, &normalized, &weights);
+    let dimensions = if matches!(kind, DistributionKind::GumbelR | DistributionKind::GumbelL) {
+        2
+    } else {
+        3
+    };
+    let family = DistributionFamily::from_reference_kind(kind);
+    let decode = |p: &[f64]| {
+        if dimensions == 2 {
+            (None, p[0], p[1].exp())
+        } else {
+            (Some(p[0]), p[1], p[2].exp())
+        }
+    };
+    let mut best: Option<SimplexResult> = None;
+    let mut total_iterations = 0;
+    let mut total_evaluations = 0;
+    for start in starts {
+        let mut start = start;
+        start[dimensions - 1] = start[dimensions - 1].ln();
+        let steps = if dimensions == 2 {
+            vec![0.1, 0.1]
+        } else {
+            vec![quantile_shape_step(kind, start[0]), 0.1, 0.1]
+        };
+        let result = quantile_nelder_mead(
+            start,
+            steps,
+            |p| {
+                let (shape, loc, scale) = decode(p);
+                let law = TailDistribution::from_parameters(
+                    family,
+                    shape,
+                    origin + span * loc,
+                    span * scale,
+                );
+                let Ok(law) = law else {
+                    return f64::INFINITY;
+                };
+                if !bounds.accepts(&law, &sorted) {
+                    return f64::INFINITY;
+                }
+                let mut nll = 0.0;
+                for &x in &sorted {
+                    let density = law.pdf(x);
+                    if !density.is_finite() || density <= 0.0 {
+                        return f64::INFINITY;
+                    }
+                    nll -= density.ln();
+                }
+                nll / sorted.len() as f64
+            },
+            |p| {
+                p[dimensions - 1] = p[dimensions - 1].clamp(-25.0, 25.0);
+                if dimensions == 3 {
+                    p[0] = match kind {
+                        DistributionKind::WeibullMin | DistributionKind::WeibullMax => {
+                            p[0].max(1.0e-6)
+                        }
+                        _ => p[0],
+                    };
+                }
+                // Projection of a location parameter satisfies quantile limits
+                // throughout the search, instead of rejecting a completed fit.
+                let (shape, loc, scale) = decode(p);
+                if let Ok(law) = TailDistribution::from_parameters(
+                    family,
+                    shape,
+                    origin + span * loc,
+                    span * scale,
+                ) {
+                    let mut shift: f64 = 0.0;
+                    if let Some(minimum) = bounds.minimum_value {
+                        if let Ok(q) = law.ppf(bounds.probability.unwrap_or(0.0)) {
+                            if q.is_finite() {
+                                shift = shift.max(minimum - q);
+                            }
+                        }
+                    }
+                    if let Some(maximum) = bounds.maximum_value {
+                        if let Ok(q) = law.ppf(bounds.probability.unwrap_or(1.0)) {
+                            if q.is_finite() {
+                                shift = shift.min(maximum - q);
+                            }
+                        }
+                    }
+                    p[dimensions - 2] += shift / span;
+                }
+            },
+            4_000,
+            1.0e-8,
+            1.0e-10,
+        );
+        total_iterations += result.iterations;
+        total_evaluations += result.evaluations;
+        if result.objective.is_finite()
+            && best.as_ref().is_none_or(|other| {
+                (result.converged && !other.converged)
+                    || (result.converged == other.converged && result.objective < other.objective)
+            })
+        {
+            best = Some(result);
+        }
+    }
+    let best = best?;
+    let (shape, loc, scale) = decode(&best.parameters);
+    Some(QuantileOptimization {
+        shape,
+        loc: origin + span * loc,
+        scale: span * scale,
+        converged: best.converged,
+        iterations: total_iterations,
+        evaluations: total_evaluations,
+    })
+}
+
 pub(crate) fn fit_quantile_points(
     kind: DistributionKind,
     probabilities: &[f64],
@@ -247,6 +382,8 @@ pub(crate) fn fit_quantile_points(
     weights: &[f64],
     value_scale: f64,
     truncation_atom: Option<f64>,
+    accept: Option<&dyn Fn(&TailDistribution) -> bool>,
+    project: Option<&dyn Fn(&mut [f64])>,
 ) -> Option<QuantileOptimization> {
     let starts = quantile_starts(kind, probabilities, values, weights);
     let parameter_count = if matches!(kind, DistributionKind::GumbelR | DistributionKind::GumbelL) {
@@ -260,6 +397,8 @@ pub(crate) fn fit_quantile_points(
     // this fit; summed here in the same order the objective used to sum it.
     let weight_sum = weights.iter().sum::<f64>();
     let mut best: Option<SimplexResult> = None;
+    let mut total_iterations = 0;
+    let mut total_evaluations = 0;
 
     for start in starts {
         let mut steps = vec![0.0; parameter_count];
@@ -275,6 +414,24 @@ pub(crate) fn fit_quantile_points(
             start,
             steps,
             |parameters| {
+                if let Some(accept) = accept {
+                    let (shape, loc, scale) = if parameter_count == 2 {
+                        (None, parameters[0], parameters[1])
+                    } else {
+                        (Some(parameters[0]), parameters[1], parameters[2])
+                    };
+                    let Ok(law) = TailDistribution::from_parameters(
+                        DistributionFamily::from_reference_kind(kind),
+                        shape,
+                        loc,
+                        scale,
+                    ) else {
+                        return f64::INFINITY;
+                    };
+                    if !accept(&law) {
+                        return f64::INFINITY;
+                    }
+                }
                 quantile_objective(
                     kind,
                     parameters,
@@ -286,11 +443,18 @@ pub(crate) fn fit_quantile_points(
                     truncation_atom,
                 )
             },
-            |parameters| constrain_quantile_parameters(kind, parameters),
+            |parameters| {
+                constrain_quantile_parameters(kind, parameters);
+                if let Some(project) = project {
+                    project(parameters);
+                }
+            },
             2_000,
             1.0e-8 * value_scale.max(1.0),
             1.0e-12,
         );
+        total_iterations += result.iterations;
+        total_evaluations += result.evaluations;
         if result.objective.is_finite()
             && best.as_ref().is_none_or(|candidate| {
                 (result.converged && !candidate.converged)
@@ -317,8 +481,8 @@ pub(crate) fn fit_quantile_points(
         loc,
         scale,
         converged: best.converged,
-        iterations: best.iterations,
-        evaluations: best.evaluations,
+        iterations: total_iterations,
+        evaluations: total_evaluations,
     })
 }
 
@@ -329,6 +493,8 @@ pub(crate) fn fit_censored_quantile_points(
     weights: &[f64],
     censor_location: f64,
     residual_scale_floor: f64,
+    accept: Option<&dyn Fn(&TailDistribution) -> bool>,
+    project: Option<&dyn Fn(&mut [f64])>,
 ) -> Option<CensoredQuantileOptimization> {
     // A knot at or below the censor is left-censored. Its recorded magnitude is
     // not a location, so the starts and the objective see the bound instead.
@@ -350,6 +516,8 @@ pub(crate) fn fit_censored_quantile_points(
         .max(10.0 * residual_scale_floor)
         .max(1.0e-12);
     let mut best: Option<SimplexResult> = None;
+    let mut total_iterations = 0;
+    let mut total_evaluations = 0;
 
     for start in starts {
         let distribution_scale = if parameter_count == 2 {
@@ -390,6 +558,24 @@ pub(crate) fn fit_censored_quantile_points(
             transformed,
             steps,
             |parameters| {
+                if let Some(accept) = accept {
+                    let (shape, loc, scale) = if parameter_count == 2 {
+                        (None, parameters[0], parameters[1].exp())
+                    } else {
+                        (Some(parameters[0]), parameters[1], parameters[2].exp())
+                    };
+                    let Ok(law) = TailDistribution::from_parameters(
+                        DistributionFamily::from_reference_kind(kind),
+                        shape,
+                        loc,
+                        scale,
+                    ) else {
+                        return f64::INFINITY;
+                    };
+                    if !accept(&law) {
+                        return f64::INFINITY;
+                    }
+                }
                 censored_quantile_objective(
                     kind,
                     parameters,
@@ -402,12 +588,17 @@ pub(crate) fn fit_censored_quantile_points(
                 )
             },
             |parameters| {
-                constrain_censored_quantile_parameters(kind, parameters, residual_scale_floor)
+                constrain_censored_quantile_parameters(kind, parameters, residual_scale_floor);
+                if let Some(project) = project {
+                    project(parameters);
+                }
             },
             20_000,
             1.0e-10 * value_range.max(1.0),
             1.0e-12,
         );
+        total_iterations += result.iterations;
+        total_evaluations += result.evaluations;
         if result.objective.is_finite()
             && best.as_ref().is_none_or(|candidate| {
                 (result.converged && !candidate.converged)
@@ -444,8 +635,8 @@ pub(crate) fn fit_censored_quantile_points(
         residual_scale: log_residual_scale.exp().max(residual_scale_floor),
         negative_log_likelihood: best.objective * weight_sum,
         converged: best.converged,
-        iterations: best.iterations,
-        evaluations: best.evaluations,
+        iterations: total_iterations,
+        evaluations: total_evaluations,
     })
 }
 
@@ -680,7 +871,7 @@ fn quantile_shape_step(kind: DistributionKind, shape: f64) -> f64 {
     }
 }
 
-fn log_standard_normal_cdf(value: f64) -> f64 {
+pub(crate) fn log_standard_normal_cdf(value: f64) -> f64 {
     if value >= 0.0 {
         // The upper half is bounded away from zero, so `1 + erf` does not cancel.
         return (0.5 * (1.0 + erf(value / SQRT_2))).ln();
@@ -688,8 +879,8 @@ fn log_standard_normal_cdf(value: f64) -> f64 {
     // Φ(z) = erfc(-z/√2) / 2. Forming `1 + erf(z/√2)` cancels once `erf` is
     // `erfc - 1`, which is every moderately negative argument.
     let tail = erfc((-value) / SQRT_2);
-    if tail > 0.0 {
-        return (0.5 * tail).ln();
+    if tail >= f64::MIN_POSITIVE {
+        return tail.ln() - std::f64::consts::LN_2;
     }
     // `erfc` underflows for z ≲ -37. The Mills expansion stays finite there.
     let inverse_square = 1.0 / (value * value);
@@ -997,7 +1188,7 @@ fn stirf(x: f64) -> f64 {
     } else {
         y = x.powf(x - 0.5) / y;
     }
-    SQRTPI * y * w
+    (SQRT_2 * SQRTPI) * y * w
 }
 
 fn polevl(x: f64, coef: &[f64]) -> f64 {
@@ -1055,7 +1246,7 @@ fn erfc(a: f64) -> f64 {
     if a < 0.0 { 2.0 - y } else { y }
 }
 
-fn erf(x: f64) -> f64 {
+pub(crate) fn erf(x: f64) -> f64 {
     if x.is_nan() {
         return f64::NAN;
     }
@@ -3396,6 +3587,8 @@ mod censored_scale_start {
             &weights,
             0.0,
             4.0e7,
+            None,
+            None,
         )
         .expect("a start above the scale cap should still optimize");
         let below_cap = 1.0e12 * (1.0 - 1.0e-6);

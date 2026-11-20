@@ -3,16 +3,22 @@
 //! Histogram bins are uniform. Discrete and point-mass laws keep their atoms.
 //! Canonical curves are accepted only as full distributions.
 
+use std::borrow::Cow;
+
+use crate::numerical::{
+    CompensatedSum, ProbabilitySegment, affine_fitted_mean_deviation, interval_fraction,
+    linear_interpolate, segment_inverse_survival, segment_probability, segment_quantile,
+};
 use crate::{
-    CanonicalCurve, Distribution, EmpiricalDistribution, FittedDistribution, HurdleDistribution,
+    Distribution, EmpiricalDistribution, FittedDistribution, HurdleDistribution,
     PointMassDistribution, TabulatedDistribution,
 };
 
 use super::error::{ContractResult, fail};
+use super::kernel_curve::KernelCurve;
 use super::quadrature::neumaier;
 
 const MASS_TOLERANCE: f64 = 1e-12;
-const EULER: f64 = 0.577_215_664_901_532_9;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum Tail {
@@ -33,8 +39,7 @@ pub struct HistogramExposure {
     edges: Vec<f64>,
     weights: Vec<f64>,
     normalized: Vec<f64>,
-    /// `cumulative[i]` is the left-to-right running sum of the first `i`
-    /// normalized weights, without forcing the final entry to one.
+    /// Compensated prefixes of the normalized weights, including zero.
     cumulative: Vec<f64>,
     original_mass_sum: f64,
     normalization_factor: f64,
@@ -85,11 +90,11 @@ impl HistogramExposure {
             .map(|weight| weight / original_mass_sum)
             .collect();
         let mut cumulative = Vec::with_capacity(normalized.len() + 1);
-        let mut running = 0.0;
-        cumulative.push(running);
+        let mut running = CompensatedSum::default();
+        cumulative.push(0.0);
         for weight in &normalized {
-            running += weight;
-            cumulative.push(running);
+            running.add(*weight);
+            cumulative.push(running.total());
         }
         Ok(Self {
             edges,
@@ -136,8 +141,8 @@ impl HistogramExposure {
         let bin = count - 1;
         let left = self.edges[bin];
         if x > left {
-            let width = self.edges[bin + 1] - left;
-            self.cumulative[bin] + self.normalized[bin] * (x - left) / width
+            self.cumulative[bin]
+                + self.normalized[bin] * interval_fraction(left, self.edges[bin + 1], left, x)
         } else {
             self.cumulative[bin]
         }
@@ -171,9 +176,10 @@ impl HistogramExposure {
         if bin >= self.normalized.len() {
             return *self.edges.last().expect("histogram has edges");
         }
-        let weight = (probability - self.cumulative[bin]) / self.normalized[bin];
-        let left = self.edges[bin];
-        left + weight * (self.edges[bin + 1] - left)
+        let left = self.cumulative[bin];
+        let right = self.cumulative[bin + 1];
+        let weight = (probability - left) / (right - left);
+        linear_interpolate(self.edges[bin], self.edges[bin + 1], weight)
     }
 
     fn knots(&self) -> Vec<f64> {
@@ -181,16 +187,34 @@ impl HistogramExposure {
         *knots.last_mut().expect("knots exist") = 1.0;
         knots
     }
+
+    fn inverse_survival(&self, survival: f64, upper: bool) -> f64 {
+        let mut suffix = CompensatedSum::default();
+        for (edges, &mass) in self.edges.windows(2).zip(&self.normalized).rev() {
+            if mass == 0.0 {
+                continue;
+            }
+            let right = suffix.total();
+            suffix.add(mass);
+            let left = suffix.total();
+            if upper && survival == left {
+                return edges[0];
+            }
+            if survival < left || survival == 0.0 {
+                let weight = ((survival - right) / mass).clamp(0.0, 1.0);
+                return linear_interpolate(edges[1], edges[0], weight);
+            }
+        }
+        self.edges[self.normalized.iter().position(|&p| p > 0.0).unwrap()]
+    }
 }
 
 /// Finite support with explicit probability atoms.
 #[derive(Clone, Debug)]
 pub struct DiscreteDistribution {
     pairs: Vec<(f64, f64)>,
-    /// Plain running sums of the masses, as used by the quantile.
+    /// Compensated prefixes of the masses, including zero.
     cumulative: Vec<f64>,
-    /// Compensated (Neumaier) sums of the first `i` masses, as used by the cdf.
-    compensated: Vec<f64>,
 }
 
 impl DiscreteDistribution {
@@ -242,30 +266,16 @@ impl DiscreteDistribution {
                 merged.push((location, probability));
             }
         }
-        let mut cumulative = Vec::with_capacity(merged.len());
-        let mut running = 0.0;
+        let mut cumulative = Vec::with_capacity(merged.len() + 1);
+        let mut running = CompensatedSum::default();
+        cumulative.push(0.0);
         for (_, mass) in &merged {
-            running += mass;
-            cumulative.push(running);
-        }
-        let mut compensated = Vec::with_capacity(merged.len() + 1);
-        let mut total = 0.0_f64;
-        let mut compensation = 0.0;
-        compensated.push(total + compensation);
-        for (_, mass) in &merged {
-            let candidate = total + mass;
-            if total.abs() >= mass.abs() {
-                compensation += (total - candidate) + mass;
-            } else {
-                compensation += (mass - candidate) + total;
-            }
-            total = candidate;
-            compensated.push(total + compensation);
+            running.add(*mass);
+            cumulative.push(running.total());
         }
         Ok(Self {
             pairs: merged,
             cumulative,
-            compensated,
         })
     }
 
@@ -278,9 +288,7 @@ impl DiscreteDistribution {
     }
 
     fn quantile(&self, probability: f64) -> f64 {
-        let index = self
-            .cumulative
-            .partition_point(|cumulative| *cumulative < probability);
+        let index = self.cumulative[1..].partition_point(|cumulative| *cumulative < probability);
         self.pairs
             .get(index)
             .unwrap_or_else(|| self.pairs.last().expect("discrete support is non-empty"))
@@ -289,25 +297,33 @@ impl DiscreteDistribution {
 
     /// `P(X <= x)`.
     fn cdf(&self, x: f64) -> f64 {
-        self.compensated[self.pairs.partition_point(|(location, _)| *location <= x)]
+        self.cumulative[self.pairs.partition_point(|(location, _)| *location <= x)]
     }
 
     /// `P(X < x)`.
     fn cdf_below(&self, x: f64) -> f64 {
-        self.compensated[self.pairs.partition_point(|(location, _)| *location < x)]
+        self.cumulative[self.pairs.partition_point(|(location, _)| *location < x)]
     }
 
     fn knots(&self) -> Vec<f64> {
-        let mut knots = Vec::with_capacity(self.cumulative.len() + 1);
-        knots.push(0.0);
-        knots.extend_from_slice(&self.cumulative);
+        let mut knots = self.cumulative.clone();
         *knots.last_mut().expect("knots exist") = 1.0;
         knots
     }
 }
 
-/// Exposure law accepted by expectation and distribution transformation.
+/// Ordered finite intervals and atoms with their own probability masses.
 #[derive(Clone, Debug)]
+pub struct WeightedSegments(Vec<ProbabilitySegment>);
+
+impl WeightedSegments {
+    fn probability(&self, start: f64, end: f64, start_closed: bool, end_closed: bool) -> f64 {
+        segment_probability(&self.0, start, end, start_closed, end_closed)
+    }
+}
+
+#[derive(Clone, Debug)]
+/// Exposure law accepted by expectation and distribution transformation.
 pub enum ImpactSource {
     Histogram(HistogramExposure),
     Discrete(DiscreteDistribution),
@@ -316,16 +332,98 @@ pub enum ImpactSource {
     Fitted(FittedDistribution),
     Hurdle(HurdleDistribution),
     Empirical(EmpiricalDistribution),
+    Segments(WeightedSegments),
 }
 
 impl ImpactSource {
-    pub fn from_curve(curve: CanonicalCurve) -> ContractResult<Self> {
+    /// Exact masses for ordered uniform intervals and atoms, including gaps.
+    pub fn from_segments(mut segments: Vec<(f64, f64, f64)>) -> ContractResult<Self> {
+        let total = neumaier(segments.iter().map(|&(_, _, mass)| mass));
+        if !total.is_finite()
+            || (total - 1.0).abs() > MASS_TOLERANCE
+            || segments.iter().any(|&(lo, hi, mass)| {
+                !lo.is_finite() || !hi.is_finite() || lo > hi || !mass.is_finite() || mass < 0.0
+            })
+        {
+            return Err(fail(
+                "invalid_value",
+                "",
+                "finite segments require ordered bounds and masses summing to one",
+            ));
+        }
+        segments.retain(|&(_, _, mass)| mass > 0.0);
+        if segments.windows(2).any(|pair| pair[0].1 > pair[1].0) {
+            return Err(fail(
+                "invalid_value",
+                "",
+                "finite segments must be ordered and non-overlapping",
+            ));
+        }
+        if segments.iter().all(|&(lo, hi, _)| lo == hi) {
+            return DiscreteDistribution::new(
+                segments.iter().map(|&(x, _, _)| x).collect(),
+                segments.iter().map(|&(_, _, mass)| mass).collect(),
+            )
+            .map(Self::Discrete);
+        }
+        for (_, _, mass) in &mut segments {
+            *mass /= total;
+        }
+        Ok(Self::Segments(WeightedSegments(segments)))
+    }
+
+    pub(crate) fn weighted_segments(&self) -> Option<Cow<'_, [ProbabilitySegment]>> {
+        match self {
+            Self::Segments(segments) => Some(Cow::Borrowed(&segments.0)),
+            Self::Histogram(histogram) => Some(Cow::Owned(
+                histogram
+                    .edges
+                    .windows(2)
+                    .zip(&histogram.normalized)
+                    .filter(|&(_, &mass)| mass > 0.0)
+                    .map(|(edges, &mass)| (edges[0], edges[1], mass))
+                    .collect(),
+            )),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn interval_probability(
+        &self,
+        start: f64,
+        end: f64,
+        start_closed: bool,
+        end_closed: bool,
+    ) -> f64 {
+        if let Self::Segments(segments) = self {
+            return segments.probability(start, end, start_closed, end_closed);
+        }
+        let left = if start_closed {
+            self.cdf_below(start)
+        } else {
+            self.cdf(start)
+        };
+        if left > 0.5 {
+            let left_tail = self.survival_at(start, start_closed);
+            let right_tail = self.survival_at(end, !end_closed);
+            (left_tail - right_tail).max(0.0)
+        } else {
+            let right = if end_closed {
+                self.cdf(end)
+            } else {
+                self.cdf_below(end)
+            };
+            (right - left).max(0.0)
+        }
+    }
+
+    pub fn from_curve(curve: KernelCurve) -> ContractResult<Self> {
         match curve {
-            CanonicalCurve::Fitted(distribution) => Ok(Self::Fitted(distribution)),
-            CanonicalCurve::Hurdle(distribution) => Ok(Self::Hurdle(distribution)),
-            CanonicalCurve::PointMass(distribution) => Ok(Self::PointMass(distribution)),
-            CanonicalCurve::Tabulated(distribution) => Ok(Self::Tabulated(distribution)),
-            CanonicalCurve::NoData => Err(fail(
+            KernelCurve::Fitted(distribution) => Ok(Self::Fitted(distribution)),
+            KernelCurve::Hurdle(distribution) => Ok(Self::Hurdle(distribution)),
+            KernelCurve::PointMass(distribution) => Ok(Self::PointMass(distribution)),
+            KernelCurve::Tabulated(distribution) => Ok(Self::Tabulated(distribution)),
+            KernelCurve::NoData => Err(fail(
                 "missing_probability_support",
                 "",
                 "a no-data curve does not define a distribution",
@@ -345,7 +443,7 @@ impl ImpactSource {
 
     pub(crate) fn is_full_probability_support(&self) -> bool {
         match self {
-            Self::Histogram(_) | Self::Discrete(_) | Self::PointMass(_) => true,
+            Self::Histogram(_) | Self::Discrete(_) | Self::PointMass(_) | Self::Segments(_) => true,
             Self::Tabulated(distribution) => distribution.has_full_probability_support(),
             Self::Fitted(distribution) => distribution.has_full_probability_support(),
             Self::Hurdle(distribution) => distribution.has_full_probability_support(),
@@ -355,7 +453,10 @@ impl ImpactSource {
 
     /// Quantile is constant on finitely many probability intervals.
     pub(crate) fn has_piecewise_constant_quantile(&self) -> bool {
-        matches!(self, Self::Discrete(_) | Self::PointMass(_))
+        matches!(
+            self,
+            Self::Discrete(_) | Self::PointMass(_) | Self::Empirical(_)
+        )
     }
 
     /// Quantile is piecewise linear or piecewise constant on `[0, 1]`.
@@ -367,6 +468,7 @@ impl ImpactSource {
                 | Self::PointMass(_)
                 | Self::Tabulated(_)
                 | Self::Empirical(_)
+                | Self::Segments(_)
         )
     }
 
@@ -394,6 +496,7 @@ impl ImpactSource {
             Self::Hurdle(distribution) => {
                 distribution.ppf(probability).map_err(distribution_error)?
             }
+            Self::Segments(segments) => segment_quantile(&segments.0, probability, false),
         };
         if value.is_finite() {
             Ok(value)
@@ -416,7 +519,129 @@ impl ImpactSource {
             {
                 Ok(histogram.upper_quantile(probability))
             }
+            Self::Tabulated(distribution) => distribution
+                .upper_quantile(probability)
+                .map_err(distribution_error),
+            Self::Segments(segments)
+                if probability.is_finite() && (0.0..=1.0).contains(&probability) =>
+            {
+                Ok(segment_quantile(&segments.0, probability, true))
+            }
+            Self::Hurdle(distribution) if probability == distribution.atom_probability() => {
+                hurdle_tail_lower_bound(distribution)
+            }
             _ => self.quantile(probability),
+        }
+    }
+
+    /// Direct survival coordinates avoid losing deep tails to `1 - s`.
+    pub(crate) fn inverse_survival(&self, survival: f64) -> ContractResult<f64> {
+        if !survival.is_finite() || !(0.0..=1.0).contains(&survival) {
+            return Err(fail(
+                "invalid_value",
+                "",
+                "survival must be finite and in [0,1]",
+            ));
+        }
+        match self {
+            Self::Fitted(distribution) => distribution.isf(survival).map_err(distribution_error),
+            Self::Hurdle(distribution) => distribution
+                .inverse_survival(survival)
+                .map_err(distribution_error),
+            Self::Histogram(histogram) => Ok(histogram.inverse_survival(survival, false)),
+            Self::Tabulated(distribution) => {
+                Ok(tabulated_inverse_survival(distribution, survival, false))
+            }
+            Self::PointMass(distribution) => Ok(distribution.location()),
+            Self::Segments(segments) => Ok(segment_inverse_survival(&segments.0, survival, false)),
+            Self::Discrete(_) | Self::Empirical(_) => {
+                let atoms = self.point_atoms();
+                let mut suffix = CompensatedSum::default();
+                for &(value, mass) in atoms.iter().rev() {
+                    suffix.add(mass);
+                    if mass > 0.0 && (survival < suffix.total() || survival == 0.0) {
+                        return Ok(value);
+                    }
+                }
+                Ok(atoms[0].0)
+            }
+        }
+    }
+
+    pub(crate) fn upper_quantile_from_survival(&self, survival: f64) -> ContractResult<f64> {
+        match self {
+            Self::Segments(segments) => Ok(segment_inverse_survival(&segments.0, survival, true)),
+            Self::Histogram(histogram) => Ok(histogram.inverse_survival(survival, true)),
+            Self::Hurdle(distribution) if survival == 1.0 - distribution.atom_probability() => {
+                hurdle_tail_lower_bound(distribution)
+            }
+            Self::Tabulated(distribution) if survival <= 0.5 => {
+                Ok(tabulated_inverse_survival(distribution, survival, true))
+            }
+            Self::Fitted(_) | Self::Hurdle(_) if survival <= 0.5 => self.inverse_survival(survival),
+            _ => self.upper_quantile(1.0 - survival),
+        }
+    }
+
+    pub(crate) fn inverse_log_tail(&self, logarithm: f64, lower: bool) -> ContractResult<f64> {
+        match (self, lower) {
+            (Self::Fitted(distribution), true) => distribution.inverse_log_cdf(logarithm),
+            (Self::Fitted(distribution), false) => distribution.inverse_log_survival(logarithm),
+            (Self::Hurdle(distribution), false) => distribution.inverse_log_survival(logarithm),
+            (_, true) => return self.upper_quantile(logarithm.exp()),
+            (_, false) => return self.inverse_survival(logarithm.exp()),
+        }
+        .map_err(distribution_error)
+    }
+
+    pub(crate) fn log_tail_at(&self, x: f64, inclusive: bool, lower: bool) -> f64 {
+        match (self, lower) {
+            (Self::Fitted(distribution), true) => distribution.log_cdf(x),
+            (Self::Fitted(distribution), false) => distribution.log_survival(x),
+            (Self::Hurdle(distribution), false) => distribution.log_survival_at(x, inclusive),
+            (_, false) => self.survival_at(x, inclusive).ln(),
+            (_, true) if inclusive => self.cdf(x).ln(),
+            (_, true) => self.cdf_below(x).ln(),
+        }
+    }
+
+    /// `P(X > x)`, or `P(X >= x)` when inclusive, without CDF subtraction.
+    pub(crate) fn survival_at(&self, x: f64, inclusive: bool) -> f64 {
+        match self {
+            Self::Fitted(distribution) => distribution.sf(x),
+            Self::Hurdle(distribution) => distribution.survival_at(x, inclusive),
+            Self::Histogram(histogram) => neumaier(
+                histogram
+                    .edges
+                    .windows(2)
+                    .zip(&histogram.normalized)
+                    .map(|(bounds, p)| p * interval_fraction(bounds[0], bounds[1], x, bounds[1])),
+            ),
+            Self::Tabulated(distribution) => neumaier(
+                distribution
+                    .values()
+                    .windows(2)
+                    .zip(distribution.probabilities().windows(2))
+                    .map(|(bounds, q)| {
+                        let fraction = if bounds[0] == bounds[1] {
+                            f64::from(if inclusive {
+                                bounds[0] >= x
+                            } else {
+                                bounds[0] > x
+                            })
+                        } else {
+                            interval_fraction(bounds[0], bounds[1], x, bounds[1])
+                        };
+                        (q[1] - q[0]) * fraction
+                    }),
+            ),
+            Self::Discrete(_) | Self::Empirical(_) | Self::PointMass(_) => neumaier(
+                self.point_atoms()
+                    .iter()
+                    .filter(|(v, _)| if inclusive { *v >= x } else { *v > x })
+                    .map(|(_, p)| *p),
+            ),
+            Self::Segments(segments) => segments.probability(x, f64::INFINITY, inclusive, false),
         }
     }
 
@@ -428,7 +653,8 @@ impl ImpactSource {
             Self::Tabulated(distribution) => distribution.cdf(x),
             Self::Fitted(distribution) => distribution.cdf(x),
             Self::Hurdle(distribution) => distribution.cdf(x),
-            Self::Empirical(distribution) => empirical_cdf(distribution.samples(), x, false),
+            Self::Empirical(distribution) => distribution.cdf(x),
+            Self::Segments(segments) => segments.probability(f64::NEG_INFINITY, x, false, true),
         }
     }
 
@@ -440,7 +666,8 @@ impl ImpactSource {
             Self::Tabulated(distribution) => distribution.cdf_below(x),
             Self::Fitted(distribution) => distribution.cdf_below(x),
             Self::Hurdle(distribution) => distribution.cdf_below(x),
-            Self::Empirical(distribution) => empirical_cdf(distribution.samples(), x, true),
+            Self::Empirical(distribution) => distribution.cdf_below(x),
+            Self::Segments(segments) => segments.probability(f64::NEG_INFINITY, x, false, false),
         }
     }
 
@@ -459,7 +686,7 @@ impl ImpactSource {
             }
             Self::Empirical(distribution) => {
                 let samples = distribution.samples();
-                let last_gap = (samples.len() - 1) as f64;
+                let count_total = samples.len() as f64;
                 let mut atoms = Vec::new();
                 let mut index = 0;
                 while index < samples.len() {
@@ -468,16 +695,17 @@ impl ImpactSource {
                     while index + count < samples.len() && samples[index + count] == location {
                         count += 1;
                     }
-                    if count > 1 {
-                        // Under the interpolated quantile, `count` equal order
-                        // statistics span `count - 1` of the `n - 1` gaps.
-                        atoms.push((location, (count - 1) as f64 / last_gap));
-                    }
+                    atoms.push((location, count as f64 / count_total));
                     index += count;
                 }
                 atoms
             }
             Self::Histogram(_) | Self::Fitted(_) => Vec::new(),
+            Self::Segments(segments) => segments
+                .0
+                .iter()
+                .filter_map(|&(lo, hi, mass)| (lo == hi).then_some((lo, mass)))
+                .collect(),
         }
     }
 
@@ -497,20 +725,41 @@ impl ImpactSource {
                 knots
             }
             Self::Empirical(distribution) => {
-                let last = (distribution.samples().len() - 1) as f64;
-                (0..distribution.samples().len())
-                    .map(|index| index as f64 / last)
+                let count = distribution.samples().len();
+                (0..=count)
+                    .map(|index| index as f64 / count as f64)
                     .collect()
             }
             Self::Fitted(_) | Self::Hurdle(_) => vec![0.0, 1.0],
+            Self::Segments(segments) => {
+                let mut knots = vec![0.0];
+                for &(_, _, mass) in &segments.0 {
+                    knots.push(knots.last().unwrap() + mass);
+                }
+                *knots.last_mut().unwrap() = 1.0;
+                knots
+            }
         }
     }
 
     pub(crate) fn support(&self) -> (Tail, Tail) {
         match self {
             Self::Histogram(histogram) => (
-                Tail::Finite(histogram.edges[0]),
-                Tail::Finite(*histogram.edges.last().expect("histogram has edges")),
+                Tail::Finite(
+                    histogram.edges[histogram
+                        .normalized
+                        .iter()
+                        .position(|p| *p > 0.0)
+                        .expect("positive mass")],
+                ),
+                Tail::Finite(
+                    histogram.edges[histogram
+                        .normalized
+                        .iter()
+                        .rposition(|p| *p > 0.0)
+                        .expect("positive mass")
+                        + 1],
+                ),
             ),
             Self::Discrete(discrete) => (
                 Tail::Finite(discrete.pairs[0].0),
@@ -533,16 +782,27 @@ impl ImpactSource {
                 let (_, upper) = fitted_support(distribution.base());
                 (Tail::Finite(distribution.atom_location()), upper)
             }
+            Self::Segments(segments) => (
+                Tail::Finite(segments.0[0].0),
+                Tail::Finite(segments.0.last().unwrap().1),
+            ),
         }
     }
 
-    pub(crate) fn mean(&self) -> Option<f64> {
-        match self {
-            Self::Fitted(distribution) => fitted_mean(distribution),
-            // The atom is exact. A closed conditional mean is not required
-            // for the families whose unconditional mean is the fixture path.
-            Self::Hurdle(_) => None,
-            _ => None,
+    pub(crate) fn affine_mean(&self, slope: f64, intercept: f64) -> Option<f64> {
+        use crate::DistributionFamily::{GenExtreme, GenPareto, GumbelLeft, GumbelRight};
+        let Self::Fitted(distribution) = self else {
+            return None;
+        };
+        if matches!(
+            distribution.family,
+            GenExtreme | GenPareto | GumbelLeft | GumbelRight
+        ) && fitted_mean_is_finite(distribution)
+        {
+            let mean = affine_fitted_mean_deviation(distribution, slope, intercept).0;
+            mean.is_finite().then_some(mean)
+        } else {
+            None
         }
     }
 
@@ -552,37 +812,38 @@ impl ImpactSource {
             | Self::Discrete(_)
             | Self::PointMass(_)
             | Self::Tabulated(_)
-            | Self::Empirical(_) => true,
+            | Self::Empirical(_)
+            | Self::Segments(_) => true,
             Self::Fitted(distribution) => fitted_mean_is_finite(distribution),
             Self::Hurdle(distribution) => fitted_mean_is_finite(distribution.base()),
         }
     }
 }
 
-/// Cdf of the law whose quantile interpolates the order statistics linearly
-/// (Hyndman-Fan type 7, the empirical `ppf`). Order statistic `k` sits at
-/// probability `k / (n - 1)`, so tied samples form an atom. `strict` gives
-/// `P(X < x)` instead of `P(X <= x)`.
-fn empirical_cdf(samples: &[f64], x: f64, strict: bool) -> f64 {
-    let count = if strict {
-        samples.partition_point(|sample| *sample < x)
-    } else {
-        samples.partition_point(|sample| *sample <= x)
-    };
-    if count == 0 {
-        return 0.0;
+fn hurdle_tail_lower_bound(distribution: &HurdleDistribution) -> ContractResult<f64> {
+    distribution
+        .base()
+        .ppf(0.0)
+        .map(|lower| lower.max(distribution.atom_location()))
+        .map_err(distribution_error)
+}
+
+fn tabulated_inverse_survival(
+    distribution: &TabulatedDistribution,
+    survival: f64,
+    upper: bool,
+) -> f64 {
+    let q = distribution.probabilities();
+    let x = distribution.values();
+    for index in (0..q.len() - 1).rev() {
+        let mass = q[index + 1] - q[index];
+        let right = 1.0 - q[index];
+        if mass > 0.0 && (survival < right || upper && survival == right) {
+            let weight = ((survival - (1.0 - q[index + 1])) / mass).clamp(0.0, 1.0);
+            return linear_interpolate(x[index + 1], x[index], weight);
+        }
     }
-    if count == samples.len() {
-        return 1.0;
-    }
-    let lower = count - 1;
-    let (left, right) = (samples[lower], samples[count]);
-    let fraction = if x > left {
-        ((x - left) / (right - left)).min(1.0)
-    } else {
-        0.0
-    };
-    (lower as f64 + fraction) / (samples.len() - 1) as f64
+    x[0]
 }
 
 fn flat_knots(probabilities: &[f64], values: &[f64]) -> Vec<(f64, f64)> {
@@ -616,103 +877,13 @@ fn distribution_error(error: crate::CrcError) -> super::error::ImpactContractErr
 }
 
 fn fitted_support(distribution: &FittedDistribution) -> (Tail, Tail) {
-    use crate::DistributionFamily::{
-        GenExtreme, GenPareto, GumbelLeft, GumbelRight, SkewNormal, WeibullMax, WeibullMin,
+    let (lower, upper) = distribution.support();
+    let tail = |value| match value {
+        f64::NEG_INFINITY => Tail::NegativeInfinity,
+        f64::INFINITY => Tail::PositiveInfinity,
+        _ => Tail::Finite(value),
     };
-    let location = distribution.location;
-    let scale = distribution.scale;
-    let shape = distribution.shape.unwrap_or(0.0);
-    match distribution.family {
-        GumbelRight | GumbelLeft | SkewNormal => (Tail::NegativeInfinity, Tail::PositiveInfinity),
-        WeibullMin => (Tail::Finite(location), Tail::PositiveInfinity),
-        WeibullMax => (Tail::NegativeInfinity, Tail::Finite(location)),
-        GenPareto => {
-            let upper = if shape < 0.0 {
-                Tail::Finite(location - scale / shape)
-            } else {
-                Tail::PositiveInfinity
-            };
-            (Tail::Finite(location), upper)
-        }
-        GenExtreme => {
-            if shape.abs() < 1e-12 {
-                (Tail::NegativeInfinity, Tail::PositiveInfinity)
-            } else if shape > 0.0 {
-                (
-                    Tail::NegativeInfinity,
-                    Tail::Finite(location + scale / shape),
-                )
-            } else {
-                (
-                    Tail::Finite(location + scale / shape),
-                    Tail::PositiveInfinity,
-                )
-            }
-        }
-    }
-}
-
-fn fitted_mean(distribution: &FittedDistribution) -> Option<f64> {
-    use crate::DistributionFamily::{GenExtreme, GenPareto, GumbelLeft, GumbelRight};
-    if !fitted_mean_is_finite(distribution) {
-        return None;
-    }
-    let location = distribution.location;
-    let scale = distribution.scale;
-    let mean = match distribution.family {
-        GumbelRight => location + scale * EULER,
-        GumbelLeft => location - scale * EULER,
-        // SciPy `genextreme`: E[X] = loc + scale * (1 - Gamma(1 + c)) / c.
-        GenExtreme => location + scale * gev_mean_factor(distribution.shape?),
-        // SciPy `genpareto`: E[X] = loc + scale / (1 - c).
-        GenPareto => location + scale / (1.0 - distribution.shape?),
-        _ => return None,
-    };
-    mean.is_finite().then_some(mean)
-}
-
-/// `(1 - Gamma(1 + c)) / c` for `c > -1`, with the limit Euler's constant at zero.
-///
-/// Near zero the direct form cancels, so `ln Gamma(1 + c)` is summed from its
-/// Taylor series `-EULER c + sum_k (-1)^k zeta(k) c^k / k` instead.
-pub(crate) fn gev_mean_factor(shape: f64) -> f64 {
-    if shape.abs() >= 0.1 {
-        return (1.0 - crate::reference::curve_fitting::gamma(1.0 + shape)) / shape;
-    }
-    // zeta(2) through zeta(17); later terms are below 1e-17 for |c| < 0.1.
-    const ZETA: [f64; 16] = [
-        1.644_934_066_848_226_4,
-        1.202_056_903_159_594_3,
-        1.082_323_233_711_138_2,
-        1.036_927_755_143_37,
-        1.017_343_061_984_449,
-        1.008_349_277_381_922_8,
-        1.004_077_356_197_944_4,
-        1.002_008_392_826_082_2,
-        1.000_994_575_127_818_1,
-        1.000_494_188_604_119_5,
-        1.000_246_086_553_308,
-        1.000_122_713_347_578_5,
-        1.000_061_248_135_058_7,
-        1.000_030_588_236_307_1,
-        1.000_015_282_259_408_7,
-        1.000_007_637_197_637_9,
-    ];
-    // `log_ratio` is ln Gamma(1 + c) / c.
-    let mut log_ratio = -EULER;
-    let mut power = 1.0;
-    for (offset, zeta) in ZETA.iter().enumerate() {
-        let order = (offset + 2) as f64;
-        power *= -shape;
-        log_ratio -= power * zeta / order;
-    }
-    let log_gamma = log_ratio * shape;
-    let expm1_ratio = if log_gamma == 0.0 {
-        1.0
-    } else {
-        log_gamma.exp_m1() / log_gamma
-    };
-    -log_ratio * expm1_ratio
+    (tail(lower), tail(upper))
 }
 
 fn fitted_mean_is_finite(distribution: &FittedDistribution) -> bool {

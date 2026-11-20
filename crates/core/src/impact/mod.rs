@@ -1,22 +1,25 @@
 mod definition;
 mod error;
 mod expectation;
-mod json;
+pub(crate) mod json;
 mod kernel;
+mod kernel_curve;
+#[doc(hidden)]
+pub use kernel_curve::{KernelCurve, KernelCurveParameters};
 mod pushforward;
-mod quadrature;
-mod record;
+pub(crate) mod quadrature;
 mod reference;
 mod registry;
 mod source;
 
-pub use record::{ImpactEvaluationRecord, RecordedSource, SnapshotRef, array_content_sha256};
 pub use registry::{
-    RegistryImpactReference, ResolutionContext, manifest_json, manifest_sha256, registry_identity,
+    RegistryImpactReference, ResolutionContext, manifest_json, manifest_sha256,
+    registry_country_choices, registry_identity,
 };
 
 pub use error::ImpactContractError;
 
+use crate::numerical::{ProbabilitySegment, interval_fraction};
 use definition::{ModelKind, compile, known_registry_factor, override_rule};
 use json::{canonical_json, content_hash, parse_json};
 
@@ -65,19 +68,62 @@ impl ImpactDefinition {
         kernel::monotonicity(&self.model, &self.clamp)
     }
 
-    pub fn expected_value(
+    pub fn expectation(
         &self,
         source: &ImpactSource,
         method: MethodRequest,
     ) -> Result<Expectation, ImpactContractError> {
-        expectation::expected_value(&self.model, &self.clamp, source, method)
+        expectation::expectation(&self.model, &self.clamp, source, method)
     }
 
-    pub fn transform_distribution(
+    pub fn pushforward(
         &self,
         source: &ImpactSource,
     ) -> Result<ImpactDistribution, ImpactContractError> {
         pushforward::transform(&self.model, &self.clamp, &self.hash, source)
+    }
+
+    /// Exact image of finite uniform intervals and atoms through a piecewise
+    /// affine impact. Boundaries include all response knots and clamp crossings.
+    pub(crate) fn image_segments(
+        &self,
+        source: &[ProbabilitySegment],
+    ) -> Result<Option<Vec<ProbabilitySegment>>, ImpactContractError> {
+        if !matches!(
+            self.model,
+            definition::Model::Linear { .. }
+                | definition::Model::Tabulated {
+                    interpolation: definition::Interpolation::Linear,
+                    ..
+                }
+        ) {
+            return Ok(None);
+        }
+        let cuts = expectation::response_breakpoints(&self.model, &self.clamp);
+        let mut segments = Vec::new();
+        for &(lower, upper, mass) in source {
+            if lower == upper {
+                let value = self.evaluate(lower)?;
+                segments.push((value, value, mass));
+                continue;
+            }
+            let mut left = lower;
+            for right in cuts
+                .iter()
+                .copied()
+                .filter(|cut| lower < *cut && *cut < upper)
+                .chain(std::iter::once(upper))
+            {
+                let portion = mass * interval_fraction(lower, upper, left, right);
+                if portion > 0.0 {
+                    let (a, b) = (self.evaluate(left)?, self.evaluate(right)?);
+                    segments.push((a.min(b), a.max(b), portion));
+                }
+                left = right;
+            }
+        }
+        segments.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.total_cmp(&b.1)));
+        Ok(Some(segments))
     }
 }
 

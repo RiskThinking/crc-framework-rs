@@ -2,7 +2,7 @@
 name = "crc-framework-rs"
 version.workspace = true
 edition = "2024"
-rust-version = "1.85"
+rust-version.workspace = true
 description = "Rust-powered Python bindings for the Climate Risk Commons Framework"
 authors = ["Riskthinking.AI"]
 license = "AGPL-3.0-or-later"
@@ -12,7 +12,8 @@ readme = "README.md"
 members = ["crates/core", "crates/wasm"]
 
 [workspace.package]
-version = "0.6.0"
+version = "1.0.0"
+rust-version = "1.87"
 
 [lib]
 name = "_core"

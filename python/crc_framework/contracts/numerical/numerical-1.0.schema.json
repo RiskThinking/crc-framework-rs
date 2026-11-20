@@ -1,0 +1,739 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://climateriskcommons.org/schemas/numerical/1.0",
+  "description": "Current numerical objects. Ordered knots, exact masses and modelling records require the numerical semantic validator in addition to structural validation.",
+  "$defs": {
+    "data": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "parametric"
+            },
+            "family": {
+              "enum": [
+                "gumbel_r",
+                "gumbel_l"
+              ]
+            },
+            "location": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            },
+            "scale": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308,
+              "exclusiveMinimum": 0
+            }
+          },
+          "required": [
+            "kind",
+            "family",
+            "location",
+            "scale"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "parametric"
+            },
+            "family": {
+              "enum": [
+                "genextreme",
+                "weibull_min",
+                "weibull_max",
+                "skewnorm",
+                "genpareto"
+              ]
+            },
+            "location": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            },
+            "scale": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308,
+              "exclusiveMinimum": 0
+            },
+            "shape": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            }
+          },
+          "required": [
+            "kind",
+            "family",
+            "location",
+            "scale",
+            "shape"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "discrete"
+            },
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": -1.7976931348623157e+308,
+                "maximum": 1.7976931348623157e+308
+              },
+              "minItems": 1
+            },
+            "probabilities": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "kind",
+            "values",
+            "probabilities"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "histogram"
+            },
+            "edges": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": -1.7976931348623157e+308,
+                "maximum": 1.7976931348623157e+308
+              },
+              "minItems": 2
+            },
+            "probabilities": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "kind",
+            "edges",
+            "probabilities"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "point_mass"
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "hurdle"
+            },
+            "base": {
+              "$ref": "#/$defs/data"
+            },
+            "atom_probability": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "atom_location": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            }
+          },
+          "required": [
+            "kind",
+            "base",
+            "atom_probability",
+            "atom_location"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "quantile"
+            },
+            "probabilities": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "minItems": 2
+            },
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": -1.7976931348623157e+308,
+                "maximum": 1.7976931348623157e+308
+              },
+              "minItems": 2
+            },
+            "evidence": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "source": {
+                      "$ref": "#/$defs/quantile_curve"
+                    },
+                    "operation": {
+                      "const": "condition"
+                    },
+                    "q_min": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "q_max": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  },
+                  "required": [
+                    "source",
+                    "operation",
+                    "q_min",
+                    "q_max"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "source": {
+                      "$ref": "#/$defs/quantile_curve"
+                    },
+                    "operation": {
+                      "const": "complete"
+                    },
+                    "policy": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "const": "finite_endpoints"
+                        },
+                        "lower": {
+                          "type": "number",
+                          "minimum": -1.7976931348623157e+308,
+                          "maximum": 1.7976931348623157e+308
+                        },
+                        "upper": {
+                          "type": "number",
+                          "minimum": -1.7976931348623157e+308,
+                          "maximum": 1.7976931348623157e+308
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "lower",
+                        "upper"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "source",
+                    "operation",
+                    "policy"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "probabilities",
+            "values"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "transformed"
+            },
+            "source": {
+              "$ref": "#/$defs/distribution"
+            },
+            "impact": {
+              "$ref": "https://climateriskcommons.org/schemas/impact-2.0.schema.json"
+            }
+          },
+          "required": [
+            "kind",
+            "source",
+            "impact"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "quantile_curve": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "object": {
+          "const": "quantile_curve"
+        },
+        "probabilities": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "minItems": 2
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": -1.7976931348623157e+308,
+            "maximum": 1.7976931348623157e+308
+          },
+          "minItems": 2
+        }
+      },
+      "required": [
+        "schema_version",
+        "object",
+        "probabilities",
+        "values"
+      ],
+      "additionalProperties": false
+    },
+    "distribution": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": "1.0"
+            },
+            "object": {
+              "const": "distribution"
+            },
+            "kind": {
+              "const": "parametric"
+            },
+            "family": {
+              "enum": [
+                "gumbel_r",
+                "gumbel_l"
+              ]
+            },
+            "location": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            },
+            "scale": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308,
+              "exclusiveMinimum": 0
+            }
+          },
+          "required": [
+            "schema_version",
+            "object",
+            "kind",
+            "family",
+            "location",
+            "scale"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": "1.0"
+            },
+            "object": {
+              "const": "distribution"
+            },
+            "kind": {
+              "const": "parametric"
+            },
+            "family": {
+              "enum": [
+                "genextreme",
+                "weibull_min",
+                "weibull_max",
+                "skewnorm",
+                "genpareto"
+              ]
+            },
+            "location": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            },
+            "scale": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308,
+              "exclusiveMinimum": 0
+            },
+            "shape": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            }
+          },
+          "required": [
+            "schema_version",
+            "object",
+            "kind",
+            "family",
+            "location",
+            "scale",
+            "shape"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": "1.0"
+            },
+            "object": {
+              "const": "distribution"
+            },
+            "kind": {
+              "const": "discrete"
+            },
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": -1.7976931348623157e+308,
+                "maximum": 1.7976931348623157e+308
+              },
+              "minItems": 1
+            },
+            "probabilities": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "schema_version",
+            "object",
+            "kind",
+            "values",
+            "probabilities"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": "1.0"
+            },
+            "object": {
+              "const": "distribution"
+            },
+            "kind": {
+              "const": "histogram"
+            },
+            "edges": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": -1.7976931348623157e+308,
+                "maximum": 1.7976931348623157e+308
+              },
+              "minItems": 2
+            },
+            "probabilities": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "schema_version",
+            "object",
+            "kind",
+            "edges",
+            "probabilities"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": "1.0"
+            },
+            "object": {
+              "const": "distribution"
+            },
+            "kind": {
+              "const": "point_mass"
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            }
+          },
+          "required": [
+            "schema_version",
+            "object",
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": "1.0"
+            },
+            "object": {
+              "const": "distribution"
+            },
+            "kind": {
+              "const": "hurdle"
+            },
+            "base": {
+              "$ref": "#/$defs/data"
+            },
+            "atom_probability": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "atom_location": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            }
+          },
+          "required": [
+            "schema_version",
+            "object",
+            "kind",
+            "base",
+            "atom_probability",
+            "atom_location"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": "1.0"
+            },
+            "object": {
+              "const": "distribution"
+            },
+            "kind": {
+              "const": "quantile"
+            },
+            "probabilities": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "minItems": 2
+            },
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": -1.7976931348623157e+308,
+                "maximum": 1.7976931348623157e+308
+              },
+              "minItems": 2
+            },
+            "evidence": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "source": {
+                      "$ref": "#/$defs/quantile_curve"
+                    },
+                    "operation": {
+                      "const": "condition"
+                    },
+                    "q_min": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "q_max": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  },
+                  "required": [
+                    "source",
+                    "operation",
+                    "q_min",
+                    "q_max"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "source": {
+                      "$ref": "#/$defs/quantile_curve"
+                    },
+                    "operation": {
+                      "const": "complete"
+                    },
+                    "policy": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "const": "finite_endpoints"
+                        },
+                        "lower": {
+                          "type": "number",
+                          "minimum": -1.7976931348623157e+308,
+                          "maximum": 1.7976931348623157e+308
+                        },
+                        "upper": {
+                          "type": "number",
+                          "minimum": -1.7976931348623157e+308,
+                          "maximum": 1.7976931348623157e+308
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "lower",
+                        "upper"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "source",
+                    "operation",
+                    "policy"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "required": [
+            "schema_version",
+            "object",
+            "kind",
+            "probabilities",
+            "values"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": "1.0"
+            },
+            "object": {
+              "const": "distribution"
+            },
+            "kind": {
+              "const": "transformed"
+            },
+            "source": {
+              "$ref": "#/$defs/distribution"
+            },
+            "impact": {
+              "$ref": "https://climateriskcommons.org/schemas/impact-2.0.schema.json"
+            }
+          },
+          "required": [
+            "schema_version",
+            "object",
+            "kind",
+            "source",
+            "impact"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/quantile_curve"
+    },
+    {
+      "$ref": "#/$defs/distribution"
+    }
+  ]
+}

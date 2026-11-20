@@ -153,7 +153,10 @@ fn gev_parameters(l1: f64, l2: f64, skew: f64) -> Result<(Option<f64>, f64, f64)
     Ok((Some(shape), location, scale))
 }
 
-fn log_gamma_one_plus(x: f64) -> f64 {
+pub(crate) fn log_gamma_one_plus(x: f64) -> f64 {
+    if x == f64::INFINITY {
+        return x;
+    }
     if x.abs() < 0.01 {
         // log Gamma(1+x) = -gamma*x + sum (-1)^k zeta(k)*x^k/k.
         return x

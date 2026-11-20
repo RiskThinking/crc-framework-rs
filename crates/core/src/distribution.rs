@@ -5,10 +5,12 @@ use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use crate::{
     error::{CrcError, Result},
+    numerical::{interval_fraction, linear_interpolate},
     reference::curve_fitting as reference_curve_fitting,
 };
 
 mod lmoments;
+pub(crate) use lmoments::log_gamma_one_plus;
 
 const EPS: f64 = 1.0e-12;
 
@@ -124,6 +126,47 @@ impl TabulatedDistribution {
         })
     }
 
+    /// Private exact quantile segments. Equal probabilities describe a
+    /// zero-mass support gap; equal values describe an atom.
+    pub fn from_segments(probabilities: Vec<f64>, values: Vec<f64>) -> Result<Self> {
+        if probabilities.len() != values.len()
+            || probabilities.len() < 2
+            || probabilities.first() != Some(&0.0)
+            || probabilities.last() != Some(&1.0)
+            || probabilities
+                .iter()
+                .any(|q| !q.is_finite() || !(0.0..=1.0).contains(q))
+            || values.iter().any(|x| !x.is_finite())
+            || probabilities.windows(2).any(|p| p[0] > p[1])
+            || values.windows(2).any(|p| p[0] > p[1])
+        {
+            return Err(CrcError::InvalidInput(
+                "exact segments require ordered finite full-support coordinates".into(),
+            ));
+        }
+        Ok(Self {
+            probabilities,
+            values,
+            interpolation: Interpolation::LinearProbability,
+            extrapolate: false,
+            return_period_tail: Tail::Upper,
+        })
+    }
+
+    /// Right-continuous inverse, which skips zero-mass support gaps.
+    pub fn upper_quantile(&self, probability: f64) -> Result<f64> {
+        if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
+            return Err(CrcError::InvalidInput(
+                "probability must be finite and in [0,1]".into(),
+            ));
+        }
+        let after = self.probabilities.partition_point(|q| *q <= probability);
+        if after > 0 && self.probabilities[after - 1] == probability {
+            return Ok(self.values[after - 1]);
+        }
+        self.interpolate(probability)
+    }
+
     pub fn from_return_periods(
         periods: Vec<f64>,
         values: Vec<f64>,
@@ -165,6 +208,10 @@ impl TabulatedDistribution {
         &self.values
     }
 
+    pub(crate) fn uses_linear_probability(&self) -> bool {
+        self.interpolation == Interpolation::LinearProbability
+    }
+
     fn axis(&self, q: f64) -> f64 {
         match self.interpolation {
             Interpolation::LinearProbability => q,
@@ -203,7 +250,11 @@ impl TabulatedDistribution {
         let x0 = self.axis(self.probabilities[lower]);
         let x1 = self.axis(self.probabilities[upper]);
         let weight = (self.axis(q) - x0) / (x1 - x0);
-        Ok(self.values[lower] + weight * (self.values[upper] - self.values[lower]))
+        Ok(linear_interpolate(
+            self.values[lower],
+            self.values[upper],
+            weight,
+        ))
     }
 }
 
@@ -229,12 +280,12 @@ impl Distribution for TabulatedDistribution {
             return self.probabilities[0];
         }
         let lower = upper - 1;
-        let span = self.values[upper] - self.values[lower];
-        if span.abs() < EPS {
-            return self.probabilities[upper];
-        }
-        let weight = (x - self.values[lower]) / span;
-        self.probabilities[lower] + weight * (self.probabilities[upper] - self.probabilities[lower])
+        let (a, b) = (self.values[lower], self.values[upper]);
+        linear_interpolate(
+            self.probabilities[lower],
+            self.probabilities[upper],
+            interval_fraction(a, b, a, x),
+        )
     }
 
     fn cdf_below(&self, x: f64) -> f64 {
@@ -255,12 +306,12 @@ impl Distribution for TabulatedDistribution {
             return 0.0;
         }
         let lower = upper - 1;
-        let span = self.values[upper] - self.values[lower];
-        if span.abs() < EPS {
-            return self.probabilities[lower];
-        }
-        let weight = (x - self.values[lower]) / span;
-        self.probabilities[lower] + weight * (self.probabilities[upper] - self.probabilities[lower])
+        let (a, b) = (self.values[lower], self.values[upper]);
+        linear_interpolate(
+            self.probabilities[lower],
+            self.probabilities[upper],
+            interval_fraction(a, b, a, x),
+        )
     }
 
     fn ppf(&self, probability: f64) -> Result<f64> {
@@ -292,9 +343,9 @@ pub struct EmpiricalDistribution {
 
 impl EmpiricalDistribution {
     pub fn new(mut samples: Vec<f64>) -> Result<Self> {
-        if samples.len() < 2 || samples.iter().any(|value| !value.is_finite()) {
+        if samples.is_empty() || samples.iter().any(|value| !value.is_finite()) {
             return Err(CrcError::InvalidInput(
-                "an empirical distribution requires at least two finite samples".into(),
+                "an empirical distribution requires nonempty finite samples".into(),
             ));
         }
         samples.sort_by(f64::total_cmp);
@@ -316,11 +367,9 @@ impl Distribution for EmpiricalDistribution {
 
     fn ppf(&self, q: f64) -> Result<f64> {
         validate_probability(q)?;
-        let position = q * (self.samples.len() - 1) as f64;
-        let lower = position.floor() as usize;
-        let upper = position.ceil() as usize;
-        let weight = position - lower as f64;
-        Ok(self.samples[lower] + weight * (self.samples[upper] - self.samples[lower]))
+        // Generalized inverse of the ECDF: ties remain their observed atoms.
+        let index = (q * self.samples.len() as f64).ceil() as usize;
+        Ok(self.samples[index.saturating_sub(1).min(self.samples.len() - 1)])
     }
 
     fn probability_atom(&self, x: f64) -> f64 {
@@ -487,7 +536,125 @@ impl FittedDistribution {
     }
 
     fn z(&self, x: f64) -> f64 {
-        (x - self.location) / self.scale
+        let centered = x - self.location;
+        if centered.is_infinite() && x.is_finite() {
+            // The unscaled difference can overflow for opposite signs.
+            x / self.scale - self.location / self.scale
+        } else {
+            centered / self.scale
+        }
+    }
+
+    fn unstandardize(&self, standardized: f64) -> f64 {
+        let value = self.location + self.scale * standardized;
+        if value.is_infinite() && standardized.is_finite() {
+            self.scale.mul_add(standardized, self.location)
+        } else {
+            value
+        }
+    }
+
+    fn shifted_ratio(&self, divisor: f64) -> f64 {
+        let offset = self.scale / divisor;
+        if offset.is_infinite() && offset.is_sign_negative() != self.location.is_sign_negative() {
+            // Halve both terms before dividing so cancellation can recover a
+            // representable endpoint even when the full offset overflows.
+            2.0 * (self.location * 0.5 + (self.scale * 0.5) / divisor)
+        } else {
+            self.location + offset
+        }
+    }
+
+    pub(crate) fn support(&self) -> (f64, f64) {
+        let shape = self.shape.unwrap_or(0.0);
+        match self.family {
+            DistributionFamily::WeibullMin => (self.location, f64::INFINITY),
+            DistributionFamily::WeibullMax => (f64::NEG_INFINITY, self.location),
+            DistributionFamily::GenPareto if shape < 0.0 => {
+                (self.location, self.shifted_ratio(-shape))
+            }
+            DistributionFamily::GenPareto => (self.location, f64::INFINITY),
+            DistributionFamily::GenExtreme if shape > 0.0 => {
+                (f64::NEG_INFINITY, self.shifted_ratio(shape))
+            }
+            DistributionFamily::GenExtreme if shape < 0.0 => {
+                (self.shifted_ratio(shape), f64::INFINITY)
+            }
+            _ => (f64::NEG_INFINITY, f64::INFINITY),
+        }
+    }
+
+    fn unstandardize_power(&self, base: f64, shape: f64, sign: f64) -> f64 {
+        let power = base.powf(1.0 / shape);
+        if power.is_finite() && power != 0.0 || base == 0.0 {
+            self.unstandardize(power.copysign(sign))
+        } else {
+            self.location + (self.scale.ln() + base.ln() / shape).exp().copysign(sign)
+        }
+    }
+
+    fn unstandardize_exp_m1(&self, exponent: f64, divisor: f64) -> f64 {
+        let numerator = exponent.exp_m1();
+        let standardized = numerator / divisor;
+        if standardized.is_finite() && standardized != 0.0 || exponent == 0.0 {
+            self.unstandardize(standardized)
+        } else {
+            let log_numerator = if numerator.is_infinite() {
+                exponent
+            } else {
+                numerator.abs().ln()
+            };
+            let offset = (self.scale.ln() + log_numerator - divisor.abs().ln()).exp();
+            self.location + offset.copysign(exponent.signum() * divisor.signum())
+        }
+    }
+
+    fn log_abs_z(&self, x: f64, z: f64) -> f64 {
+        if z.is_finite() {
+            return z.abs().ln();
+        }
+        let centered = x - self.location;
+        let log_centered = if centered.is_finite() {
+            centered.abs().ln()
+        } else {
+            (x * 0.5 - self.location * 0.5).abs().ln() + std::f64::consts::LN_2
+        };
+        log_centered - self.scale.ln()
+    }
+
+    fn pareto_log_survival(&self, x: f64, z: f64, shape: f64) -> f64 {
+        if z < 0.0 {
+            return 0.0;
+        }
+        if shape.abs() < EPS {
+            return -z;
+        }
+        let product = shape * z;
+        if product <= -1.0 {
+            return f64::NEG_INFINITY;
+        }
+        let logarithm = if product == f64::INFINITY && x.is_finite() {
+            shape.ln() + self.log_abs_z(x, z)
+        } else {
+            product.ln_1p()
+        };
+        -logarithm / shape
+    }
+
+    fn gev_log_rate(&self, x: f64, z: f64, shape: f64) -> f64 {
+        if shape.abs() < EPS {
+            return -z;
+        }
+        let product = -shape * z;
+        if product <= -1.0 {
+            return f64::INFINITY.copysign(-shape);
+        }
+        let log_support = if product == f64::INFINITY && x.is_finite() {
+            shape.abs().ln() + self.log_abs_z(x, z)
+        } else {
+            product.ln_1p()
+        };
+        log_support / shape
     }
 
     /// Upper-tail probability `P(X > x)`.
@@ -513,38 +680,142 @@ impl FittedDistribution {
                     -(-(-z).powf(self.shape.expect("validated"))).exp_m1()
                 }
             }
-            DistributionFamily::GenPareto => {
-                let c = self.shape.expect("validated");
-                if z < 0.0 {
-                    1.0
-                } else if c.abs() < EPS {
-                    (-z).exp()
-                } else {
-                    let support = 1.0 + c * z;
-                    if support <= 0.0 {
-                        0.0
-                    } else {
-                        support.powf(-1.0 / c)
-                    }
-                }
-            }
-            DistributionFamily::GenExtreme => {
-                let c = self.shape.expect("validated");
-                if c.abs() < EPS {
-                    -(-(-z).exp()).exp_m1()
-                } else {
-                    let support = 1.0 - c * z;
-                    if support <= 0.0 {
-                        if c > 0.0 { 0.0 } else { 1.0 }
-                    } else {
-                        -(-support.powf(1.0 / c)).exp_m1()
-                    }
-                }
-            }
+            DistributionFamily::GenPareto => self
+                .pareto_log_survival(x, z, self.shape.expect("validated"))
+                .exp(),
+            DistributionFamily::GenExtreme => -(-self
+                .gev_log_rate(x, z, self.shape.expect("validated"))
+                .exp())
+            .exp_m1(),
             // If X ~ SN(alpha, loc, scale) then -X ~ SN(-alpha, -loc, scale).
             DistributionFamily::SkewNormal => skew_normal_cdf(-z, -self.shape.expect("validated")),
         }
         .clamp(0.0, 1.0)
+    }
+
+    /// Logarithmic upper tail, retaining probabilities smaller than binary64 can store.
+    pub(crate) fn log_survival(&self, x: f64) -> f64 {
+        let z = self.z(x);
+        let shape = self.shape.unwrap_or(0.0);
+        match self.family {
+            DistributionFamily::GumbelRight => log_exponential_complement(-z),
+            DistributionFamily::GumbelLeft => -z.exp(),
+            DistributionFamily::WeibullMin => -z.max(0.0).powf(shape),
+            DistributionFamily::WeibullMax if z < 0.0 => {
+                log_exponential_complement(shape * (-z).ln())
+            }
+            DistributionFamily::WeibullMax => f64::NEG_INFINITY,
+            DistributionFamily::GenPareto => self.pareto_log_survival(x, z, shape),
+            DistributionFamily::GenExtreme => {
+                log_exponential_complement(self.gev_log_rate(x, z, shape))
+            }
+            DistributionFamily::SkewNormal => skew_normal_log_cdf(-z, -shape),
+        }
+    }
+
+    pub(crate) fn log_cdf(&self, x: f64) -> f64 {
+        let z = self.z(x);
+        let shape = self.shape.unwrap_or(0.0);
+        match self.family {
+            DistributionFamily::GumbelRight => -(-z).exp(),
+            DistributionFamily::GumbelLeft => log_exponential_complement(z),
+            DistributionFamily::WeibullMin if z > 0.0 => log_exponential_complement(shape * z.ln()),
+            DistributionFamily::WeibullMin => f64::NEG_INFINITY,
+            DistributionFamily::WeibullMax => -(-z).max(0.0).powf(shape),
+            DistributionFamily::GenPareto => {
+                log_exponential_complement((-self.pareto_log_survival(x, z, shape)).ln())
+            }
+            DistributionFamily::GenExtreme => -self.gev_log_rate(x, z, shape).exp(),
+            DistributionFamily::SkewNormal => skew_normal_log_cdf(z, shape),
+        }
+    }
+
+    pub(crate) fn inverse_log_cdf(&self, logarithm: f64) -> Result<f64> {
+        if logarithm >= f64::MIN_POSITIVE.ln() || logarithm == f64::NEG_INFINITY {
+            return self.ppf(logarithm.exp());
+        }
+        let shape = self.shape.unwrap_or(0.0);
+        let standardized = match self.family {
+            DistributionFamily::GumbelRight => -(-logarithm).ln(),
+            DistributionFamily::GumbelLeft => logarithm,
+            DistributionFamily::WeibullMin => {
+                return Ok(self.location + (self.scale.ln() + logarithm / shape).exp());
+            }
+            DistributionFamily::WeibullMax => {
+                return Ok(self.unstandardize_power(-logarithm, shape, -1.0));
+            }
+            DistributionFamily::GenPareto => {
+                return Ok(self.location + (self.scale.ln() + logarithm).exp());
+            }
+            DistributionFamily::GenExtreme if shape.abs() < EPS => -(-logarithm).ln(),
+            DistributionFamily::GenExtreme => {
+                return Ok(self.unstandardize_exp_m1(shape * (-logarithm).ln(), -shape));
+            }
+            DistributionFamily::SkewNormal => skew_normal_inverse_log_tail(logarithm, shape),
+        };
+        Ok(self.unstandardize(standardized))
+    }
+
+    /// Invert a positive tail even when its linear probability underflows.
+    pub(crate) fn inverse_log_survival(&self, logarithm: f64) -> Result<f64> {
+        if logarithm > f64::MIN_POSITIVE.ln() {
+            return self.isf(logarithm.exp());
+        }
+        let shape = self.shape.unwrap_or(0.0);
+        // Below MIN_POSITIVE, log(-log(1-s)) equals log(s) to binary64 precision.
+        let standardized = match self.family {
+            DistributionFamily::GumbelRight => -logarithm,
+            DistributionFamily::GumbelLeft => (-logarithm).ln(),
+            DistributionFamily::WeibullMin => {
+                return Ok(self.unstandardize_power(-logarithm, shape, 1.0));
+            }
+            DistributionFamily::WeibullMax => {
+                let power = (logarithm / shape).exp();
+                if power == 0.0 {
+                    return Ok(self.location - (self.scale.ln() + logarithm / shape).exp());
+                }
+                -power
+            }
+            DistributionFamily::GenPareto | DistributionFamily::GenExtreme if shape.abs() < EPS => {
+                -logarithm
+            }
+            DistributionFamily::GenPareto => {
+                return Ok(self.unstandardize_exp_m1(-shape * logarithm, shape));
+            }
+            DistributionFamily::GenExtreme => {
+                return Ok(self.unstandardize_exp_m1(shape * logarithm, -shape));
+            }
+            DistributionFamily::SkewNormal => -skew_normal_inverse_log_tail(logarithm, -shape),
+        };
+        Ok(self.unstandardize(standardized))
+    }
+
+    fn log_pdf(&self, x: f64) -> f64 {
+        if x.is_infinite() {
+            return f64::NEG_INFINITY;
+        }
+        let z = self.z(x);
+        let shape = self.shape.unwrap_or(0.0);
+        let standardized = match self.family {
+            DistributionFamily::GumbelRight => -z - (-z).exp(),
+            DistributionFamily::GumbelLeft => z - z.exp(),
+            DistributionFamily::WeibullMin => weibull_log_pdf(z, shape),
+            DistributionFamily::WeibullMax => weibull_log_pdf(-z, shape),
+            DistributionFamily::GenPareto if z < 0.0 || shape * z <= -1.0 => f64::NEG_INFINITY,
+            DistributionFamily::GenPareto if shape.abs() < EPS => -z,
+            DistributionFamily::GenPareto => (-1.0 / shape - 1.0) * (shape * z).ln_1p(),
+            DistributionFamily::GenExtreme if shape.abs() < EPS => -z - (-z).exp(),
+            DistributionFamily::GenExtreme if 1.0 - shape * z <= 0.0 => f64::NEG_INFINITY,
+            DistributionFamily::GenExtreme => {
+                let log_power = (-shape * z).ln_1p() / shape;
+                (1.0 - shape) * log_power - log_power.exp()
+            }
+            DistributionFamily::SkewNormal => {
+                (2.0 / PI).sqrt().ln() - 0.5 * z * z
+                    + reference_curve_fitting::log_standard_normal_cdf(shape * z)
+            }
+        };
+        standardized - self.scale.ln()
     }
 
     /// Inverse of [`Self::sf`]: the value exceeded with probability `survival`.
@@ -559,24 +830,20 @@ impl FittedDistribution {
             ));
         }
         let value = match self.family {
-            DistributionFamily::GumbelRight => {
-                self.location - self.scale * (-(-survival).ln_1p()).ln()
-            }
-            DistributionFamily::GumbelLeft => self.location + self.scale * (-survival.ln()).ln(),
+            DistributionFamily::GumbelRight => self.unstandardize(-(-(-survival).ln_1p()).ln()),
+            DistributionFamily::GumbelLeft => self.unstandardize((-survival.ln()).ln()),
             DistributionFamily::WeibullMin => {
-                self.location
-                    + self.scale * (-survival.ln()).powf(1.0 / self.shape.expect("validated"))
+                self.unstandardize_power(-survival.ln(), self.shape.expect("validated"), 1.0)
             }
             DistributionFamily::WeibullMax => {
-                self.location
-                    - self.scale * (-(-survival).ln_1p()).powf(1.0 / self.shape.expect("validated"))
+                self.unstandardize_power(-(-survival).ln_1p(), self.shape.expect("validated"), -1.0)
             }
             DistributionFamily::GenPareto => {
                 let c = self.shape.expect("validated");
                 if c.abs() < EPS {
-                    self.location - self.scale * survival.ln()
+                    self.unstandardize(-survival.ln())
                 } else {
-                    self.location + self.scale * (survival.powf(-c) - 1.0) / c
+                    self.unstandardize_exp_m1(-c * survival.ln(), c)
                 }
             }
             DistributionFamily::GenExtreme => {
@@ -585,19 +852,15 @@ impl FittedDistribution {
                 // the cdf to one first.
                 let neg_log_cdf = -(-survival).ln_1p();
                 if c.abs() < EPS {
-                    self.location - self.scale * neg_log_cdf.ln()
+                    self.unstandardize(-neg_log_cdf.ln())
                 } else {
-                    self.location + self.scale * (1.0 - neg_log_cdf.powf(c)) / c
+                    self.unstandardize_exp_m1(c * neg_log_cdf.ln(), -c)
                 }
             }
-            DistributionFamily::SkewNormal => {
-                let reflected = Self {
-                    shape: self.shape.map(|alpha| -alpha),
-                    location: -self.location,
-                    ..*self
-                };
-                -inverse_by_bisection(&reflected, survival)
-            }
+            DistributionFamily::SkewNormal => self.unstandardize(-skew_normal_quantile(
+                survival,
+                -self.shape.expect("validated"),
+            )),
         };
         Ok(value)
     }
@@ -710,35 +973,13 @@ impl Distribution for FittedDistribution {
                     (-(-z).powf(self.shape.expect("validated"))).exp()
                 }
             }
-            DistributionFamily::GenPareto => {
-                let c = self.shape.expect("validated");
-                if z < 0.0 {
-                    0.0
-                } else if c.abs() < EPS {
-                    -(-z).exp_m1()
-                } else {
-                    let support = 1.0 + c * z;
-                    if support <= 0.0 {
-                        1.0
-                    } else {
-                        // 1 - (1 + c z)^(-1/c), without cancellation for small z.
-                        -(-(c * z).ln_1p() / c).exp_m1()
-                    }
-                }
-            }
-            DistributionFamily::GenExtreme => {
-                let c = self.shape.expect("validated");
-                if c.abs() < EPS {
-                    (-(-z).exp()).exp()
-                } else {
-                    let support = 1.0 - c * z;
-                    if support <= 0.0 {
-                        if c > 0.0 { 1.0 } else { 0.0 }
-                    } else {
-                        (-support.powf(1.0 / c)).exp()
-                    }
-                }
-            }
+            DistributionFamily::GenPareto => -self
+                .pareto_log_survival(x, z, self.shape.expect("validated"))
+                .exp_m1(),
+            DistributionFamily::GenExtreme => (-self
+                .gev_log_rate(x, z, self.shape.expect("validated"))
+                .exp())
+            .exp(),
             DistributionFamily::SkewNormal => skew_normal_cdf(z, self.shape.expect("validated")),
         }
         .clamp(0.0, 1.0)
@@ -746,38 +987,38 @@ impl Distribution for FittedDistribution {
 
     fn ppf(&self, q: f64) -> Result<f64> {
         validate_probability(q)?;
-        if q <= 0.0 || q >= 1.0 {
-            return Err(CrcError::InvalidInput(
-                "parametric ppf requires probability strictly between zero and one".into(),
-            ));
+        if q == 0.0 || q == 1.0 {
+            let (lower, upper) = self.support();
+            return Ok(if q == 0.0 { lower } else { upper });
         }
         let value = match self.family {
-            DistributionFamily::GumbelRight => self.location - self.scale * (-q.ln()).ln(),
-            DistributionFamily::GumbelLeft => self.location + self.scale * (-(-q).ln_1p()).ln(),
+            DistributionFamily::GumbelRight => self.unstandardize(-(-q.ln()).ln()),
+            DistributionFamily::GumbelLeft => self.unstandardize((-(-q).ln_1p()).ln()),
             DistributionFamily::WeibullMin => {
-                self.location
-                    + self.scale * (-(-q).ln_1p()).powf(1.0 / self.shape.expect("validated"))
+                self.unstandardize_power(-(-q).ln_1p(), self.shape.expect("validated"), 1.0)
             }
             DistributionFamily::WeibullMax => {
-                self.location - self.scale * (-q.ln()).powf(1.0 / self.shape.expect("validated"))
+                self.unstandardize_power(-q.ln(), self.shape.expect("validated"), -1.0)
             }
             DistributionFamily::GenPareto => {
                 let c = self.shape.expect("validated");
                 if c.abs() < EPS {
-                    self.location - self.scale * (-q).ln_1p()
+                    self.unstandardize(-(-q).ln_1p())
                 } else {
-                    self.location + self.scale * ((1.0 - q).powf(-c) - 1.0) / c
+                    self.unstandardize_exp_m1(-c * (-q).ln_1p(), c)
                 }
             }
             DistributionFamily::GenExtreme => {
                 let c = self.shape.expect("validated");
                 if c.abs() < EPS {
-                    self.location - self.scale * (-q.ln()).ln()
+                    self.unstandardize(-(-q.ln()).ln())
                 } else {
-                    self.location + self.scale * (1.0 - (-q.ln()).powf(c)) / c
+                    self.unstandardize_exp_m1(c * (-q.ln()).ln(), -c)
                 }
             }
-            DistributionFamily::SkewNormal => inverse_by_bisection(self, q),
+            DistributionFamily::SkewNormal => {
+                self.unstandardize(skew_normal_quantile(q, self.shape.expect("validated")))
+            }
         };
         Ok(value)
     }
@@ -790,6 +1031,7 @@ pub struct HurdleDistribution {
     base: FittedDistribution,
     base_cdf_at_atom: f64,
     base_sf_at_atom: f64,
+    base_log_sf_at_atom: f64,
 }
 
 impl HurdleDistribution {
@@ -810,13 +1052,8 @@ impl HurdleDistribution {
         }
         let base_cdf_at_atom = base.cdf(atom_location);
         let base_sf_at_atom = base.sf(atom_location);
-        // Only a tail that is empty (or has underflowed) is rejected: the
-        // conditional tail is evaluated in survival space, so an atom deep in
-        // the base's upper tail remains exact.
-        if !base_cdf_at_atom.is_finite()
-            || !base_sf_at_atom.is_finite()
-            || base_sf_at_atom < f64::MIN_POSITIVE
-        {
+        let base_log_sf_at_atom = base.log_survival(atom_location);
+        if !base_log_sf_at_atom.is_finite() {
             return Err(CrcError::InvalidInput(
                 "hurdle base distribution must have positive probability above the atom".into(),
             ));
@@ -827,6 +1064,7 @@ impl HurdleDistribution {
             base,
             base_cdf_at_atom,
             base_sf_at_atom,
+            base_log_sf_at_atom,
         })
     }
 
@@ -849,14 +1087,76 @@ impl HurdleDistribution {
             0.0
         }
     }
+
+    pub(crate) fn survival_at(&self, x: f64, inclusive: bool) -> f64 {
+        if x < self.atom_location || (inclusive && x == self.atom_location) {
+            1.0
+        } else {
+            let survival = self.base.sf(x);
+            let conditional =
+                if survival >= f64::MIN_POSITIVE && self.base_sf_at_atom >= f64::MIN_POSITIVE {
+                    survival / self.base_sf_at_atom
+                } else {
+                    (self.base.log_survival(x) - self.base_log_sf_at_atom)
+                        .min(0.0)
+                        .exp()
+                };
+            (1.0 - self.atom_probability) * conditional
+        }
+    }
+
+    pub(crate) fn log_survival_at(&self, x: f64, inclusive: bool) -> f64 {
+        if x < self.atom_location || inclusive && x == self.atom_location {
+            0.0
+        } else {
+            (-self.atom_probability).ln_1p()
+                + (self.base.log_survival(x) - self.base_log_sf_at_atom).min(0.0)
+        }
+    }
+
+    pub(crate) fn inverse_log_survival(&self, logarithm: f64) -> Result<f64> {
+        if logarithm >= f64::MIN_POSITIVE.ln() || logarithm == f64::NEG_INFINITY {
+            return self.inverse_survival(logarithm.exp());
+        }
+        let log_weight = (-self.atom_probability).ln_1p();
+        if logarithm >= log_weight {
+            Ok(self.atom_location)
+        } else {
+            self.base
+                .inverse_log_survival(logarithm - log_weight + self.base_log_sf_at_atom)
+                .map(|value| value.max(self.atom_location))
+        }
+    }
+
+    pub(crate) fn inverse_survival(&self, survival: f64) -> Result<f64> {
+        let weight = 1.0 - self.atom_probability;
+        if survival >= weight {
+            return Ok(self.atom_location);
+        }
+        if survival == 0.0 {
+            return self.base.ppf(1.0);
+        }
+        let conditional = survival / weight;
+        let target = conditional * self.base_sf_at_atom;
+        let quantile = if target >= f64::MIN_POSITIVE {
+            self.base.isf(target)
+        } else {
+            self.base
+                .inverse_log_survival(conditional.ln() + self.base_log_sf_at_atom)
+        }?;
+        Ok(quantile.max(self.atom_location))
+    }
 }
 
 impl Distribution for HurdleDistribution {
     fn pdf(&self, x: f64) -> f64 {
         if x <= self.atom_location {
             0.0
+        } else if self.base_sf_at_atom < f64::MIN_POSITIVE {
+            ((-self.atom_probability).ln_1p() + self.base.log_pdf(x) - self.base_log_sf_at_atom)
+                .exp()
         } else {
-            (1.0 - self.atom_probability) * self.base.pdf(x) / self.base_sf_at_atom
+            (self.base.pdf(x) / self.base_sf_at_atom) * (1.0 - self.atom_probability)
         }
     }
 
@@ -868,8 +1168,11 @@ impl Distribution for HurdleDistribution {
         } else if x == self.atom_location {
             self.atom_probability
         } else {
-            let conditional =
-                truncated_cdf(&self.base, self.base_cdf_at_atom, self.base_sf_at_atom, x);
+            let conditional = if self.base_sf_at_atom < f64::MIN_POSITIVE {
+                -(self.base.log_survival(x) - self.base_log_sf_at_atom).exp_m1()
+            } else {
+                truncated_cdf(&self.base, self.base_cdf_at_atom, self.base_sf_at_atom, x)
+            };
             (self.atom_probability + (1.0 - self.atom_probability) * conditional)
                 .clamp(self.atom_probability, 1.0)
         }
@@ -888,10 +1191,8 @@ impl Distribution for HurdleDistribution {
         if q <= self.atom_probability {
             return Ok(self.atom_location);
         }
-        if q >= 1.0 {
-            return Err(CrcError::InvalidInput(
-                "hurdle ppf requires probability below one".into(),
-            ));
+        if q >= 0.5 || self.base_sf_at_atom < 0.5 {
+            return self.inverse_survival(1.0 - q);
         }
         let conditional_probability = (q - self.atom_probability) / (1.0 - self.atom_probability);
         truncated_ppf(
@@ -915,6 +1216,148 @@ pub struct DiagnosticMetrics {
 pub struct FitResult {
     pub distribution: FittedDistribution,
     pub diagnostics: DiagnosticMetrics,
+    pub iterations: usize,
+    pub evaluations: usize,
+}
+
+/// Constraints on the selected law, enforced inside optimization.
+/// With no probability, limits bound the complete support. Otherwise both
+/// limits bound the quantile at that probability.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct FitBounds {
+    pub minimum_value: Option<f64>,
+    pub maximum_value: Option<f64>,
+    pub probability: Option<f64>,
+    pub require_sample_support: bool,
+}
+
+impl FitBounds {
+    pub fn validate(&self) -> Result<()> {
+        if self.minimum_value.is_some_and(|x| !x.is_finite())
+            || self.maximum_value.is_some_and(|x| !x.is_finite())
+            || self
+                .probability
+                .is_some_and(|q| !q.is_finite() || !(0.0..=1.0).contains(&q))
+            || matches!((self.minimum_value, self.maximum_value), (Some(a), Some(b)) if a > b)
+        {
+            return Err(CrcError::InvalidInput("invalid fitting constraints".into()));
+        }
+        Ok(())
+    }
+
+    pub fn accepts(&self, law: &dyn Distribution, samples: &[f64]) -> bool {
+        let lower = law
+            .ppf(self.probability.unwrap_or(0.0))
+            .unwrap_or(f64::NEG_INFINITY);
+        let upper = law
+            .ppf(self.probability.unwrap_or(1.0))
+            .unwrap_or(f64::INFINITY);
+        self.minimum_value.is_none_or(|minimum| lower >= minimum)
+            && self.maximum_value.is_none_or(|maximum| upper <= maximum)
+            && (!self.require_sample_support
+                || samples.iter().all(|&value| {
+                    let a = law.ppf(0.0).unwrap_or(f64::NEG_INFINITY);
+                    let b = law.ppf(1.0).unwrap_or(f64::INFINITY);
+                    value >= a && value <= b
+                }))
+    }
+}
+
+fn project_fit_bounds(
+    family: DistributionFamily,
+    bounds: FitBounds,
+    parameters: &mut [f64],
+    log_scale: bool,
+) {
+    let shaped = !matches!(
+        family,
+        DistributionFamily::GumbelRight | DistributionFamily::GumbelLeft
+    );
+    let location_index = usize::from(shaped);
+    let shape = shaped.then_some(parameters[0]);
+    let scale = if log_scale {
+        parameters[location_index + 1].exp()
+    } else {
+        parameters[location_index + 1]
+    };
+    // A location shift moves every unconditional quantile by that exact amount.
+    // Project before scoring to let the optimizer converge on an active limit.
+    if let Ok(law) =
+        FittedDistribution::from_parameters(family, shape, parameters[location_index], scale)
+    {
+        if let Some((probability, target)) = bounds
+            .probability
+            .zip(bounds.minimum_value)
+            .filter(|&(_, target)| bounds.maximum_value == Some(target))
+        {
+            // The two one-sided projections deliberately move inside their
+            // bounds. An equality has no interior, so place it directly.
+            let offset = FittedDistribution::from_parameters(family, shape, 0.0, scale)
+                .and_then(|centered| centered.ppf(probability));
+            if let Ok(offset) = offset {
+                if offset.is_finite() {
+                    parameters[location_index] = target - offset;
+                }
+            }
+            return;
+        }
+        let mut shift: f64 = 0.0;
+        if let Some(minimum) = bounds.minimum_value {
+            if let Ok(q) = law.ppf(bounds.probability.unwrap_or(0.0)) {
+                if q.is_finite() && q < minimum {
+                    shift = minimum - q + 1e-12 * scale;
+                }
+            }
+        }
+        if let Some(maximum) = bounds.maximum_value {
+            if let Ok(q) = law.ppf(bounds.probability.unwrap_or(1.0)) {
+                if q + shift > maximum {
+                    shift = maximum - q - 1e-12 * scale;
+                }
+            }
+        }
+        parameters[location_index] += shift;
+    }
+}
+
+pub fn fit_samples_mle(
+    samples: &[f64],
+    family: DistributionFamily,
+    bounds: FitBounds,
+) -> Result<FitResult> {
+    if samples.len() < 3 || samples.iter().any(|x| !x.is_finite()) {
+        return Err(CrcError::InvalidInput(
+            "MLE requires at least three finite observations".into(),
+        ));
+    }
+    bounds.validate()?;
+    let kind = reference_curve_fitting::DistributionKind::from_name(family.name())
+        .expect("shared family names");
+    let optimized = reference_curve_fitting::fit_sample_likelihood(kind, samples, bounds)
+        .ok_or_else(|| {
+            CrcError::Unsupported(format!(
+                "{} has no feasible likelihood fit under the supplied constraints",
+                family.name()
+            ))
+        })?;
+    if !optimized.converged {
+        return Err(CrcError::ConvergenceFailed {
+            family: family.name().into(),
+            iterations: optimized.iterations,
+        });
+    }
+    let distribution = FittedDistribution::from_parameters(
+        family,
+        optimized.shape,
+        optimized.loc,
+        optimized.scale,
+    )?;
+    Ok(FitResult {
+        diagnostics: diagnostics(samples, &distribution),
+        distribution,
+        iterations: optimized.iterations,
+        evaluations: optimized.evaluations,
+    })
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -967,21 +1410,6 @@ pub struct HurdleQuantileFitResult {
     pub diagnostics: HurdleQuantileFitDiagnostics,
 }
 
-pub fn fit_distribution(samples: &[f64], family: Option<DistributionFamily>) -> Result<FitResult> {
-    validate_samples(samples)?;
-    if let Some(family) = family {
-        return fit_family(samples, family);
-    }
-    fit_all(samples)?
-        .into_iter()
-        .max_by(|left, right| {
-            left.diagnostics
-                .ks_pvalue
-                .total_cmp(&right.diagnostics.ks_pvalue)
-        })
-        .ok_or_else(|| CrcError::Unsupported("no candidate distribution could be fitted".into()))
-}
-
 /// Fit GEV or Gumbel observations by unbiased sample L-moments.
 ///
 /// This is a standalone estimator: no likelihood optimization or family selection.
@@ -991,6 +1419,8 @@ pub fn fit_lmoments(samples: &[f64], family: DistributionFamily) -> Result<FitRe
     Ok(FitResult {
         diagnostics: diagnostics_sorted(&sorted, &distribution),
         distribution,
+        iterations: 0,
+        evaluations: 0,
     })
 }
 
@@ -1000,8 +1430,19 @@ pub fn fit_quantiles(
     weights: Option<&[f64]>,
     family: DistributionFamily,
 ) -> Result<QuantileFitResult> {
+    fit_quantiles_with_bounds(probabilities, values, weights, family, FitBounds::default())
+}
+
+pub fn fit_quantiles_with_bounds(
+    probabilities: &[f64],
+    values: &[f64],
+    weights: Option<&[f64]>,
+    family: DistributionFamily,
+    bounds: FitBounds,
+) -> Result<QuantileFitResult> {
+    bounds.validate()?;
     let weights = validate_quantile_points(probabilities, values, weights)?;
-    fit_quantile_points_internal(probabilities, values, &weights, family, None)
+    fit_quantile_points_internal(probabilities, values, &weights, family, None, None, bounds)
 }
 
 pub fn fit_censored_quantiles(
@@ -1012,6 +1453,27 @@ pub fn fit_censored_quantiles(
     censor_location: f64,
     residual_scale_floor_ratio: f64,
 ) -> Result<CensoredQuantileFitResult> {
+    fit_censored_quantiles_with_bounds(
+        probabilities,
+        values,
+        weights,
+        family,
+        censor_location,
+        residual_scale_floor_ratio,
+        FitBounds::default(),
+    )
+}
+
+pub fn fit_censored_quantiles_with_bounds(
+    probabilities: &[f64],
+    values: &[f64],
+    weights: Option<&[f64]>,
+    family: DistributionFamily,
+    censor_location: f64,
+    residual_scale_floor_ratio: f64,
+    bounds: FitBounds,
+) -> Result<CensoredQuantileFitResult> {
+    bounds.validate()?;
     let weights = validate_quantile_points(probabilities, values, weights)?;
     if !censor_location.is_finite() {
         return Err(CrcError::InvalidInput(
@@ -1039,7 +1501,17 @@ pub fn fit_censored_quantiles(
         ));
     }
 
-    let conditioning_scale = censored_conditioning_scale(values, &weights, censor_location);
+    // Values at or below the threshold all encode the same observation.
+    // Use that observation in the optimizer, support checks, and diagnostics.
+    let bounded_values: Vec<f64> = values
+        .iter()
+        .map(|value| value.max(censor_location))
+        .collect();
+    let conditioning_scale = conditioning_scale(
+        &bounded_values,
+        &weights,
+        reference_curve_fitting::positive_value_span(&bounded_values, &weights, censor_location),
+    );
     let residual_scale_floor = (residual_scale_floor_ratio * conditioning_scale).max(EPS);
     if !residual_scale_floor.is_finite()
         || residual_scale_floor > reference_curve_fitting::MAXIMUM_QUANTILE_SCALE
@@ -1053,10 +1525,12 @@ pub fn fit_censored_quantiles(
     let optimized = reference_curve_fitting::fit_censored_quantile_points(
         kind,
         probabilities,
-        values,
+        &bounded_values,
         &weights,
         censor_location,
         residual_scale_floor,
+        Some(&|law| bounds.accepts(law, &bounded_values)),
+        Some(&|parameters| project_fit_bounds(family, bounds, parameters, true)),
     )
     .ok_or_else(|| CrcError::Unsupported(format!("{} could not be fitted", family.name())))?;
     if !optimized.converged {
@@ -1078,7 +1552,7 @@ pub fn fit_censored_quantiles(
         .map(|&probability| distribution.ppf(probability))
         .collect::<Result<Vec<_>>>()?;
     let transition_is_preserved =
-        preserves_censor_transition(values, &latent_values, &weights, censor_location);
+        preserves_censor_transition(&bounded_values, &latent_values, &weights, censor_location);
     if !transition_is_preserved {
         return Err(CrcError::Unsupported(
             "censored fit does not preserve the observed censor transition".into(),
@@ -1088,12 +1562,6 @@ pub fn fit_censored_quantiles(
         .iter()
         .map(|value| value.max(censor_location))
         .collect::<Vec<_>>();
-    // Left-censored knots are scored at the bound. A placeholder below it is
-    // not an observed residual.
-    let bounded_values: Vec<f64> = values
-        .iter()
-        .map(|value| value.max(censor_location))
-        .collect();
     let observed = quantile_diagnostics(
         &bounded_values,
         &fitted_values,
@@ -1123,6 +1591,27 @@ pub fn fit_hurdle_quantiles(
     atom_location: f64,
     atom_probability: f64,
 ) -> Result<HurdleQuantileFitResult> {
+    fit_hurdle_quantiles_with_bounds(
+        probabilities,
+        values,
+        weights,
+        family,
+        atom_location,
+        atom_probability,
+        FitBounds::default(),
+    )
+}
+
+pub fn fit_hurdle_quantiles_with_bounds(
+    probabilities: &[f64],
+    values: &[f64],
+    weights: Option<&[f64]>,
+    family: DistributionFamily,
+    atom_location: f64,
+    atom_probability: f64,
+    bounds: FitBounds,
+) -> Result<HurdleQuantileFitResult> {
+    bounds.validate()?;
     let weights = validate_quantile_points(probabilities, values, weights)?;
     if !atom_location.is_finite()
         || values
@@ -1177,6 +1666,8 @@ pub fn fit_hurdle_quantiles(
         &tail_weights,
         family,
         Some(atom_location),
+        Some(atom_probability),
+        bounds,
     )?;
     let distribution =
         HurdleDistribution::new(atom_location, atom_probability, tail_result.distribution)?;
@@ -1198,6 +1689,8 @@ fn fit_quantile_points_internal(
     weights: &[f64],
     family: DistributionFamily,
     truncation_atom: Option<f64>,
+    atom_probability: Option<f64>,
+    bounds: FitBounds,
 ) -> Result<QuantileFitResult> {
     let conditioning_scale = robust_value_scale(values, weights);
     let kind = reference_curve_fitting::DistributionKind::from_name(family.name())
@@ -1209,6 +1702,23 @@ fn fit_quantile_points_internal(
         weights,
         conditioning_scale,
         truncation_atom,
+        Some(&|law| {
+            if let Some(atom) = truncation_atom {
+                HurdleDistribution::new(
+                    atom,
+                    atom_probability.expect("hurdle probability"),
+                    law.clone(),
+                )
+                .is_ok_and(|hurdle| bounds.accepts(&hurdle, values))
+            } else {
+                bounds.accepts(law, values)
+            }
+        }),
+        Some(&|parameters| {
+            if truncation_atom.is_none() {
+                project_fit_bounds(family, bounds, parameters, false);
+            }
+        }),
     )
     .ok_or_else(|| CrcError::Unsupported(format!("{} could not be fitted", family.name())))?;
     if !optimized.converged {
@@ -1251,56 +1761,12 @@ fn fit_quantile_points_internal(
     })
 }
 
-pub fn fit_all(samples: &[f64]) -> Result<Vec<FitResult>> {
-    validate_samples(samples)?;
-    reference_curve_fitting::fit_all_candidates_diagnostic(samples)
-        .into_iter()
-        .map(reference_diagnostic)
-        .collect()
-}
-
 pub fn calculate_diagnostics(
     samples: &[f64],
     distribution: &dyn Distribution,
 ) -> Result<DiagnosticMetrics> {
     validate_samples(samples)?;
     Ok(diagnostics(samples, distribution))
-}
-
-fn fit_family(samples: &[f64], family: DistributionFamily) -> Result<FitResult> {
-    reference_curve_fitting::fit_all_candidates_diagnostic(samples)
-        .into_iter()
-        .find(|candidate| candidate.name == family.name())
-        .ok_or_else(|| {
-            CrcError::Unsupported(format!(
-                "{} could not be fitted to the samples",
-                family.name()
-            ))
-        })
-        .and_then(reference_diagnostic)
-}
-
-fn reference_diagnostic(diagnostic: reference_curve_fitting::DiagnosticFit) -> Result<FitResult> {
-    let family = DistributionFamily::from_name(diagnostic.name).ok_or_else(|| {
-        CrcError::Unsupported(format!(
-            "reference fitter returned unknown family {}",
-            diagnostic.name
-        ))
-    })?;
-    Ok(FitResult {
-        distribution: FittedDistribution::from_parameters(
-            family,
-            diagnostic.shape,
-            diagnostic.loc,
-            diagnostic.scale,
-        )?,
-        diagnostics: DiagnosticMetrics {
-            ks_statistic: diagnostic.ks_stat,
-            ks_pvalue: diagnostic.p_value,
-            rmse: diagnostic.rmse,
-            r_squared: diagnostic.r_squared,
-        },
-    })
 }
 
 fn diagnostics(samples: &[f64], distribution: &dyn Distribution) -> DiagnosticMetrics {
@@ -1442,18 +1908,6 @@ fn robust_value_scale(values: &[f64], weights: &[f64]) -> f64 {
     )
 }
 
-fn censored_conditioning_scale(values: &[f64], weights: &[f64], censor_location: f64) -> f64 {
-    let bounded: Vec<f64> = values
-        .iter()
-        .map(|value| value.max(censor_location))
-        .collect();
-    conditioning_scale(
-        &bounded,
-        weights,
-        reference_curve_fitting::positive_value_span(&bounded, weights, censor_location),
-    )
-}
-
 fn conditioning_scale(values: &[f64], weights: &[f64], range: f64) -> f64 {
     let median = weighted_median(
         values
@@ -1563,33 +2017,76 @@ fn quantile_diagnostics(
     }
 }
 
-fn inverse_by_bisection(distribution: &dyn Distribution, q: f64) -> f64 {
-    let mut lower = -1.0;
-    let mut upper = 1.0;
-    while distribution.cdf(lower) > q {
-        lower *= 2.0;
+fn skew_normal_quantile(q: f64, alpha: f64) -> f64 {
+    if (0.25..=0.75).contains(&q) {
+        // Invert F(z) - 1/2 directly so a small but nonzero median (or
+        // shifted center rank) is not erased by rounding the CDF to 1/2.
+        invert_skew_normal_cdf(
+            |z| {
+                0.5 * reference_curve_fitting::erf(z / std::f64::consts::SQRT_2)
+                    - 2.0 * reference_curve_fitting::owens_t(z, alpha)
+            },
+            q - 0.5,
+        )
+    } else if q > 0.5 {
+        -skew_normal_inverse_log_tail((-q).ln_1p(), -alpha)
+    } else {
+        skew_normal_inverse_log_tail(q.ln(), alpha)
     }
-    while distribution.cdf(upper) < q {
+}
+
+fn skew_normal_inverse_log_tail(logarithm: f64, alpha: f64) -> f64 {
+    invert_skew_normal_cdf(|z| skew_normal_log_cdf(z, alpha), logarithm)
+}
+
+fn invert_skew_normal_cdf(cdf: impl Fn(f64) -> f64, target: f64) -> f64 {
+    let at_zero = cdf(0.0);
+    if target == at_zero {
+        return 0.0;
+    }
+    let direction = if target < at_zero { -1.0 } else { 1.0 };
+    let reached = |magnitude: f64| {
+        let probability = cdf(direction * magnitude);
+        if direction < 0.0 {
+            probability <= target
+        } else {
+            probability >= target
+        }
+    };
+    let mut lower = 0.0_f64;
+    let mut upper = 1.0_f64;
+    while !reached(upper) {
+        lower = upper;
         upper *= 2.0;
     }
-    for _ in 0..120 {
-        let middle = (lower + upper) * 0.5;
-        // Once the bounds are adjacent f64 values, further CDF integrations
-        // cannot refine the quantile. This preserves the converged result.
-        if middle == lower || middle == upper {
-            break;
-        }
-        if distribution.cdf(middle) < q {
-            lower = middle;
+    // For nonnegative floats, bit order matches numeric order. Bisect
+    // representable magnitudes to resolve even a root very close to zero.
+    let (mut lo, mut hi) = (lower.to_bits(), upper.to_bits());
+    while hi - lo > 1 {
+        let mid = lo + (hi - lo) / 2;
+        if reached(f64::from_bits(mid)) {
+            hi = mid;
         } else {
-            upper = middle;
+            lo = mid;
         }
     }
-    (lower + upper) * 0.5
+    direction * f64::from_bits(lo).midpoint(f64::from_bits(hi))
 }
 
 fn normal_pdf(x: f64) -> f64 {
     (-0.5 * x * x).exp() / (2.0 * PI).sqrt()
+}
+
+fn weibull_log_pdf(x: f64, shape: f64) -> f64 {
+    if x > 0.0 {
+        shape.ln() + (shape - 1.0) * x.ln() - x.powf(shape)
+    } else if x == 0.0 && shape == 1.0 {
+        0.0
+    } else if x == 0.0 && shape < 1.0 {
+        f64::INFINITY
+    } else {
+        f64::NEG_INFINITY
+    }
 }
 
 fn normal_cdf(x: f64) -> f64 {
@@ -1601,12 +2098,113 @@ fn skew_normal_cdf(z: f64, alpha: f64) -> f64 {
     if z.is_nan() {
         return f64::NAN;
     }
-    (reference_curve_fitting::ndtr_cephes(z) - 2.0 * reference_curve_fitting::owens_t(z, alpha))
-        .clamp(0.0, 1.0)
+    let normal = reference_curve_fitting::ndtr_cephes(z);
+    let probability = normal - 2.0 * reference_curve_fitting::owens_t(z, alpha);
+    if probability < f64::MIN_POSITIVE || (alpha > 0.0 && probability <= 0.01 * normal) {
+        skew_normal_log_cdf(z, alpha).exp()
+    } else {
+        probability.clamp(0.0, 1.0)
+    }
+}
+
+fn log_exponential_complement(log_rate: f64) -> f64 {
+    if log_rate < -37.0 {
+        log_rate
+    } else {
+        let rate = log_rate.exp();
+        if rate > std::f64::consts::LN_2 {
+            (-(-rate).exp()).ln_1p()
+        } else {
+            (-(-rate).exp_m1()).ln()
+        }
+    }
+}
+
+fn skew_normal_log_cdf(z: f64, alpha: f64) -> f64 {
+    if z == f64::NEG_INFINITY {
+        return f64::NEG_INFINITY;
+    }
+    if z == f64::INFINITY {
+        return 0.0;
+    }
+    if z == 0.0 && alpha > 0.0 {
+        return ((1.0 / alpha).atan() / PI).ln();
+    }
+    if alpha == 0.0 {
+        return reference_curve_fitting::log_standard_normal_cdf(z);
+    }
+    let normal = reference_curve_fitting::ndtr_cephes(z);
+    let probability = normal - 2.0 * reference_curve_fitting::owens_t(z, alpha);
+    if z <= 0.0 && (probability < f64::MIN_POSITIVE || probability <= 0.01 * normal) {
+        skew_normal_log_tail(-z, alpha)
+    } else if z > 0.0 && alpha > 0.0 && probability <= 0.01 * normal {
+        // The skew-normal densities with opposite shapes sum to twice the
+        // standard normal density. Reflect the small contribution to compute
+        // F(z) = erf(z/sqrt(2)) + F(-z) without cancellation near zero.
+        let half_normal = reference_curve_fitting::erf(z / std::f64::consts::SQRT_2);
+        (half_normal + skew_normal_log_tail(z, alpha).exp()).ln()
+    } else {
+        probability.clamp(0.0, 1.0).ln()
+    }
+}
+
+fn skew_normal_log_tail(cutoff: f64, alpha: f64) -> f64 {
+    if cutoff.is_infinite() {
+        return f64::NEG_INFINITY;
+    }
+    // Integrate the positive density φ(t) erfc(αt/√2) for t >= cutoff.
+    // Its natural scale is sqrt(1 + α²) when the skew suppresses this tail.
+    let scale = alpha.max(0.0).hypot(1.0);
+    let start = scale * cutoff;
+    if !start.is_finite() {
+        return f64::NEG_INFINITY;
+    }
+    let width = 1.0 / (1.0 + start);
+    let slope = alpha / scale;
+    let log_normal = reference_curve_fitting::log_standard_normal_cdf;
+    let at_start = log_normal(-slope * start);
+    let log_peak = -0.5 * cutoff * cutoff + at_start;
+    if !log_peak.is_finite() {
+        return f64::NEG_INFINITY;
+    }
+    let options = crate::impact::quadrature::GaussKronrod {
+        absolute_tolerance: 1e-12,
+        relative_tolerance: 1e-11,
+        ..crate::impact::quadrature::GaussKronrod::defaults()
+    };
+    let integral = crate::impact::quadrature::integrate(&[(0.0, 1.0)], &options, |u| {
+        let remaining = 1.0 - u;
+        let step = width * u / remaining;
+        let delta = step / scale;
+        let log_ratio =
+            -delta * (cutoff + 0.5 * delta) + log_normal(-slope * (start + step)) - at_start;
+        Ok((log_ratio - 2.0 * remaining.ln()).exp())
+    });
+    integral.map_or(f64::NEG_INFINITY, |integral| {
+        log_peak + width.ln() - scale.ln() + (2.0 / PI).sqrt().ln() + integral.value.ln()
+    })
 }
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn empirical_quantile_is_the_generalized_inverse_of_its_ecdf() {
+        use super::{Distribution, EmpiricalDistribution};
+        let law = EmpiricalDistribution::new(vec![0.0, 0.0, 2.0, 10.0]).unwrap();
+        assert_eq!(law.ppf(0.0).unwrap(), 0.0);
+        assert_eq!(law.ppf(0.5).unwrap(), 0.0);
+        assert_eq!(law.ppf(0.50001).unwrap(), 2.0);
+        assert_eq!(law.ppf(1.0).unwrap(), 10.0);
+        assert_eq!(law.cdf(0.0), 0.5);
+        assert_eq!(law.probability_atom(0.0), 0.5);
+        assert_eq!(
+            EmpiricalDistribution::new(vec![3.0])
+                .unwrap()
+                .ppf(0.5)
+                .unwrap(),
+            3.0
+        );
+    }
     use super::*;
 
     #[test]
@@ -1829,15 +2427,56 @@ mod tests {
     }
 
     #[test]
-    fn sample_mle_gumbel_regression_is_unchanged() {
-        let result = fit_distribution(
-            &[0.0, 0.2, 0.7, 1.1, 1.9, 2.4, 3.2, 4.8],
-            Some(DistributionFamily::GumbelRight),
+    fn sample_mle_gumbel_solves_the_likelihood_score() {
+        let samples = [0.0, 0.2, 0.7, 1.1, 1.9, 2.4, 3.2, 4.8];
+        let result = fit_samples_mle(
+            &samples,
+            DistributionFamily::GumbelRight,
+            FitBounds::default(),
         )
         .unwrap();
-        assert!((result.distribution.location - 1.077_032_290_250_686_6).abs() < 1.0e-12);
-        assert!((result.distribution.scale - 1.173_589_689_864_434_2).abs() < 1.0e-12);
-        assert!((result.diagnostics.ks_statistic - 0.128_920_449_165_263_24).abs() < 1.0e-12);
+        let law = result.distribution;
+        let score_location = samples
+            .iter()
+            .map(|x| 1.0 - (-((x - law.location) / law.scale)).exp())
+            .sum::<f64>();
+        let score_scale = samples
+            .iter()
+            .map(|x| {
+                let z = (x - law.location) / law.scale;
+                -1.0 + z * (1.0 - (-z).exp())
+            })
+            .sum::<f64>();
+        assert!(
+            score_location.abs() < 1e-5,
+            "location score {score_location}"
+        );
+        assert!(score_scale.abs() < 1e-5, "scale score {score_scale}");
+        assert!(result.iterations > 0 && result.evaluations > 0);
+    }
+
+    #[test]
+    fn fixed_family_mle_enforces_quantile_bounds_during_optimization() {
+        let samples = [0.0, 0.2, 0.7, 1.1, 1.9, 2.4, 3.2, 4.8];
+        let bounds = FitBounds {
+            maximum_value: Some(4.0),
+            probability: Some(0.99),
+            ..FitBounds::default()
+        };
+        let result = fit_samples_mle(&samples, DistributionFamily::GumbelRight, bounds).unwrap();
+        assert_eq!(result.distribution.family, DistributionFamily::GumbelRight);
+        assert!(result.distribution.ppf(0.99).unwrap() <= 4.0);
+        assert!(result.evaluations > 0);
+    }
+
+    #[test]
+    fn infeasible_support_constraint_cannot_return_an_mle() {
+        let samples = [0.0, 0.2, 0.7, 1.1, 1.9, 2.4, 3.2, 4.8];
+        let bounds = FitBounds {
+            minimum_value: Some(0.0),
+            ..FitBounds::default()
+        };
+        assert!(fit_samples_mle(&samples, DistributionFamily::GumbelRight, bounds).is_err());
     }
 
     #[test]
@@ -2028,9 +2667,22 @@ mod tests {
             let expected = -(-conditional).ln_1p();
             assert!((hurdle.ppf(q).unwrap() - expected).abs() < 1.0e-9);
         }
-        let empty =
+        let underflow =
             FittedDistribution::from_parameters(DistributionFamily::GumbelRight, None, -800.0, 1.0)
                 .unwrap();
+        assert_eq!(underflow.sf(0.0), 0.0);
+        let hurdle = HurdleDistribution::new(0.0, 0.25, underflow).unwrap();
+        assert!((hurdle.ppf(0.75).unwrap() - 3.0_f64.ln()).abs() < 1e-12);
+        assert!((hurdle.cdf(1.0) - (1.0 - 0.75 * (-1.0_f64).exp())).abs() < 1e-12);
+        assert!((hurdle.pdf(1.0) - 0.75 * (-1.0_f64).exp()).abs() < 1e-12);
+
+        let empty = FittedDistribution::from_parameters(
+            DistributionFamily::WeibullMax,
+            Some(1.0),
+            0.0,
+            1.0,
+        )
+        .unwrap();
         assert!(HurdleDistribution::new(0.0, 0.25, empty).is_err());
     }
 

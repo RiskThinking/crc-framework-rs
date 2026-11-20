@@ -11,6 +11,7 @@ use super::error::{ContractResult, fail};
 use super::kernel;
 use super::quadrature::{self, GaussKronrod, neumaier};
 use super::source::{ImpactSource, Tail};
+use crate::numerical::interval_fraction;
 
 pub const EXACT_PIECEWISE_VERSION: &str = "crc-exact-piecewise/1";
 pub const EXACT_MOMENT_VERSION: &str = "crc-exact-moment/1";
@@ -105,7 +106,7 @@ pub struct Expectation {
     pub normalization_factor: Option<f64>,
 }
 
-pub(crate) fn expected_value(
+pub(crate) fn expectation(
     model: &Model,
     clamp: &Clamp,
     source: &ImpactSource,
@@ -209,11 +210,56 @@ fn exact_expectation(
     clamp: &Clamp,
     source: &ImpactSource,
 ) -> ContractResult<Option<(f64, &'static str)>> {
+    // Atomic probabilities are data, not differences of rounded cumulative
+    // probabilities. Direct summation preserves even sub-ulp rare masses.
+    if source.has_piecewise_constant_quantile() {
+        let mut contributions = Vec::new();
+        for (value, probability) in source.point_atoms() {
+            contributions.push(probability * kernel::evaluate(model, clamp, value)?);
+        }
+        return Ok(Some((neumaier(contributions), EXACT_PIECEWISE_VERSION)));
+    }
+    if let Model::Binned {
+        edges,
+        values,
+        outside_domain,
+    } = model
+    {
+        if restricted_domain_exited(model, source) {
+            return Err(fail(
+                "out_of_domain",
+                "",
+                "the source support leaves the binned domain",
+            ));
+        }
+        let mut contributions = Vec::new();
+        for (index, &value) in values.iter().enumerate() {
+            let start = if index == 0 && *outside_domain == OutsideDomain::Clamp {
+                f64::NEG_INFINITY
+            } else {
+                edges[index]
+            };
+            let last = index + 1 == values.len();
+            let end = if last {
+                if *outside_domain == OutsideDomain::Clamp {
+                    f64::INFINITY
+                } else {
+                    edges[index + 1]
+                }
+            } else {
+                edges[index + 1]
+            };
+            let response = clamp.maximum.map_or(value, |maximum| value.min(maximum));
+            let response = clamp
+                .minimum
+                .map_or(response, |minimum| response.max(minimum));
+            contributions.push(source.interval_probability(start, end, true, last) * response);
+        }
+        return Ok(Some((neumaier(contributions), EXACT_PIECEWISE_VERSION)));
+    }
     // A piecewise-constant quantile makes `f(Q(p))` piecewise constant for every
     // finite response, so the midpoint rule is exact weighted summation.
-    if source.has_piecewise_constant_quantile()
-        || (piecewise_linear(model) && source.has_piecewise_linear_quantile())
-    {
+    if piecewise_linear(model) && source.has_piecewise_linear_quantile() {
         return Ok(Some((
             piecewise_expectation(model, clamp, source)?,
             EXACT_PIECEWISE_VERSION,
@@ -241,6 +287,9 @@ fn piecewise_expectation(
     clamp: &Clamp,
     source: &ImpactSource,
 ) -> ContractResult<f64> {
+    if let Some(segments) = source.weighted_segments() {
+        return weighted_expectation(model, clamp, &segments);
+    }
     let mut breaks = source.probability_knots();
     for exposure in response_breakpoints(model, clamp) {
         let probability = source.cdf(exposure);
@@ -280,6 +329,42 @@ fn piecewise_expectation(
     }
 }
 
+fn weighted_expectation(
+    model: &Model,
+    clamp: &Clamp,
+    segments: &[crate::numerical::ProbabilitySegment],
+) -> ContractResult<f64> {
+    let mut cuts = response_breakpoints(model, clamp);
+    cuts.sort_by(f64::total_cmp);
+    cuts.dedup();
+    let mut contributions = Vec::new();
+    for &(lo, hi, mass) in segments {
+        if lo == hi {
+            contributions.push(mass * kernel::evaluate(model, clamp, lo)?);
+            continue;
+        }
+        let start = cuts.partition_point(|cut| *cut <= lo);
+        let end = cuts.partition_point(|cut| *cut < hi);
+        let mut left = lo;
+        for right in cuts[start..end].iter().copied().chain(std::iter::once(hi)) {
+            let fraction = interval_fraction(lo, hi, left, right);
+            let midpoint = left.midpoint(right);
+            contributions.push(mass * fraction * kernel::evaluate(model, clamp, midpoint)?);
+            left = right;
+        }
+    }
+    let value = neumaier(contributions);
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(fail(
+            "non_finite_result",
+            "",
+            "exact expectation is not finite",
+        ))
+    }
+}
+
 fn moment_expectation(model: &Model, clamp: &Clamp, source: &ImpactSource) -> Option<f64> {
     let Model::Linear { slope, intercept } = model else {
         return None;
@@ -290,7 +375,7 @@ fn moment_expectation(model: &Model, clamp: &Clamp, source: &ImpactSource) -> Op
     if *slope == 0.0 {
         return Some(*intercept);
     }
-    source.mean().map(|mean| slope * mean + intercept)
+    source.affine_mean(*slope, *intercept)
 }
 
 fn split_at_breakpoints(
@@ -525,7 +610,14 @@ pub(crate) fn response_breakpoints(model: &Model, clamp: &Clamp) -> Vec<f64> {
     points
 }
 
-fn push_crossings(x0: f64, y0: f64, x1: f64, y1: f64, clamp: &Clamp, points: &mut Vec<f64>) {
+pub(super) fn push_crossings(
+    x0: f64,
+    y0: f64,
+    x1: f64,
+    y1: f64,
+    clamp: &Clamp,
+    points: &mut Vec<f64>,
+) {
     if y0 == y1 {
         return;
     }
@@ -533,7 +625,12 @@ fn push_crossings(x0: f64, y0: f64, x1: f64, y1: f64, clamp: &Clamp, points: &mu
         let low = y0.min(y1);
         let high = y0.max(y1);
         if limit > low && limit < high {
-            points.push(x0 + (x1 - x0) * (limit - y0) / (y1 - y0));
+            let (left, right) = if y0 < y1 {
+                ((y0, x0), (y1, x1))
+            } else {
+                ((y1, x1), (y0, x0))
+            };
+            points.push(kernel::interpolate_segment(left, right, limit));
         }
     }
 }

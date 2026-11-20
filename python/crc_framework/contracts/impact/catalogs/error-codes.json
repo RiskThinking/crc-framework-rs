@@ -76,9 +76,9 @@
       "stage": "resolve",
       "meaning": "The installed manifest digest differs from the pinned digest."
     },
-    "fallback_required": {
+    "missing_table_key": {
       "stage": "resolve",
-      "meaning": "A table key is missing and the fallback policy is error."
+      "meaning": "The resolved context has no exact entry in a required table."
     },
     "non_finite_exposure": {
       "stage": "evaluate",

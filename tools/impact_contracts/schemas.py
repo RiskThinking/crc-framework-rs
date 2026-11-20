@@ -12,7 +12,6 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Sequence
 
 from reference import (
-    FALLBACK_POLICIES,
     OVERRIDE_CATALOG,
     OVERRIDE_KEYS,
     REGISTRY_FACTORS,
@@ -221,11 +220,9 @@ def _lookup() -> Dict[str, Any]:
         {
             "table_id": field(ref("identifier"), "Manifest table identifier.", STRING, "RegistryLookup::table_id: String"),
             "table_sha256": field(ref("sha256"), "Digest of the table content in the pinned manifest.", STRING, "RegistryLookup::table_sha256: [u8; 32]"),
-            "requested_key": field(key, "Key requested after manifest normalization; composite keys use named string fields.", "string, or object with sorted keys", "RegistryLookup::requested_key: LookupKey"),
-            "resolved_key": field(key, "Key actually used; differs from requested_key only for fallbacks.", "string, or object with sorted keys", "RegistryLookup::resolved_key: LookupKey"),
-            "status": field(enum(("exact", "fallback")), "Whether the requested key was found or a documented fallback applied.", STRING, "RegistryLookup::status: LookupStatus"),
+            "key": field(key, "Exact key used after manifest normalization; composite keys use named string fields.", "string, or object with sorted keys", "RegistryLookup::key: LookupKey"),
         },
-        ["table_id", "table_sha256", "requested_key", "resolved_key", "status"],
+        ["table_id", "table_sha256", "key"],
     )
 
 
@@ -234,7 +231,7 @@ def _registry_identity(owner: str) -> Dict[str, Dict[str, Any]]:
         "registry_id": field(ref("identifier"), "Registry identity.", STRING, f"{owner}::registry_id: String"),
         "registry_revision": field(ref("identifier"), "Pinned registry revision; never 'latest' by omission.", STRING, f"{owner}::registry_revision: String"),
         "registry_manifest_sha256": field(ref("sha256"), "Digest of the pinned registry manifest; resolution rejects a different manifest.", STRING, f"{owner}::registry_manifest_sha256: [u8; 32]"),
-        "resolver_semantics_version": field(const("crc-impact-registry/1"), "Resolver semantics: override catalog, context precedence, fallbacks and key normalization.", STRING, f"{owner}::resolver_semantics_version: ResolverSemantics"),
+        "resolver_semantics_version": field(const("crc-impact-registry/1"), "Resolver semantics: override catalog, explicit context and key normalization.", STRING, f"{owner}::resolver_semantics_version: ResolverSemantics"),
         "factor": field(enum(REGISTRY_FACTORS), "Registry factor.", STRING, f"{owner}::factor: RegistryFactor"),
     }
 
@@ -291,8 +288,8 @@ def _models() -> Dict[str, Dict[str, Any]]:
                 "kind": kind("sigmoid", "ModelSpec::Sigmoid"),
                 "midpoint": field(ref("number"), "Logistic midpoint.", NUMBER, "SigmoidKernel::midpoint: f64"),
                 "steepness": field(ref("number"), "Logistic steepness; zero gives a constant response.", NUMBER, "SigmoidKernel::steepness: f64"),
-                "offset": field(ref("number"), "Lower curve level (legacy minimum).", f"{NUMBER}; {ALWAYS}", "SigmoidKernel::offset: f64", 0.0),
-                "amplitude": field(ref("non_negative_number"), "Curve height (legacy maximum minus minimum).", f"{NUMBER}; {ALWAYS}", "SigmoidKernel::amplitude: f64", 1.0),
+                "offset": field(ref("number"), "Lower asymptote of the response.", f"{NUMBER}; {ALWAYS}", "SigmoidKernel::offset: f64", 0.0),
+                "amplitude": field(ref("non_negative_number"), "Difference between the upper and lower asymptotes.", f"{NUMBER}; {ALWAYS}", "SigmoidKernel::amplitude: f64", 1.0),
                 "origin_adjustment": field(
                     enum(("none", "subtract_at_zero")),
                     "subtract_at_zero subtracts the unit logistic at x = 0 without renormalizing the upper asymptote.",
@@ -445,11 +442,9 @@ def _origins() -> Dict[str, Dict[str, Any]]:
                 **_registry_identity("RegistryOrigin"),
                 "context": field(ref("context"), "Effective context used by the resolved branch; unused members are null.", "object with all members present", "RegistryOrigin::context: ImpactContext"),
                 "overrides": field(ref("overrides"), "Supplied override keys after type normalization; resolved defaults are not listed.", "object with sorted keys; absent keys omitted", "RegistryOrigin::overrides: RegistryOverrides"),
-                "fallback_policy": field(enum(FALLBACK_POLICIES), "Fallback policy used during resolution.", STRING, "RegistryOrigin::fallback_policy: FallbackPolicy"),
                 "lookups": field({"type": "array", "items": ref("lookup")}, "Every table lookup in resolution order.", "array order preserved", "RegistryOrigin::lookups: Vec<RegistryLookup>"),
             },
-            ["kind", "registry_id", "registry_revision", "registry_manifest_sha256", "resolver_semantics_version", "factor", "context", "overrides", "fallback_policy", "lookups"],
-            ["A fallback lookup requires fallback_policy legacy_defaults."],
+            ["kind", "registry_id", "registry_revision", "registry_manifest_sha256", "resolver_semantics_version", "factor", "context", "overrides", "lookups"],
         ),
     }
 
@@ -551,18 +546,16 @@ def reference_schema() -> Dict[str, Any]:
             "schema_version": field(const("1.0"), "Reference wire format.", STRING, "RegistryImpactReference::schema_version"),
             **_registry_identity("RegistryImpactReference"),
             "overrides": field(ref("overrides"), "Typed overrides; absent keys use pinned registry defaults.", f"object with sorted keys; absent keys omitted; {ALWAYS}", "RegistryImpactReference::overrides: RegistryOverrides", {}),
-            "context_defaults": field(ref("context"), "Lowest-precedence context values.", f"object with all members present; {ALWAYS}", "RegistryImpactReference::context_defaults: ImpactContext", {}),
-            "fallback_policy": field(enum(FALLBACK_POLICIES), "error rejects missing table keys; legacy_defaults permits and records documented fallbacks.", f"{STRING}; {ALWAYS}", "RegistryImpactReference::fallback_policy: FallbackPolicy", "error"),
         },
         ["schema_version", "registry_id", "registry_revision", "registry_manifest_sha256", "resolver_semantics_version", "factor"],
     )
     return _document(
         "registry-impact-reference-1.0",
         "CRC registry impact reference 1.0",
-        "Pinned recipe that resolves to a self-contained impact definition. reference_hash uses the definition "
+        "Pinned recipe that resolves to a self-contained impact definition with explicit context. reference_hash uses the definition "
         "canonicalization and hashing rules and is never embedded in the payload.",
         root,
-        {"context": _context(), "overrides": _overrides()},
+        {"overrides": _overrides()},
     )
 
 
@@ -654,7 +647,7 @@ def _record_defs() -> Dict[str, Any]:
             },
             ["kind", "version", "absolute_tolerance", "relative_tolerance", "max_evaluations"],
         ),
-        "settings_expected_value": obj(
+        "settings_expectation": obj(
             "Expectation settings: E[f(X)], never f(E[X]).",
             {
                 "requested_method": field(enum(("auto", "exact", "gauss_kronrod")), "Method requested by the caller.", STRING, "ExpectationSettings::requested: MethodRequest"),
@@ -663,7 +656,7 @@ def _record_defs() -> Dict[str, Any]:
             ["requested_method", "method"],
             ["A non-auto request equals the resolved method kind."],
         ),
-        "settings_transform_distribution": obj(
+        "settings_pushforward": obj(
             "Distribution pushforward settings.",
             {"algorithm": field(ref("identifier"), "Exact pushforward algorithm identity, for example crc-pushforward/1.", STRING, "TransformSettings::algorithm: String")},
             ["algorithm"],
@@ -687,7 +680,7 @@ def _record_defs() -> Dict[str, Any]:
                 },
                 ["kind", "settings"],
             )
-            for name in ("point", "expected_value", "transform_distribution", "tabulate")
+            for name in ("point", "expectation", "pushforward", "tabulate")
         },
         "engine": obj(
             "Engine identity.",
@@ -837,7 +830,7 @@ def record_schema() -> Dict[str, Any]:
             "schema_version": field(const("1.0"), "Evaluation-record format.", STRING, "ImpactEvaluationRecord::schema_version"),
             "function": field({"oneOf": [ref("function_definition"), ref("function_custom")]}, "Function identity.", "tagged object", "ImpactEvaluationRecord::function: FunctionIdentity"),
             "operation": field(
-                {"oneOf": [ref(f"operation_{name}") for name in ("point", "expected_value", "transform_distribution", "tabulate")]},
+                {"oneOf": [ref(f"operation_{name}") for name in ("point", "expectation", "pushforward", "tabulate")]},
                 "Operation and its typed settings.",
                 "tagged object",
                 "ImpactEvaluationRecord::operation: Operation",

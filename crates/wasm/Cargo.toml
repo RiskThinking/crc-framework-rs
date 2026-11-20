@@ -2,7 +2,7 @@
 name = "crc-framework-wasm"
 version.workspace = true
 edition = "2024"
-rust-version = "1.85"
+rust-version.workspace = true
 description = "Official JavaScript/WebAssembly bindings for CRC Framework canonical curves"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/RiskThinking/crc-framework-rs"

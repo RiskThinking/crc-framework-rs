@@ -1,185 +1,69 @@
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import test from "node:test";
-import init, {
-  evaluateCurve,
-  evaluateCurves,
-  prepareCurve,
-  prepareCurves,
-} from "../src/index.js";
-
-assert.throws(() => evaluateCurve({}, 0.5), /not initialized/);
-await Promise.all([
-  init({
-    module_or_path: readFileSync(
-      new URL("../wasm/crc_framework_bg.wasm", import.meta.url),
-    ),
-  }),
-  init(),
-]);
-export const cases = JSON.parse(
-  readFileSync(
-    new URL("../../tests/fixtures/canonical-quantiles.json", import.meta.url),
-  ),
-);
-
-export function close(actual, expected) {
-  if (expected === null) return assert.equal(actual, null);
-  assert.equal(typeof actual, "number");
-  assert.ok(
-    Math.abs(actual - expected) <= 2e-10 * Math.max(1, Math.abs(expected)),
-    `${actual} != ${expected}`,
-  );
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import test from 'node:test';
+import init, * as api from '../src/node.js';
+const directory=new URL('../../python/crc_framework/contracts/',import.meta.url);
+// Retain exact large integer tokens when passing source documents through JS.
+function fixtures(path) {
+ return JSON.parse(readFileSync(new URL(path,directory),'utf8'),(key,value,context)=>
+   typeof value==='number' && Number.isInteger(value) && !Number.isSafeInteger(value)
+     ? JSON.rawJSON(context.source) : value);
 }
-
-for (const fixture of cases) {
-  test(`Python/native/WASM parity: ${fixture.name}`, () => {
-    const curve = prepareCurve(fixture.properties);
-    try {
-      const quantiles = curve.quantiles(fixture.probabilities);
-      fixture.probabilities.forEach((q, index) => {
-        const expected = fixture.expected[index];
-        close(evaluateCurve(fixture.properties, q), expected);
-        close(evaluateCurves([fixture.properties], q)[0], expected);
-        close(curve.evaluate(q), expected);
-        close(quantiles[index], expected);
-      });
-    } finally {
-      curve.free();
-    }
-    assert.throws(() => curve.evaluate(0.5), /freed/);
-    curve.free();
-  });
+const numerical=fixtures('numerical/fixtures-1.0.json');
+await init();
+for (const fixture of numerical.accepted) test(`numerical ${fixture.name}`,()=>{
+ const text=JSON.stringify(fixture.document);
+ api.validateDocument(api.DocumentSchema.NUMERICAL,text);
+ const prepared=api.prepareNumerical(text);
+ try {
+  for(const query of fixture.queries) {
+   if(query.outcome==='out_of_support') {assert.throws(()=>prepared.quantile(query.probability),RangeError);continue;}
+   const expected=query.outcome==='positive_infinity'?Infinity:query.outcome==='negative_infinity'?-Infinity:Number(query.value?.rawJSON??query.value);
+   for(const actual of [prepared.quantile(query.probability),api.quantile(text,query.probability)]) {
+    if(!Number.isFinite(expected)) assert.equal(actual,expected);
+    else assert.ok(Math.abs(actual-expected)<=2e-10*Math.max(1,Math.abs(expected)),`${actual} != ${expected}`);
+   }
+  }
+ } finally {prepared.free();prepared.free();}
+ assert.throws(()=>prepared.quantile(.5),/freed/);
+});
+for(const fixture of numerical.rejected) test(`reject numerical ${fixture.name}`,()=>assert.throws(()=>api.prepareNumerical(JSON.stringify(fixture.document)))) ;
+for(const fixture of numerical.rejected_text) test(`reject text ${fixture.name}`,()=>assert.throws(()=>api.prepareNumerical(fixture.text)));
+for(const fixture of fixtures('scientific/fixtures-1.0.json').cases) test(`scientific ${fixture.name}`,()=>{
+ const call=()=>api.validateDocument(fixture.schema,JSON.stringify(fixture.document));
+ if(fixture.valid) assert.doesNotThrow(call);else assert.throws(call);
+});
+for(const [path,schema] of [['dataset/fixtures.json',api.DocumentSchema.DATASET],['taxonomy/fixtures.json',api.DocumentSchema.CATALOG]]) {
+ const cases=fixtures(path);
+ for(const fixture of cases.accepted) test(`accept ${path} ${fixture.name}`,()=>assert.doesNotThrow(()=>api.validateDocument(schema,JSON.stringify(fixture.document))));
+ for(const fixture of cases.rejected) test(`reject ${path} ${fixture.name}`,()=>assert.throws(()=>api.validateDocument(schema,JSON.stringify(fixture.document))));
 }
-
-test("MVT string arrays, unrelated properties, omitted nulls and batch ordering", () => {
-  const row = {
-    curve_kind: "tabulated",
-    curve_type: "linear_probability",
-    curve_probabilities: "[0.2,0.8]",
-    curve_values: "[1,4]",
-    h3_cell: "arbitrary",
-    building_count: 10,
-  };
-  evaluateCurves([row, cases.at(-1).properties, row], 0.5).forEach((value, i) =>
-    close(value, [2.5, null, 2.5][i]),
-  );
-  assert.equal(evaluateCurve(row, 0.1), null);
-  const gumbel = cases.find(
-    (c) => c.properties.curve_type === "gumbel_r",
-  ).properties;
-  assert.equal(
-    evaluateCurve({ ...gumbel, curve_shape: 999 }, 0.5),
-    evaluateCurve(gumbel, 0.5),
-  );
-  const { curve_shape, ...omitted } = gumbel;
-  assert.equal(evaluateCurve(omitted, 0.5), evaluateCurve(gumbel, 0.5));
+test('scalar and batch queries share one name and preserve infinities',()=>{
+ const text=JSON.stringify(numerical.accepted.find(x=>x.name==='point').document);
+ assert.deepEqual([...api.quantile(text,new Float64Array([0,.5,1]))],[0,0,0]);
+ const prepared=api.prepareNumericals(`[${text},${text}]`);
+ try {assert.equal(prepared.quantile(.5).length,2);} finally {prepared.free();}
+ for(const name of ['evaluateCurve','evaluateCurves','prepareCurve','prepareCurves']) assert.equal(api[name],undefined);
 });
 
-test("signed zero is preserved through the WASM boundary", () => {
-  const fixture = cases.find((c) => c.name === "point-mass-negative-zero");
-  assert.ok(Object.is(evaluateCurve(fixture.properties, 0.5), -0));
-});
-
-test("malformed inputs throw TypeError; invalid q throws RangeError; batches abort", () => {
-  const fitted = cases[0].properties;
-  const tabulated = cases.find((c) => c.name === "tabulated-narrow").properties;
-  for (const q of [NaN, Infinity, -0.1, 1.1, null, "0.5", undefined]) {
-    assert.throws(() => evaluateCurve(fitted, q), RangeError);
-    assert.throws(() => evaluateCurves([], q), RangeError);
+test('WASM queries reject values that JavaScript could coerce to a probability', () => {
+ const text = JSON.stringify(numerical.accepted.find(fixture => fixture.name === 'point').document);
+ const single = api.prepareNumerical(text);
+ const batch = api.prepareNumericals(`[${text}]`);
+ try {
+  for (const invalid of ['0.5', null, true, undefined]) {
+   assert.throws(() => single.quantile(invalid), TypeError);
+   assert.throws(() => single.quantile([invalid]), TypeError);
+   assert.throws(() => batch.quantile(invalid), TypeError);
   }
-  for (const row of [
-    null,
-    [],
-    {},
-    { ...fitted, curve_scale: 0 },
-    { ...fitted, curve_scale: Infinity },
-    { ...fitted, curve_type: "invalid" },
-    { ...fitted, curve_shape: null },
-    { ...fitted, curve_location: "1" },
-    { ...fitted, curve_atom_probability: 0.5 },
-    { ...tabulated, curve_probabilities: "[bad" },
-    { ...tabulated, curve_values: "{}" },
-    { ...tabulated, curve_values: [4, 1] },
-    { ...tabulated, curve_probabilities: [0.5, 0.5] },
-    { ...tabulated, curve_values: [1, null] },
-    { ...tabulated, curve_probabilities: [-0.1, 0.9] },
-    { curve_kind: "no_data", curve_type: "invalid" },
-    { ...cases.at(-1).properties, curve_location: 0 },
-    { curve_kind: "point_mass", curve_type: "point_mass", curve_location: 0 },
-  ]) {
-    assert.throws(() => evaluateCurve(row, 0.5), TypeError);
-    assert.throws(() => evaluateCurves([fitted, row, fitted], 0.5), TypeError);
+  assert.throws(() => single.quantile(new Array(1)), TypeError);
+  for (const invalid of [NaN, Infinity, -.1, 1.1]) {
+   assert.throws(() => single.quantile(invalid), RangeError);
+   assert.throws(() => single.quantile(new Float64Array([invalid])), RangeError);
+   assert.throws(() => batch.quantile(invalid), RangeError);
   }
-});
-
-test("prepared collections match every family, preserve order/null/signed zero and own a snapshot", () => {
-  const rows = cases.map((fixture) => structuredClone(fixture.properties));
-  const collection = prepareCurves(rows);
-  try {
-    for (const q of [0, 0.1, 0.2, 0.5, 0.99, 0.9985, 1]) {
-      const expected = rows.map((row) => evaluateCurve(row, q));
-      const actual = collection.evaluate(q);
-      assert.deepEqual(actual, expected);
-    }
-    const before = collection.evaluate(0.5);
-    rows[0].curve_location = 999;
-    assert.deepEqual(collection.evaluate(0.5), before);
-    for (const q of [NaN, Infinity, -0.1, 1.1, "0.5", null]) {
-      assert.throws(() => collection.evaluate(q), RangeError);
-    }
-  } finally {
-    collection.free();
-  }
-  collection.free();
-  assert.throws(() => collection.evaluate(0.5), /freed/);
-  const empty = prepareCurves([]);
-  try {
-    assert.deepEqual(empty.evaluate(0.5), []);
-    assert.throws(() => empty.evaluate(NaN), RangeError);
-  } finally {
-    empty.free();
-  }
-  assert.throws(
-    () => prepareCurves([cases[0].properties, { curve_kind: "fitted" }]),
-    TypeError,
-  );
-});
-
-test("packed transport preserves missing/non-finite distinctions and strict element types", () => {
-  const row = cases[0].properties;
-  for (const value of [NaN, Infinity, -Infinity]) {
-    assert.throws(
-      () => evaluateCurve({ ...row, curve_atom_probability: value }, 0.5),
-      TypeError,
-    );
-    assert.throws(
-      () => prepareCurves([{ ...row, curve_location: value }]),
-      TypeError,
-    );
-  }
-  const tabulated = cases.find(
-    (fixture) => fixture.name === "tabulated-narrow",
-  ).properties;
-  for (const knots of [
-    [1, null],
-    [1, "2"],
-    [1, undefined],
-    [1, NaN],
-    [1, Infinity],
-    [],
-    [1],
-  ]) {
-    assert.throws(
-      () => prepareCurves([{ ...tabulated, curve_values: knots }]),
-      TypeError,
-    );
-  }
-  const gumbel = cases.find(
-    (fixture) => fixture.properties.curve_type === "gumbel_r",
-  ).properties;
-  assert.equal(
-    evaluateCurve({ ...gumbel, curve_shape: NaN }, 0.5),
-    evaluateCurve(gumbel, 0.5),
-  );
+ } finally {
+  single.free();
+  batch.free();
+ }
 });

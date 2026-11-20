@@ -2,9 +2,10 @@
 //!
 //! Reference values come from the published operation fixtures. This runner
 //! does not call the Python reference implementation.
+use crc_framework_core::impact::KernelCurveParameters;
 use crc_framework_core::{
-    CurveParameters, DiscreteDistribution, GaussKronrodOptions, HistogramExposure,
-    ImpactDefinition, ImpactSource, Interpolation, MethodRequest, ResolvedMethod,
+    DiscreteDistribution, GaussKronrodOptions, HistogramExposure, ImpactDefinition, ImpactSource,
+    Interpolation, MethodRequest, ResolvedMethod,
 };
 use serde_json::Value;
 
@@ -49,7 +50,7 @@ fn source(value: &Value) -> Result<ImpactSource, crc_framework_core::ImpactContr
             numbers(&value["probabilities"]),
         )?)),
         Some("canonical_distribution") => {
-            let parameters: CurveParameters =
+            let parameters: KernelCurveParameters =
                 serde_json::from_value(value["parameters"].clone()).expect("curve parameters");
             let curve = parameters
                 .reconstruct()
@@ -91,7 +92,7 @@ fn close(actual: f64, expected: f64, tolerance: &Value) -> bool {
 #[test]
 fn expectation_fixtures_match_reference_values_and_errors() {
     let operations = document();
-    for case in operations["expected_value"].as_array().expect("cases") {
+    for case in operations["expectation"].as_array().expect("cases") {
         let name = case["name"].as_str().unwrap();
         let impact = definition(&case["definition"]);
         assert_eq!(
@@ -100,7 +101,7 @@ fn expectation_fixtures_match_reference_values_and_errors() {
             "{name}"
         );
         let outcome = source(&case["source"])
-            .and_then(|exposure| impact.expected_value(&exposure, method(&case["method"])));
+            .and_then(|exposure| impact.expectation(&exposure, method(&case["method"])));
         match case.get("error").and_then(Value::as_str) {
             Some(code) => {
                 let error = outcome.expect_err(name);
@@ -151,14 +152,10 @@ fn expectation_fixtures_match_reference_values_and_errors() {
 #[test]
 fn pushforward_fixtures_match_quantiles_atoms_and_errors() {
     let operations = document();
-    for case in operations["transform_distribution"]
-        .as_array()
-        .expect("cases")
-    {
+    for case in operations["pushforward"].as_array().expect("cases") {
         let name = case["name"].as_str().unwrap();
         let impact = definition(&case["definition"]);
-        let outcome =
-            source(&case["source"]).and_then(|exposure| impact.transform_distribution(&exposure));
+        let outcome = source(&case["source"]).and_then(|exposure| impact.pushforward(&exposure));
         match case.get("error").and_then(Value::as_str) {
             Some(code) => {
                 let error = outcome.expect_err(name);
@@ -218,7 +215,7 @@ fn pushforward_fixtures_match_quantiles_atoms_and_errors() {
 #[test]
 fn decreasing_transform_uses_each_probability_not_array_reversal() {
     let operations = document();
-    let case = operations["transform_distribution"]
+    let case = operations["pushforward"]
         .as_array()
         .unwrap()
         .iter()
@@ -226,7 +223,7 @@ fn decreasing_transform_uses_each_probability_not_array_reversal() {
         .unwrap();
     let impact = definition(&case["definition"]);
     let exposure = source(&case["source"]).unwrap();
-    let distribution = impact.transform_distribution(&exposure).unwrap();
+    let distribution = impact.pushforward(&exposure).unwrap();
     let quantiles = distribution.quantiles(&[0.1, 0.5, 0.8]).unwrap();
     assert_eq!(quantiles, vec![1.0, 5.0, 8.0]);
     let reflected_wrongly = {
@@ -263,18 +260,18 @@ fn threshold_tie_uses_the_lower_response() {
     .unwrap();
     assert_eq!(impact.monotonicity(), "non_decreasing");
     let exposure = ImpactSource::from_curve(
-        CurveParameters {
+        KernelCurveParameters {
             curve_kind: "tabulated".into(),
             curve_type: "linear_probability".into(),
             curve_probabilities: Some(vec![0.0, 1.0]),
             curve_values: Some(vec![0.0, 10.0]),
-            ..CurveParameters::default()
+            ..KernelCurveParameters::default()
         }
         .reconstruct()
         .unwrap(),
     )
     .unwrap();
-    let distribution = impact.transform_distribution(&exposure).unwrap();
+    let distribution = impact.pushforward(&exposure).unwrap();
     assert!((distribution.quantile(0.5).unwrap() - 0.0).abs() < 1e-12);
     assert!(distribution.quantile(0.75).unwrap() > 0.9);
     let atoms = distribution.atoms();
@@ -307,20 +304,20 @@ fn quadrature_panel_is_exact_for_low_degree_polynomials() {
     )
     .unwrap();
     let exposure = ImpactSource::from_curve(
-        CurveParameters {
+        KernelCurveParameters {
             curve_kind: "fitted".into(),
             curve_type: "genpareto".into(),
             curve_shape: Some(1.0),
             curve_location: Some(0.0),
             curve_scale: Some(1.0),
-            ..CurveParameters::default()
+            ..KernelCurveParameters::default()
         }
         .reconstruct()
         .unwrap(),
     )
     .unwrap();
     let result = impact
-        .expected_value(&exposure, MethodRequest::GaussKronrod(options))
+        .expectation(&exposure, MethodRequest::GaussKronrod(options))
         .unwrap();
     let expected = std::f64::consts::LN_2;
     assert!((result.value - expected).abs() <= 1e-10 + 1e-8 * expected);
@@ -345,13 +342,13 @@ fn divergent_frechet_gev_is_rejected_for_unclamped_linear_expectation() {
     )
     .unwrap();
     let exposure = ImpactSource::from_curve(
-        CurveParameters {
+        KernelCurveParameters {
             curve_kind: "fitted".into(),
             curve_type: "genextreme".into(),
             curve_shape: Some(-1.0),
             curve_location: Some(0.0),
             curve_scale: Some(1.0),
-            ..CurveParameters::default()
+            ..KernelCurveParameters::default()
         }
         .reconstruct()
         .unwrap(),
@@ -359,7 +356,7 @@ fn divergent_frechet_gev_is_rejected_for_unclamped_linear_expectation() {
     .unwrap();
 
     let error = impact
-        .expected_value(&exposure, MethodRequest::Auto)
+        .expectation(&exposure, MethodRequest::Auto)
         .unwrap_err();
     assert_eq!(error.code, "not_integrable");
 }
@@ -382,22 +379,20 @@ fn bounded_weibull_gev_is_integrable_for_unclamped_linear_expectation() {
     )
     .unwrap();
     let exposure = ImpactSource::from_curve(
-        CurveParameters {
+        KernelCurveParameters {
             curve_kind: "fitted".into(),
             curve_type: "genextreme".into(),
             curve_shape: Some(1.0),
             curve_location: Some(0.0),
             curve_scale: Some(1.0),
-            ..CurveParameters::default()
+            ..KernelCurveParameters::default()
         }
         .reconstruct()
         .unwrap(),
     )
     .unwrap();
 
-    let result = impact
-        .expected_value(&exposure, MethodRequest::Auto)
-        .unwrap();
+    let result = impact.expectation(&exposure, MethodRequest::Auto).unwrap();
     assert!(result.value.is_finite());
     assert!((result.value - 0.0).abs() < 1e-8);
 }

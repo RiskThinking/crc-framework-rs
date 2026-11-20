@@ -1,0 +1,3759 @@
+{
+  "models": [
+    {
+      "accepted_units": [
+        "count"
+      ],
+      "context_fields": [
+        {
+          "annotation": "ContextValue | int",
+          "choices": [],
+          "name": "cell",
+          "required": true
+        }
+      ],
+      "context_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "cell": {
+            "oneOf": [
+              {
+                "maximum": 18446744073709551615,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "column": {
+                    "minLength": 1,
+                    "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "column"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "kind": {
+            "const": "cell_context"
+          }
+        },
+        "required": [
+          "kind",
+          "cell"
+        ],
+        "type": "object"
+      },
+      "context_type": "CellContext",
+      "id": "crc:freeze_thaw_cycles",
+      "input": {
+        "aggregation": "count",
+        "event": "freeze_thaw_cycle",
+        "kind": "event_count"
+      },
+      "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+      "measurement_schema": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "event": {
+                  "enum": [
+                    "frost_day",
+                    "hot_day",
+                    "freeze_thaw_cycle"
+                  ]
+                }
+              },
+              "required": [
+                "event"
+              ]
+            },
+            "then": {
+              "properties": {
+                "threshold": {
+                  "properties": {
+                    "unit": {
+                      "enum": [
+                        "degC",
+                        "K",
+                        "degF"
+                      ],
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "description": "Count of explicitly identified events, with optional threshold and counting duration.",
+        "properties": {
+          "aggregation": {
+            "enum": [
+              "maximum",
+              "minimum",
+              "mean",
+              "sum",
+              "count"
+            ],
+            "type": "string"
+          },
+          "duration": {
+            "additionalProperties": false,
+            "properties": {
+              "unit": {
+                "enum": [
+                  "s",
+                  "h",
+                  "d",
+                  "month",
+                  "yr"
+                ],
+                "type": "string"
+              },
+              "value": {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "value",
+              "unit"
+            ],
+            "type": "object"
+          },
+          "event": {
+            "enum": [
+              "freeze_thaw_cycle",
+              "frost_day",
+              "hot_day",
+              "dry_day"
+            ],
+            "type": "string"
+          },
+          "kind": {
+            "const": "event_count"
+          },
+          "threshold": {
+            "additionalProperties": false,
+            "properties": {
+              "unit": {
+                "minLength": 1,
+                "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                "type": "string"
+              },
+              "value": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "value",
+              "unit"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "kind",
+          "event",
+          "aggregation"
+        ],
+        "title": "EventCount",
+        "type": "object",
+        "x-crc-calibration": {
+          "fixed_unit": "count",
+          "quantity": "event_count"
+        }
+      },
+      "measurement_type": "EventCount",
+      "output": {
+        "kind": "ratio",
+        "unit": "1"
+      },
+      "unestablished_facts": [
+        "event threshold",
+        "counting duration",
+        "calibration reference period"
+      ],
+      "version": "2026.10.1"
+    },
+    {
+      "accepted_units": [
+        "count"
+      ],
+      "context_fields": [
+        {
+          "annotation": "ContextValue | int",
+          "choices": [],
+          "name": "cell",
+          "required": true
+        }
+      ],
+      "context_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "cell": {
+            "oneOf": [
+              {
+                "maximum": 18446744073709551615,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "column": {
+                    "minLength": 1,
+                    "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "column"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "kind": {
+            "const": "cell_context"
+          }
+        },
+        "required": [
+          "kind",
+          "cell"
+        ],
+        "type": "object"
+      },
+      "context_type": "CellContext",
+      "id": "crc:frost_days",
+      "input": {
+        "aggregation": "count",
+        "event": "frost_day",
+        "kind": "event_count"
+      },
+      "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+      "measurement_schema": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "event": {
+                  "enum": [
+                    "frost_day",
+                    "hot_day",
+                    "freeze_thaw_cycle"
+                  ]
+                }
+              },
+              "required": [
+                "event"
+              ]
+            },
+            "then": {
+              "properties": {
+                "threshold": {
+                  "properties": {
+                    "unit": {
+                      "enum": [
+                        "degC",
+                        "K",
+                        "degF"
+                      ],
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "description": "Count of explicitly identified events, with optional threshold and counting duration.",
+        "properties": {
+          "aggregation": {
+            "enum": [
+              "maximum",
+              "minimum",
+              "mean",
+              "sum",
+              "count"
+            ],
+            "type": "string"
+          },
+          "duration": {
+            "additionalProperties": false,
+            "properties": {
+              "unit": {
+                "enum": [
+                  "s",
+                  "h",
+                  "d",
+                  "month",
+                  "yr"
+                ],
+                "type": "string"
+              },
+              "value": {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "value",
+              "unit"
+            ],
+            "type": "object"
+          },
+          "event": {
+            "enum": [
+              "freeze_thaw_cycle",
+              "frost_day",
+              "hot_day",
+              "dry_day"
+            ],
+            "type": "string"
+          },
+          "kind": {
+            "const": "event_count"
+          },
+          "threshold": {
+            "additionalProperties": false,
+            "properties": {
+              "unit": {
+                "minLength": 1,
+                "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                "type": "string"
+              },
+              "value": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "value",
+              "unit"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "kind",
+          "event",
+          "aggregation"
+        ],
+        "title": "EventCount",
+        "type": "object",
+        "x-crc-calibration": {
+          "fixed_unit": "count",
+          "quantity": "event_count"
+        }
+      },
+      "measurement_type": "EventCount",
+      "output": {
+        "kind": "ratio",
+        "unit": "1"
+      },
+      "unestablished_facts": [
+        "event threshold",
+        "counting duration",
+        "calibration reference period"
+      ],
+      "version": "2026.10.1"
+    },
+    {
+      "accepted_units": [
+        "mm"
+      ],
+      "context_fields": [
+        {
+          "annotation": "ContextValue | int",
+          "choices": [],
+          "name": "cell",
+          "required": true
+        }
+      ],
+      "context_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "cell": {
+            "oneOf": [
+              {
+                "maximum": 18446744073709551615,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "column": {
+                    "minLength": 1,
+                    "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "column"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "kind": {
+            "const": "cell_context"
+          }
+        },
+        "required": [
+          "kind",
+          "cell"
+        ],
+        "type": "object"
+      },
+      "context_type": "CellContext",
+      "id": "crc:maximum_daily_precipitation",
+      "input": {
+        "accumulation_duration": {
+          "unit": "d",
+          "value": 1
+        },
+        "kind": "precipitation_amount",
+        "unit": "mm"
+      },
+      "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+      "measurement_schema": {
+        "additionalProperties": false,
+        "description": "Accumulated precipitation amount over an explicit interval.",
+        "properties": {
+          "accumulation_duration": {
+            "additionalProperties": false,
+            "properties": {
+              "unit": {
+                "enum": [
+                  "s",
+                  "h",
+                  "d",
+                  "month",
+                  "yr"
+                ],
+                "type": "string"
+              },
+              "value": {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "value",
+              "unit"
+            ],
+            "type": "object"
+          },
+          "kind": {
+            "const": "precipitation_amount"
+          },
+          "unit": {
+            "enum": [
+              "m",
+              "cm",
+              "mm",
+              "ft"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "unit",
+          "accumulation_duration"
+        ],
+        "title": "PrecipitationAmount",
+        "type": "object",
+        "x-crc-calibration": {
+          "quantity": "precipitation_amount",
+          "unit_field": "unit"
+        }
+      },
+      "measurement_type": "PrecipitationAmount",
+      "output": {
+        "kind": "ratio",
+        "unit": "1"
+      },
+      "unestablished_facts": [
+        "calibration reference period"
+      ],
+      "version": "2026.10.1"
+    },
+    {
+      "accepted_units": [
+        "m/s"
+      ],
+      "context_fields": [
+        {
+          "annotation": "ContextValue | str",
+          "choices": [
+            "ABW",
+            "AFG",
+            "AIA",
+            "ARE",
+            "ARG",
+            "ARM",
+            "ASM",
+            "ATG",
+            "AUS",
+            "AZE",
+            "BGD",
+            "BHR",
+            "BHS",
+            "BLZ",
+            "BMU",
+            "BOL",
+            "BRB",
+            "BTN",
+            "CAN",
+            "CHL",
+            "CHN",
+            "COD",
+            "COK",
+            "COL",
+            "COM",
+            "CPV",
+            "CRI",
+            "CUB",
+            "CYM",
+            "DJI",
+            "DMA",
+            "DOM",
+            "ECU",
+            "ERI",
+            "ETH",
+            "FJI",
+            "FLK",
+            "FSM",
+            "GEO",
+            "GLP",
+            "GRD",
+            "GTM",
+            "GUF",
+            "GUM",
+            "GUY",
+            "HKG",
+            "HND",
+            "HTI",
+            "IDN",
+            "IND",
+            "IRN",
+            "IRQ",
+            "ISR",
+            "JAM",
+            "JOR",
+            "JPN",
+            "KAZ",
+            "KGZ",
+            "KHM",
+            "KIR",
+            "KNA",
+            "KWT",
+            "LAO",
+            "LBN",
+            "LCA",
+            "LKA",
+            "MAC",
+            "MDG",
+            "MDV",
+            "MEX",
+            "MHL",
+            "MLI",
+            "MMR",
+            "MNG",
+            "MNP",
+            "MOZ",
+            "MSR",
+            "MTQ",
+            "MUS",
+            "MWI",
+            "MYS",
+            "NCL",
+            "NFK",
+            "NIC",
+            "NIU",
+            "NPL",
+            "NRU",
+            "NZL",
+            "OMN",
+            "PAK",
+            "PAN",
+            "PCN",
+            "PER",
+            "PHL",
+            "PLW",
+            "PNG",
+            "PRI",
+            "PRK",
+            "PRY",
+            "PYF",
+            "QAT",
+            "SAU",
+            "SHN",
+            "SLB",
+            "SLV",
+            "SOM",
+            "SUR",
+            "SWZ",
+            "SXM",
+            "SYR",
+            "TCA",
+            "THA",
+            "TJK",
+            "TKL",
+            "TKM",
+            "TLS",
+            "TON",
+            "TTO",
+            "TUV",
+            "TWN",
+            "TZA",
+            "UGA",
+            "URY",
+            "USA",
+            "UZB",
+            "VCT",
+            "VEN",
+            "VGB",
+            "VIR",
+            "VNM",
+            "VUT",
+            "WLD",
+            "WLF",
+            "WSM",
+            "YEM",
+            "ZAF",
+            "ZWE"
+          ],
+          "name": "country",
+          "required": true
+        }
+      ],
+      "context_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "country": {
+            "oneOf": [
+              {
+                "enum": [
+                  "ABW",
+                  "AFG",
+                  "AIA",
+                  "ARE",
+                  "ARG",
+                  "ARM",
+                  "ASM",
+                  "ATG",
+                  "AUS",
+                  "AZE",
+                  "BGD",
+                  "BHR",
+                  "BHS",
+                  "BLZ",
+                  "BMU",
+                  "BOL",
+                  "BRB",
+                  "BTN",
+                  "CAN",
+                  "CHL",
+                  "CHN",
+                  "COD",
+                  "COK",
+                  "COL",
+                  "COM",
+                  "CPV",
+                  "CRI",
+                  "CUB",
+                  "CYM",
+                  "DJI",
+                  "DMA",
+                  "DOM",
+                  "ECU",
+                  "ERI",
+                  "ETH",
+                  "FJI",
+                  "FLK",
+                  "FSM",
+                  "GEO",
+                  "GLP",
+                  "GRD",
+                  "GTM",
+                  "GUF",
+                  "GUM",
+                  "GUY",
+                  "HKG",
+                  "HND",
+                  "HTI",
+                  "IDN",
+                  "IND",
+                  "IRN",
+                  "IRQ",
+                  "ISR",
+                  "JAM",
+                  "JOR",
+                  "JPN",
+                  "KAZ",
+                  "KGZ",
+                  "KHM",
+                  "KIR",
+                  "KNA",
+                  "KWT",
+                  "LAO",
+                  "LBN",
+                  "LCA",
+                  "LKA",
+                  "MAC",
+                  "MDG",
+                  "MDV",
+                  "MEX",
+                  "MHL",
+                  "MLI",
+                  "MMR",
+                  "MNG",
+                  "MNP",
+                  "MOZ",
+                  "MSR",
+                  "MTQ",
+                  "MUS",
+                  "MWI",
+                  "MYS",
+                  "NCL",
+                  "NFK",
+                  "NIC",
+                  "NIU",
+                  "NPL",
+                  "NRU",
+                  "NZL",
+                  "OMN",
+                  "PAK",
+                  "PAN",
+                  "PCN",
+                  "PER",
+                  "PHL",
+                  "PLW",
+                  "PNG",
+                  "PRI",
+                  "PRK",
+                  "PRY",
+                  "PYF",
+                  "QAT",
+                  "SAU",
+                  "SHN",
+                  "SLB",
+                  "SLV",
+                  "SOM",
+                  "SUR",
+                  "SWZ",
+                  "SXM",
+                  "SYR",
+                  "TCA",
+                  "THA",
+                  "TJK",
+                  "TKL",
+                  "TKM",
+                  "TLS",
+                  "TON",
+                  "TTO",
+                  "TUV",
+                  "TWN",
+                  "TZA",
+                  "UGA",
+                  "URY",
+                  "USA",
+                  "UZB",
+                  "VCT",
+                  "VEN",
+                  "VGB",
+                  "VIR",
+                  "VNM",
+                  "VUT",
+                  "WLD",
+                  "WLF",
+                  "WSM",
+                  "YEM",
+                  "ZAF",
+                  "ZWE"
+                ]
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "column": {
+                    "minLength": 1,
+                    "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "column"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "kind": {
+            "const": "country_context"
+          }
+        },
+        "required": [
+          "kind",
+          "country"
+        ],
+        "type": "object"
+      },
+      "context_type": "CountryContext",
+      "id": "crc:cyclone",
+      "input": {
+        "aggregation": "maximum",
+        "kind": "wind_speed",
+        "unit": "m/s"
+      },
+      "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+      "measurement_schema": {
+        "additionalProperties": false,
+        "description": "Wind speed with optional explicit averaging and reduction facts.",
+        "properties": {
+          "aggregation": {
+            "enum": [
+              "maximum",
+              "minimum",
+              "mean",
+              "sum",
+              "count"
+            ],
+            "type": "string"
+          },
+          "averaging_duration": {
+            "additionalProperties": false,
+            "properties": {
+              "unit": {
+                "enum": [
+                  "s",
+                  "h",
+                  "d",
+                  "month",
+                  "yr"
+                ],
+                "type": "string"
+              },
+              "value": {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "value",
+              "unit"
+            ],
+            "type": "object"
+          },
+          "kind": {
+            "const": "wind_speed"
+          },
+          "unit": {
+            "enum": [
+              "m/s",
+              "km/h"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "unit"
+        ],
+        "title": "WindSpeed",
+        "type": "object",
+        "x-crc-calibration": {
+          "quantity": "wind_speed",
+          "unit_field": "unit"
+        }
+      },
+      "measurement_type": "WindSpeed",
+      "output": {
+        "kind": "ratio",
+        "unit": "1"
+      },
+      "unestablished_facts": [
+        "wind averaging duration",
+        "calibration reference period"
+      ],
+      "version": "2026.10.1"
+    },
+    {
+      "accepted_units": [
+        "m/s"
+      ],
+      "context_fields": [
+        {
+          "annotation": "ContextValue | str",
+          "choices": [
+            "ABW",
+            "AFG",
+            "AIA",
+            "ARE",
+            "ARG",
+            "ARM",
+            "ASM",
+            "ATG",
+            "AUS",
+            "AZE",
+            "BGD",
+            "BHR",
+            "BHS",
+            "BLZ",
+            "BMU",
+            "BOL",
+            "BRB",
+            "BTN",
+            "CAN",
+            "CHL",
+            "CHN",
+            "COD",
+            "COK",
+            "COL",
+            "COM",
+            "CPV",
+            "CRI",
+            "CUB",
+            "CYM",
+            "DJI",
+            "DMA",
+            "DOM",
+            "ECU",
+            "ERI",
+            "ETH",
+            "FJI",
+            "FLK",
+            "FSM",
+            "GEO",
+            "GLP",
+            "GRD",
+            "GTM",
+            "GUF",
+            "GUM",
+            "GUY",
+            "HKG",
+            "HND",
+            "HTI",
+            "IDN",
+            "IND",
+            "IRN",
+            "IRQ",
+            "ISR",
+            "JAM",
+            "JOR",
+            "JPN",
+            "KAZ",
+            "KGZ",
+            "KHM",
+            "KIR",
+            "KNA",
+            "KWT",
+            "LAO",
+            "LBN",
+            "LCA",
+            "LKA",
+            "MAC",
+            "MDG",
+            "MDV",
+            "MEX",
+            "MHL",
+            "MLI",
+            "MMR",
+            "MNG",
+            "MNP",
+            "MOZ",
+            "MSR",
+            "MTQ",
+            "MUS",
+            "MWI",
+            "MYS",
+            "NCL",
+            "NFK",
+            "NIC",
+            "NIU",
+            "NPL",
+            "NRU",
+            "NZL",
+            "OMN",
+            "PAK",
+            "PAN",
+            "PCN",
+            "PER",
+            "PHL",
+            "PLW",
+            "PNG",
+            "PRI",
+            "PRK",
+            "PRY",
+            "PYF",
+            "QAT",
+            "SAU",
+            "SHN",
+            "SLB",
+            "SLV",
+            "SOM",
+            "SUR",
+            "SWZ",
+            "SXM",
+            "SYR",
+            "TCA",
+            "THA",
+            "TJK",
+            "TKL",
+            "TKM",
+            "TLS",
+            "TON",
+            "TTO",
+            "TUV",
+            "TWN",
+            "TZA",
+            "UGA",
+            "URY",
+            "USA",
+            "UZB",
+            "VCT",
+            "VEN",
+            "VGB",
+            "VIR",
+            "VNM",
+            "VUT",
+            "WLD",
+            "WLF",
+            "WSM",
+            "YEM",
+            "ZAF",
+            "ZWE"
+          ],
+          "name": "country",
+          "required": true
+        }
+      ],
+      "context_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "country": {
+            "oneOf": [
+              {
+                "enum": [
+                  "ABW",
+                  "AFG",
+                  "AIA",
+                  "ARE",
+                  "ARG",
+                  "ARM",
+                  "ASM",
+                  "ATG",
+                  "AUS",
+                  "AZE",
+                  "BGD",
+                  "BHR",
+                  "BHS",
+                  "BLZ",
+                  "BMU",
+                  "BOL",
+                  "BRB",
+                  "BTN",
+                  "CAN",
+                  "CHL",
+                  "CHN",
+                  "COD",
+                  "COK",
+                  "COL",
+                  "COM",
+                  "CPV",
+                  "CRI",
+                  "CUB",
+                  "CYM",
+                  "DJI",
+                  "DMA",
+                  "DOM",
+                  "ECU",
+                  "ERI",
+                  "ETH",
+                  "FJI",
+                  "FLK",
+                  "FSM",
+                  "GEO",
+                  "GLP",
+                  "GRD",
+                  "GTM",
+                  "GUF",
+                  "GUM",
+                  "GUY",
+                  "HKG",
+                  "HND",
+                  "HTI",
+                  "IDN",
+                  "IND",
+                  "IRN",
+                  "IRQ",
+                  "ISR",
+                  "JAM",
+                  "JOR",
+                  "JPN",
+                  "KAZ",
+                  "KGZ",
+                  "KHM",
+                  "KIR",
+                  "KNA",
+                  "KWT",
+                  "LAO",
+                  "LBN",
+                  "LCA",
+                  "LKA",
+                  "MAC",
+                  "MDG",
+                  "MDV",
+                  "MEX",
+                  "MHL",
+                  "MLI",
+                  "MMR",
+                  "MNG",
+                  "MNP",
+                  "MOZ",
+                  "MSR",
+                  "MTQ",
+                  "MUS",
+                  "MWI",
+                  "MYS",
+                  "NCL",
+                  "NFK",
+                  "NIC",
+                  "NIU",
+                  "NPL",
+                  "NRU",
+                  "NZL",
+                  "OMN",
+                  "PAK",
+                  "PAN",
+                  "PCN",
+                  "PER",
+                  "PHL",
+                  "PLW",
+                  "PNG",
+                  "PRI",
+                  "PRK",
+                  "PRY",
+                  "PYF",
+                  "QAT",
+                  "SAU",
+                  "SHN",
+                  "SLB",
+                  "SLV",
+                  "SOM",
+                  "SUR",
+                  "SWZ",
+                  "SXM",
+                  "SYR",
+                  "TCA",
+                  "THA",
+                  "TJK",
+                  "TKL",
+                  "TKM",
+                  "TLS",
+                  "TON",
+                  "TTO",
+                  "TUV",
+                  "TWN",
+                  "TZA",
+                  "UGA",
+                  "URY",
+                  "USA",
+                  "UZB",
+                  "VCT",
+                  "VEN",
+                  "VGB",
+                  "VIR",
+                  "VNM",
+                  "VUT",
+                  "WLD",
+                  "WLF",
+                  "WSM",
+                  "YEM",
+                  "ZAF",
+                  "ZWE"
+                ]
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "column": {
+                    "minLength": 1,
+                    "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "column"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "kind": {
+            "const": "country_context"
+          }
+        },
+        "required": [
+          "kind",
+          "country"
+        ],
+        "type": "object"
+      },
+      "context_type": "CountryContext",
+      "id": "crc:maximum_daily_wind_speed",
+      "input": {
+        "aggregation": "maximum",
+        "kind": "wind_speed",
+        "unit": "m/s"
+      },
+      "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+      "measurement_schema": {
+        "additionalProperties": false,
+        "description": "Wind speed with optional explicit averaging and reduction facts.",
+        "properties": {
+          "aggregation": {
+            "enum": [
+              "maximum",
+              "minimum",
+              "mean",
+              "sum",
+              "count"
+            ],
+            "type": "string"
+          },
+          "averaging_duration": {
+            "additionalProperties": false,
+            "properties": {
+              "unit": {
+                "enum": [
+                  "s",
+                  "h",
+                  "d",
+                  "month",
+                  "yr"
+                ],
+                "type": "string"
+              },
+              "value": {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "value",
+              "unit"
+            ],
+            "type": "object"
+          },
+          "kind": {
+            "const": "wind_speed"
+          },
+          "unit": {
+            "enum": [
+              "m/s",
+              "km/h"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "unit"
+        ],
+        "title": "WindSpeed",
+        "type": "object",
+        "x-crc-calibration": {
+          "quantity": "wind_speed",
+          "unit_field": "unit"
+        }
+      },
+      "measurement_type": "WindSpeed",
+      "output": {
+        "kind": "ratio",
+        "unit": "1"
+      },
+      "unestablished_facts": [
+        "wind averaging duration",
+        "calibration reference period"
+      ],
+      "version": "2026.10.1"
+    },
+    {
+      "accepted_units": [
+        "1"
+      ],
+      "context_fields": [],
+      "context_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "empty_context"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "type": "object"
+      },
+      "context_type": "EmptyContext",
+      "id": "crc:fire_weather_index",
+      "input": {
+        "index": "fire_weather_index",
+        "kind": "climate_index"
+      },
+      "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+      "measurement_schema": {
+        "additionalProperties": false,
+        "description": "An identified climate index, with explicit timescale and reference years when known.",
+        "properties": {
+          "accumulation_duration": {
+            "additionalProperties": false,
+            "properties": {
+              "unit": {
+                "enum": [
+                  "s",
+                  "h",
+                  "d",
+                  "month",
+                  "yr"
+                ],
+                "type": "string"
+              },
+              "value": {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "value",
+              "unit"
+            ],
+            "type": "object"
+          },
+          "index": {
+            "enum": [
+              "fire_weather_index",
+              "standardized_precipitation_evapotranspiration_index"
+            ],
+            "type": "string"
+          },
+          "kind": {
+            "const": "climate_index"
+          },
+          "reference_period": {
+            "additionalProperties": false,
+            "properties": {
+              "end": {
+                "type": "integer"
+              },
+              "start": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "start",
+              "end"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "kind",
+          "index"
+        ],
+        "title": "ClimateIndex",
+        "type": "object",
+        "x-crc-calibration": {
+          "fixed_unit": "1",
+          "quantity": "climate_index"
+        }
+      },
+      "measurement_type": "ClimateIndex",
+      "output": {
+        "kind": "ratio",
+        "unit": "1"
+      },
+      "unestablished_facts": [],
+      "version": "2026.10.1"
+    },
+    {
+      "accepted_units": [
+        "count"
+      ],
+      "context_fields": [],
+      "context_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "empty_context"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "type": "object"
+      },
+      "context_type": "EmptyContext",
+      "id": "crc:hot_days",
+      "input": {
+        "aggregation": "count",
+        "event": "hot_day",
+        "kind": "event_count"
+      },
+      "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+      "measurement_schema": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "event": {
+                  "enum": [
+                    "frost_day",
+                    "hot_day",
+                    "freeze_thaw_cycle"
+                  ]
+                }
+              },
+              "required": [
+                "event"
+              ]
+            },
+            "then": {
+              "properties": {
+                "threshold": {
+                  "properties": {
+                    "unit": {
+                      "enum": [
+                        "degC",
+                        "K",
+                        "degF"
+                      ],
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "description": "Count of explicitly identified events, with optional threshold and counting duration.",
+        "properties": {
+          "aggregation": {
+            "enum": [
+              "maximum",
+              "minimum",
+              "mean",
+              "sum",
+              "count"
+            ],
+            "type": "string"
+          },
+          "duration": {
+            "additionalProperties": false,
+            "properties": {
+              "unit": {
+                "enum": [
+                  "s",
+                  "h",
+                  "d",
+                  "month",
+                  "yr"
+                ],
+                "type": "string"
+              },
+              "value": {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "value",
+              "unit"
+            ],
+            "type": "object"
+          },
+          "event": {
+            "enum": [
+              "freeze_thaw_cycle",
+              "frost_day",
+              "hot_day",
+              "dry_day"
+            ],
+            "type": "string"
+          },
+          "kind": {
+            "const": "event_count"
+          },
+          "threshold": {
+            "additionalProperties": false,
+            "properties": {
+              "unit": {
+                "minLength": 1,
+                "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                "type": "string"
+              },
+              "value": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "value",
+              "unit"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "kind",
+          "event",
+          "aggregation"
+        ],
+        "title": "EventCount",
+        "type": "object",
+        "x-crc-calibration": {
+          "fixed_unit": "count",
+          "quantity": "event_count"
+        }
+      },
+      "measurement_type": "EventCount",
+      "output": {
+        "kind": "ratio",
+        "unit": "1"
+      },
+      "unestablished_facts": [
+        "event threshold",
+        "counting duration",
+        "calibration reference period"
+      ],
+      "version": "2026.10.1"
+    },
+    {
+      "accepted_units": [
+        "m"
+      ],
+      "context_fields": [
+        {
+          "annotation": "ContextValue | FloodRegion",
+          "choices": [
+            "africa",
+            "asia",
+            "europe",
+            "north_america",
+            "south_america",
+            "oceania",
+            "global"
+          ],
+          "name": "region",
+          "required": true
+        },
+        {
+          "annotation": "ContextValue | AssetType",
+          "choices": [
+            "residential",
+            "commercial",
+            "industrial",
+            "transport",
+            "roads",
+            "agricultural_land"
+          ],
+          "name": "asset_type",
+          "required": true
+        }
+      ],
+      "context_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_type": {
+            "oneOf": [
+              {
+                "enum": [
+                  "residential",
+                  "commercial",
+                  "industrial",
+                  "transport",
+                  "roads",
+                  "agricultural_land"
+                ]
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "column": {
+                    "minLength": 1,
+                    "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "column"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "kind": {
+            "const": "inundation_context"
+          },
+          "region": {
+            "oneOf": [
+              {
+                "enum": [
+                  "africa",
+                  "asia",
+                  "europe",
+                  "north_america",
+                  "south_america",
+                  "oceania",
+                  "global"
+                ],
+                "type": "string"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "column": {
+                    "minLength": 1,
+                    "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "column"
+                ],
+                "type": "object"
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "region",
+          "asset_type"
+        ],
+        "type": "object"
+      },
+      "context_type": "InundationContext",
+      "id": "crc:coastal_flood",
+      "input": {
+        "kind": "depth_above_ground",
+        "unit": "m"
+      },
+      "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+      "measurement_schema": {
+        "additionalProperties": false,
+        "description": "Depth measured above the local ground surface.",
+        "properties": {
+          "kind": {
+            "const": "depth_above_ground"
+          },
+          "unit": {
+            "enum": [
+              "m",
+              "cm",
+              "mm",
+              "ft"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "unit"
+        ],
+        "title": "DepthAboveGround",
+        "type": "object",
+        "x-crc-calibration": {
+          "quantity": "depth_above_ground",
+          "unit_field": "unit"
+        }
+      },
+      "measurement_type": "DepthAboveGround",
+      "output": {
+        "kind": "ratio",
+        "unit": "1"
+      },
+      "unestablished_facts": [],
+      "version": "2026.10.1"
+    },
+    {
+      "accepted_units": [
+        "m"
+      ],
+      "context_fields": [
+        {
+          "annotation": "ContextValue | FloodRegion",
+          "choices": [
+            "africa",
+            "asia",
+            "europe",
+            "north_america",
+            "south_america",
+            "oceania",
+            "global"
+          ],
+          "name": "region",
+          "required": true
+        },
+        {
+          "annotation": "ContextValue | AssetType",
+          "choices": [
+            "residential",
+            "commercial",
+            "industrial",
+            "transport",
+            "roads",
+            "agricultural_land"
+          ],
+          "name": "asset_type",
+          "required": true
+        }
+      ],
+      "context_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_type": {
+            "oneOf": [
+              {
+                "enum": [
+                  "residential",
+                  "commercial",
+                  "industrial",
+                  "transport",
+                  "roads",
+                  "agricultural_land"
+                ]
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "column": {
+                    "minLength": 1,
+                    "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "column"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "kind": {
+            "const": "inundation_context"
+          },
+          "region": {
+            "oneOf": [
+              {
+                "enum": [
+                  "africa",
+                  "asia",
+                  "europe",
+                  "north_america",
+                  "south_america",
+                  "oceania",
+                  "global"
+                ],
+                "type": "string"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "column": {
+                    "minLength": 1,
+                    "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "column"
+                ],
+                "type": "object"
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "region",
+          "asset_type"
+        ],
+        "type": "object"
+      },
+      "context_type": "InundationContext",
+      "id": "crc:river_flood",
+      "input": {
+        "kind": "depth_above_ground",
+        "unit": "m"
+      },
+      "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+      "measurement_schema": {
+        "additionalProperties": false,
+        "description": "Depth measured above the local ground surface.",
+        "properties": {
+          "kind": {
+            "const": "depth_above_ground"
+          },
+          "unit": {
+            "enum": [
+              "m",
+              "cm",
+              "mm",
+              "ft"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "unit"
+        ],
+        "title": "DepthAboveGround",
+        "type": "object",
+        "x-crc-calibration": {
+          "quantity": "depth_above_ground",
+          "unit_field": "unit"
+        }
+      },
+      "measurement_type": "DepthAboveGround",
+      "output": {
+        "kind": "ratio",
+        "unit": "1"
+      },
+      "unestablished_facts": [],
+      "version": "2026.10.1"
+    },
+    {
+      "accepted_units": [
+        "m"
+      ],
+      "context_fields": [
+        {
+          "annotation": "ContextValue | FloodRegion",
+          "choices": [
+            "africa",
+            "asia",
+            "europe",
+            "north_america",
+            "south_america",
+            "oceania",
+            "global"
+          ],
+          "name": "region",
+          "required": true
+        },
+        {
+          "annotation": "ContextValue | AssetType",
+          "choices": [
+            "residential",
+            "commercial",
+            "industrial",
+            "transport",
+            "roads",
+            "agricultural_land"
+          ],
+          "name": "asset_type",
+          "required": true
+        }
+      ],
+      "context_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_type": {
+            "oneOf": [
+              {
+                "enum": [
+                  "residential",
+                  "commercial",
+                  "industrial",
+                  "transport",
+                  "roads",
+                  "agricultural_land"
+                ]
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "column": {
+                    "minLength": 1,
+                    "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "column"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "kind": {
+            "const": "inundation_context"
+          },
+          "region": {
+            "oneOf": [
+              {
+                "enum": [
+                  "africa",
+                  "asia",
+                  "europe",
+                  "north_america",
+                  "south_america",
+                  "oceania",
+                  "global"
+                ],
+                "type": "string"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "column": {
+                    "minLength": 1,
+                    "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "column"
+                ],
+                "type": "object"
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "region",
+          "asset_type"
+        ],
+        "type": "object"
+      },
+      "context_type": "InundationContext",
+      "id": "crc:inundation",
+      "input": {
+        "kind": "depth_above_ground",
+        "unit": "m"
+      },
+      "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+      "measurement_schema": {
+        "additionalProperties": false,
+        "description": "Depth measured above the local ground surface.",
+        "properties": {
+          "kind": {
+            "const": "depth_above_ground"
+          },
+          "unit": {
+            "enum": [
+              "m",
+              "cm",
+              "mm",
+              "ft"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "unit"
+        ],
+        "title": "DepthAboveGround",
+        "type": "object",
+        "x-crc-calibration": {
+          "quantity": "depth_above_ground",
+          "unit_field": "unit"
+        }
+      },
+      "measurement_type": "DepthAboveGround",
+      "output": {
+        "kind": "ratio",
+        "unit": "1"
+      },
+      "unestablished_facts": [],
+      "version": "2026.10.1"
+    },
+    {
+      "accepted_units": [
+        "1"
+      ],
+      "context_fields": [
+        {
+          "annotation": "ContextValue | str",
+          "choices": [
+            "AUS",
+            "BRA",
+            "CAN",
+            "CHN",
+            "IDN",
+            "IND",
+            "JPN",
+            "KOR",
+            "MEX",
+            "NZL",
+            "RUS",
+            "TUR",
+            "USA",
+            "ZAF"
+          ],
+          "name": "country",
+          "required": true
+        },
+        {
+          "annotation": "ContextValue | AssetType",
+          "choices": [
+            "residential",
+            "commercial",
+            "industrial"
+          ],
+          "name": "asset_type",
+          "required": true
+        }
+      ],
+      "context_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_type": {
+            "oneOf": [
+              {
+                "enum": [
+                  "residential",
+                  "commercial",
+                  "industrial"
+                ]
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "column": {
+                    "minLength": 1,
+                    "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "column"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "country": {
+            "oneOf": [
+              {
+                "enum": [
+                  "AUS",
+                  "BRA",
+                  "CAN",
+                  "CHN",
+                  "IDN",
+                  "IND",
+                  "JPN",
+                  "KOR",
+                  "MEX",
+                  "NZL",
+                  "RUS",
+                  "TUR",
+                  "USA",
+                  "ZAF"
+                ]
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "column": {
+                    "minLength": 1,
+                    "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "column"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "kind": {
+            "const": "water_cost_context"
+          }
+        },
+        "required": [
+          "kind",
+          "country",
+          "asset_type"
+        ],
+        "type": "object"
+      },
+      "context_type": "WaterCostContext",
+      "id": "crc:standardized_precipitation_evapotranspiration_index",
+      "input": {
+        "index": "standardized_precipitation_evapotranspiration_index",
+        "kind": "climate_index"
+      },
+      "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+      "measurement_schema": {
+        "additionalProperties": false,
+        "description": "An identified climate index, with explicit timescale and reference years when known.",
+        "properties": {
+          "accumulation_duration": {
+            "additionalProperties": false,
+            "properties": {
+              "unit": {
+                "enum": [
+                  "s",
+                  "h",
+                  "d",
+                  "month",
+                  "yr"
+                ],
+                "type": "string"
+              },
+              "value": {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "value",
+              "unit"
+            ],
+            "type": "object"
+          },
+          "index": {
+            "enum": [
+              "fire_weather_index",
+              "standardized_precipitation_evapotranspiration_index"
+            ],
+            "type": "string"
+          },
+          "kind": {
+            "const": "climate_index"
+          },
+          "reference_period": {
+            "additionalProperties": false,
+            "properties": {
+              "end": {
+                "type": "integer"
+              },
+              "start": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "start",
+              "end"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "kind",
+          "index"
+        ],
+        "title": "ClimateIndex",
+        "type": "object",
+        "x-crc-calibration": {
+          "fixed_unit": "1",
+          "quantity": "climate_index"
+        }
+      },
+      "measurement_type": "ClimateIndex",
+      "output": {
+        "kind": "measurement",
+        "quantity": "normalized_water_cost",
+        "unit": "1"
+      },
+      "unestablished_facts": [
+        "index accumulation duration",
+        "index reference period"
+      ],
+      "version": "2026.10.1"
+    },
+    {
+      "accepted_units": [
+        "K.d"
+      ],
+      "context_fields": [
+        {
+          "annotation": "ContextValue | str",
+          "choices": [
+            "AGO",
+            "ALB",
+            "ARE",
+            "ARG",
+            "ARM",
+            "AUS",
+            "AUT",
+            "AZE",
+            "BDI",
+            "BEL",
+            "BEN",
+            "BFA",
+            "BGD",
+            "BGR",
+            "BHR",
+            "BIH",
+            "BLR",
+            "BOL",
+            "BRA",
+            "BRN",
+            "BWA",
+            "CAN",
+            "CHE",
+            "CHL",
+            "CHN",
+            "CIV",
+            "CMR",
+            "COD",
+            "COG",
+            "COL",
+            "COM",
+            "CPV",
+            "CRI",
+            "CUB",
+            "CYP",
+            "CZE",
+            "DEU",
+            "DJI",
+            "DNK",
+            "DOM",
+            "DZA",
+            "ECU",
+            "EGY",
+            "ERI",
+            "ESP",
+            "EST",
+            "ETH",
+            "FIN",
+            "FRA",
+            "GAB",
+            "GBR",
+            "GEO",
+            "GHA",
+            "GIN",
+            "GMB",
+            "GNB",
+            "GRC",
+            "GTM",
+            "HKG",
+            "HND",
+            "HRV",
+            "HTI",
+            "HUN",
+            "IDN",
+            "IND",
+            "IRL",
+            "IRN",
+            "IRQ",
+            "ISL",
+            "ISR",
+            "ITA",
+            "JAM",
+            "JOR",
+            "JPN",
+            "KAZ",
+            "KEN",
+            "KGZ",
+            "KHM",
+            "KOR",
+            "KWT",
+            "LBN",
+            "LBR",
+            "LBY",
+            "LKA",
+            "LTU",
+            "LUX",
+            "LVA",
+            "MAR",
+            "MDA",
+            "MDG",
+            "MEX",
+            "MKD",
+            "MLI",
+            "MLT",
+            "MMR",
+            "MNE",
+            "MNG",
+            "MOZ",
+            "MRT",
+            "MUS",
+            "MWI",
+            "MYS",
+            "NAM",
+            "NER",
+            "NGA",
+            "NIC",
+            "NLD",
+            "NOR",
+            "NPL",
+            "NZL",
+            "OMN",
+            "PAK",
+            "PAN",
+            "PER",
+            "PHL",
+            "POL",
+            "PRT",
+            "PRY",
+            "QAT",
+            "REU",
+            "ROU",
+            "RUS",
+            "RWA",
+            "SAU",
+            "SDN",
+            "SEN",
+            "SGP",
+            "SLE",
+            "SLV",
+            "SOM",
+            "SRB",
+            "SSD",
+            "SUR",
+            "SVK",
+            "SVN",
+            "SWE",
+            "SYC",
+            "SYR",
+            "TGO",
+            "THA",
+            "TJK",
+            "TKM",
+            "TTO",
+            "TUN",
+            "TUR",
+            "TWN",
+            "TZA",
+            "UGA",
+            "UKR",
+            "URY",
+            "USA",
+            "UZB",
+            "VEN",
+            "VNM",
+            "WLD",
+            "YEM",
+            "ZAF",
+            "ZMB",
+            "ZWE"
+          ],
+          "choices_by_asset_type": {
+            "commercial": [
+              "ARG",
+              "BDI",
+              "BEN",
+              "BFA",
+              "BRA",
+              "CAN",
+              "CHN",
+              "CIV",
+              "COL",
+              "COM",
+              "CPV",
+              "DJI",
+              "ERI",
+              "ETH",
+              "GBR",
+              "GHA",
+              "GIN",
+              "GMB",
+              "GNB",
+              "IDN",
+              "IND",
+              "JPN",
+              "KEN",
+              "LBR",
+              "MDG",
+              "MEX",
+              "MLI",
+              "MOZ",
+              "MRT",
+              "MUS",
+              "MWI",
+              "NGA",
+              "PAK",
+              "REU",
+              "RUS",
+              "RWA",
+              "SEN",
+              "SLE",
+              "SOM",
+              "SSD",
+              "SYC",
+              "TGO",
+              "TUR",
+              "TZA",
+              "UGA",
+              "USA",
+              "WLD",
+              "ZAF"
+            ],
+            "industrial": [
+              "AGO",
+              "ALB",
+              "ARE",
+              "ARG",
+              "ARM",
+              "AUS",
+              "AUT",
+              "AZE",
+              "BDI",
+              "BEL",
+              "BEN",
+              "BFA",
+              "BGD",
+              "BGR",
+              "BHR",
+              "BIH",
+              "BLR",
+              "BOL",
+              "BRA",
+              "BRN",
+              "BWA",
+              "CAN",
+              "CHE",
+              "CHL",
+              "CHN",
+              "CIV",
+              "CMR",
+              "COD",
+              "COG",
+              "COL",
+              "COM",
+              "CPV",
+              "CRI",
+              "CUB",
+              "CYP",
+              "CZE",
+              "DEU",
+              "DJI",
+              "DNK",
+              "DOM",
+              "DZA",
+              "ECU",
+              "EGY",
+              "ERI",
+              "ESP",
+              "EST",
+              "ETH",
+              "FIN",
+              "FRA",
+              "GAB",
+              "GBR",
+              "GEO",
+              "GHA",
+              "GIN",
+              "GMB",
+              "GNB",
+              "GRC",
+              "GTM",
+              "HKG",
+              "HND",
+              "HRV",
+              "HTI",
+              "HUN",
+              "IDN",
+              "IND",
+              "IRL",
+              "IRN",
+              "IRQ",
+              "ISL",
+              "ISR",
+              "ITA",
+              "JAM",
+              "JOR",
+              "JPN",
+              "KAZ",
+              "KEN",
+              "KGZ",
+              "KHM",
+              "KOR",
+              "KWT",
+              "LBN",
+              "LBR",
+              "LBY",
+              "LKA",
+              "LTU",
+              "LUX",
+              "LVA",
+              "MAR",
+              "MDA",
+              "MDG",
+              "MEX",
+              "MKD",
+              "MLI",
+              "MLT",
+              "MMR",
+              "MNE",
+              "MNG",
+              "MOZ",
+              "MRT",
+              "MUS",
+              "MWI",
+              "MYS",
+              "NAM",
+              "NER",
+              "NGA",
+              "NIC",
+              "NLD",
+              "NOR",
+              "NPL",
+              "NZL",
+              "OMN",
+              "PAK",
+              "PAN",
+              "PER",
+              "PHL",
+              "POL",
+              "PRT",
+              "PRY",
+              "QAT",
+              "REU",
+              "ROU",
+              "RUS",
+              "RWA",
+              "SAU",
+              "SDN",
+              "SEN",
+              "SGP",
+              "SLE",
+              "SLV",
+              "SOM",
+              "SRB",
+              "SSD",
+              "SUR",
+              "SVK",
+              "SVN",
+              "SWE",
+              "SYC",
+              "SYR",
+              "TGO",
+              "THA",
+              "TJK",
+              "TKM",
+              "TTO",
+              "TUN",
+              "TUR",
+              "TWN",
+              "TZA",
+              "UGA",
+              "UKR",
+              "URY",
+              "USA",
+              "UZB",
+              "VEN",
+              "VNM",
+              "WLD",
+              "YEM",
+              "ZAF",
+              "ZMB",
+              "ZWE"
+            ],
+            "residential": [
+              "ARG",
+              "BDI",
+              "BEN",
+              "BFA",
+              "BRA",
+              "CAN",
+              "CHN",
+              "CIV",
+              "COL",
+              "COM",
+              "CPV",
+              "DJI",
+              "ERI",
+              "ETH",
+              "GBR",
+              "GHA",
+              "GIN",
+              "GMB",
+              "GNB",
+              "IDN",
+              "IND",
+              "JPN",
+              "KEN",
+              "LBR",
+              "MDG",
+              "MEX",
+              "MLI",
+              "MOZ",
+              "MRT",
+              "MUS",
+              "MWI",
+              "NGA",
+              "PAK",
+              "REU",
+              "RUS",
+              "RWA",
+              "SEN",
+              "SLE",
+              "SOM",
+              "SSD",
+              "SYC",
+              "TGO",
+              "TUR",
+              "TZA",
+              "UGA",
+              "USA",
+              "WLD",
+              "ZAF"
+            ]
+          },
+          "name": "country",
+          "required": true
+        },
+        {
+          "annotation": "ContextValue | AssetType",
+          "choices": [
+            "residential",
+            "commercial",
+            "industrial"
+          ],
+          "name": "asset_type",
+          "required": true
+        },
+        {
+          "annotation": "ContextValue | float",
+          "choices": [],
+          "name": "historic_mean",
+          "required": true
+        }
+      ],
+      "context_schema": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "asset_type": {
+                  "const": "residential"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "country": {
+                  "oneOf": [
+                    {
+                      "enum": [
+                        "ARG",
+                        "BDI",
+                        "BEN",
+                        "BFA",
+                        "BRA",
+                        "CAN",
+                        "CHN",
+                        "CIV",
+                        "COL",
+                        "COM",
+                        "CPV",
+                        "DJI",
+                        "ERI",
+                        "ETH",
+                        "GBR",
+                        "GHA",
+                        "GIN",
+                        "GMB",
+                        "GNB",
+                        "IDN",
+                        "IND",
+                        "JPN",
+                        "KEN",
+                        "LBR",
+                        "MDG",
+                        "MEX",
+                        "MLI",
+                        "MOZ",
+                        "MRT",
+                        "MUS",
+                        "MWI",
+                        "NGA",
+                        "PAK",
+                        "REU",
+                        "RUS",
+                        "RWA",
+                        "SEN",
+                        "SLE",
+                        "SOM",
+                        "SSD",
+                        "SYC",
+                        "TGO",
+                        "TUR",
+                        "TZA",
+                        "UGA",
+                        "USA",
+                        "WLD",
+                        "ZAF"
+                      ]
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "column": {
+                          "minLength": 1,
+                          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "column"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "asset_type": {
+                  "const": "commercial"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "country": {
+                  "oneOf": [
+                    {
+                      "enum": [
+                        "ARG",
+                        "BDI",
+                        "BEN",
+                        "BFA",
+                        "BRA",
+                        "CAN",
+                        "CHN",
+                        "CIV",
+                        "COL",
+                        "COM",
+                        "CPV",
+                        "DJI",
+                        "ERI",
+                        "ETH",
+                        "GBR",
+                        "GHA",
+                        "GIN",
+                        "GMB",
+                        "GNB",
+                        "IDN",
+                        "IND",
+                        "JPN",
+                        "KEN",
+                        "LBR",
+                        "MDG",
+                        "MEX",
+                        "MLI",
+                        "MOZ",
+                        "MRT",
+                        "MUS",
+                        "MWI",
+                        "NGA",
+                        "PAK",
+                        "REU",
+                        "RUS",
+                        "RWA",
+                        "SEN",
+                        "SLE",
+                        "SOM",
+                        "SSD",
+                        "SYC",
+                        "TGO",
+                        "TUR",
+                        "TZA",
+                        "UGA",
+                        "USA",
+                        "WLD",
+                        "ZAF"
+                      ]
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "column": {
+                          "minLength": 1,
+                          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "column"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "asset_type": {
+                  "const": "industrial"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "country": {
+                  "oneOf": [
+                    {
+                      "enum": [
+                        "AGO",
+                        "ALB",
+                        "ARE",
+                        "ARG",
+                        "ARM",
+                        "AUS",
+                        "AUT",
+                        "AZE",
+                        "BDI",
+                        "BEL",
+                        "BEN",
+                        "BFA",
+                        "BGD",
+                        "BGR",
+                        "BHR",
+                        "BIH",
+                        "BLR",
+                        "BOL",
+                        "BRA",
+                        "BRN",
+                        "BWA",
+                        "CAN",
+                        "CHE",
+                        "CHL",
+                        "CHN",
+                        "CIV",
+                        "CMR",
+                        "COD",
+                        "COG",
+                        "COL",
+                        "COM",
+                        "CPV",
+                        "CRI",
+                        "CUB",
+                        "CYP",
+                        "CZE",
+                        "DEU",
+                        "DJI",
+                        "DNK",
+                        "DOM",
+                        "DZA",
+                        "ECU",
+                        "EGY",
+                        "ERI",
+                        "ESP",
+                        "EST",
+                        "ETH",
+                        "FIN",
+                        "FRA",
+                        "GAB",
+                        "GBR",
+                        "GEO",
+                        "GHA",
+                        "GIN",
+                        "GMB",
+                        "GNB",
+                        "GRC",
+                        "GTM",
+                        "HKG",
+                        "HND",
+                        "HRV",
+                        "HTI",
+                        "HUN",
+                        "IDN",
+                        "IND",
+                        "IRL",
+                        "IRN",
+                        "IRQ",
+                        "ISL",
+                        "ISR",
+                        "ITA",
+                        "JAM",
+                        "JOR",
+                        "JPN",
+                        "KAZ",
+                        "KEN",
+                        "KGZ",
+                        "KHM",
+                        "KOR",
+                        "KWT",
+                        "LBN",
+                        "LBR",
+                        "LBY",
+                        "LKA",
+                        "LTU",
+                        "LUX",
+                        "LVA",
+                        "MAR",
+                        "MDA",
+                        "MDG",
+                        "MEX",
+                        "MKD",
+                        "MLI",
+                        "MLT",
+                        "MMR",
+                        "MNE",
+                        "MNG",
+                        "MOZ",
+                        "MRT",
+                        "MUS",
+                        "MWI",
+                        "MYS",
+                        "NAM",
+                        "NER",
+                        "NGA",
+                        "NIC",
+                        "NLD",
+                        "NOR",
+                        "NPL",
+                        "NZL",
+                        "OMN",
+                        "PAK",
+                        "PAN",
+                        "PER",
+                        "PHL",
+                        "POL",
+                        "PRT",
+                        "PRY",
+                        "QAT",
+                        "REU",
+                        "ROU",
+                        "RUS",
+                        "RWA",
+                        "SAU",
+                        "SDN",
+                        "SEN",
+                        "SGP",
+                        "SLE",
+                        "SLV",
+                        "SOM",
+                        "SRB",
+                        "SSD",
+                        "SUR",
+                        "SVK",
+                        "SVN",
+                        "SWE",
+                        "SYC",
+                        "SYR",
+                        "TGO",
+                        "THA",
+                        "TJK",
+                        "TKM",
+                        "TTO",
+                        "TUN",
+                        "TUR",
+                        "TWN",
+                        "TZA",
+                        "UGA",
+                        "UKR",
+                        "URY",
+                        "USA",
+                        "UZB",
+                        "VEN",
+                        "VNM",
+                        "WLD",
+                        "YEM",
+                        "ZAF",
+                        "ZMB",
+                        "ZWE"
+                      ]
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "column": {
+                          "minLength": 1,
+                          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "column"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ],
+        "properties": {
+          "asset_type": {
+            "oneOf": [
+              {
+                "enum": [
+                  "residential",
+                  "commercial",
+                  "industrial"
+                ]
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "column": {
+                    "minLength": 1,
+                    "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "column"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "country": {
+            "oneOf": [
+              {
+                "enum": [
+                  "AGO",
+                  "ALB",
+                  "ARE",
+                  "ARG",
+                  "ARM",
+                  "AUS",
+                  "AUT",
+                  "AZE",
+                  "BDI",
+                  "BEL",
+                  "BEN",
+                  "BFA",
+                  "BGD",
+                  "BGR",
+                  "BHR",
+                  "BIH",
+                  "BLR",
+                  "BOL",
+                  "BRA",
+                  "BRN",
+                  "BWA",
+                  "CAN",
+                  "CHE",
+                  "CHL",
+                  "CHN",
+                  "CIV",
+                  "CMR",
+                  "COD",
+                  "COG",
+                  "COL",
+                  "COM",
+                  "CPV",
+                  "CRI",
+                  "CUB",
+                  "CYP",
+                  "CZE",
+                  "DEU",
+                  "DJI",
+                  "DNK",
+                  "DOM",
+                  "DZA",
+                  "ECU",
+                  "EGY",
+                  "ERI",
+                  "ESP",
+                  "EST",
+                  "ETH",
+                  "FIN",
+                  "FRA",
+                  "GAB",
+                  "GBR",
+                  "GEO",
+                  "GHA",
+                  "GIN",
+                  "GMB",
+                  "GNB",
+                  "GRC",
+                  "GTM",
+                  "HKG",
+                  "HND",
+                  "HRV",
+                  "HTI",
+                  "HUN",
+                  "IDN",
+                  "IND",
+                  "IRL",
+                  "IRN",
+                  "IRQ",
+                  "ISL",
+                  "ISR",
+                  "ITA",
+                  "JAM",
+                  "JOR",
+                  "JPN",
+                  "KAZ",
+                  "KEN",
+                  "KGZ",
+                  "KHM",
+                  "KOR",
+                  "KWT",
+                  "LBN",
+                  "LBR",
+                  "LBY",
+                  "LKA",
+                  "LTU",
+                  "LUX",
+                  "LVA",
+                  "MAR",
+                  "MDA",
+                  "MDG",
+                  "MEX",
+                  "MKD",
+                  "MLI",
+                  "MLT",
+                  "MMR",
+                  "MNE",
+                  "MNG",
+                  "MOZ",
+                  "MRT",
+                  "MUS",
+                  "MWI",
+                  "MYS",
+                  "NAM",
+                  "NER",
+                  "NGA",
+                  "NIC",
+                  "NLD",
+                  "NOR",
+                  "NPL",
+                  "NZL",
+                  "OMN",
+                  "PAK",
+                  "PAN",
+                  "PER",
+                  "PHL",
+                  "POL",
+                  "PRT",
+                  "PRY",
+                  "QAT",
+                  "REU",
+                  "ROU",
+                  "RUS",
+                  "RWA",
+                  "SAU",
+                  "SDN",
+                  "SEN",
+                  "SGP",
+                  "SLE",
+                  "SLV",
+                  "SOM",
+                  "SRB",
+                  "SSD",
+                  "SUR",
+                  "SVK",
+                  "SVN",
+                  "SWE",
+                  "SYC",
+                  "SYR",
+                  "TGO",
+                  "THA",
+                  "TJK",
+                  "TKM",
+                  "TTO",
+                  "TUN",
+                  "TUR",
+                  "TWN",
+                  "TZA",
+                  "UGA",
+                  "UKR",
+                  "URY",
+                  "USA",
+                  "UZB",
+                  "VEN",
+                  "VNM",
+                  "WLD",
+                  "YEM",
+                  "ZAF",
+                  "ZMB",
+                  "ZWE"
+                ]
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "column": {
+                    "minLength": 1,
+                    "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "column"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "historic_mean": {
+            "oneOf": [
+              {
+                "type": "number"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "column": {
+                    "minLength": 1,
+                    "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "column"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "kind": {
+            "const": "cooling_cost_context"
+          }
+        },
+        "required": [
+          "kind",
+          "country",
+          "asset_type",
+          "historic_mean"
+        ],
+        "type": "object"
+      },
+      "context_type": "CoolingCostContext",
+      "id": "crc:cooling_degree_days",
+      "input": {
+        "kind": "measurement",
+        "quantity": "degree_days",
+        "unit": "K.d"
+      },
+      "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+      "measurement_schema": {
+        "additionalProperties": false,
+        "description": "Integrated temperature departures from a declared threshold over a declared duration.",
+        "properties": {
+          "duration": {
+            "additionalProperties": false,
+            "properties": {
+              "unit": {
+                "enum": [
+                  "s",
+                  "h",
+                  "d",
+                  "month",
+                  "yr"
+                ],
+                "type": "string"
+              },
+              "value": {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "value",
+              "unit"
+            ],
+            "type": "object"
+          },
+          "kind": {
+            "const": "degree_days"
+          },
+          "threshold": {
+            "additionalProperties": false,
+            "properties": {
+              "unit": {
+                "minLength": 1,
+                "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                "type": "string"
+              },
+              "value": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "value",
+              "unit"
+            ],
+            "type": "object"
+          },
+          "unit": {
+            "enum": [
+              "K.d",
+              "degC.d"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "unit",
+          "threshold",
+          "duration"
+        ],
+        "title": "DegreeDays",
+        "type": "object",
+        "x-crc-calibration": {
+          "quantity": "degree_days",
+          "unit_field": "unit"
+        }
+      },
+      "measurement_type": "DegreeDays",
+      "output": {
+        "kind": "measurement",
+        "quantity": "normalized_cooling_cost",
+        "unit": "1"
+      },
+      "unestablished_facts": [
+        "temperature threshold",
+        "accumulation duration",
+        "calibration reference period"
+      ],
+      "version": "2026.10.1"
+    },
+    {
+      "accepted_units": [
+        "K.d"
+      ],
+      "context_fields": [
+        {
+          "annotation": "ContextValue | str",
+          "choices": [
+            "AUS",
+            "BGR",
+            "BRA",
+            "HUN",
+            "ISR",
+            "LTU",
+            "POL",
+            "ROU",
+            "RUS",
+            "THA",
+            "UKR",
+            "USA"
+          ],
+          "name": "country",
+          "required": true
+        },
+        {
+          "annotation": "ContextValue | float",
+          "choices": [],
+          "name": "historic_mean",
+          "required": true
+        }
+      ],
+      "context_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "country": {
+            "oneOf": [
+              {
+                "enum": [
+                  "AUS",
+                  "BGR",
+                  "BRA",
+                  "HUN",
+                  "ISR",
+                  "LTU",
+                  "POL",
+                  "ROU",
+                  "RUS",
+                  "THA",
+                  "UKR",
+                  "USA"
+                ]
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "column": {
+                    "minLength": 1,
+                    "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "column"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "historic_mean": {
+            "oneOf": [
+              {
+                "type": "number"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "column": {
+                    "minLength": 1,
+                    "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "column"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "kind": {
+            "const": "crop_context"
+          }
+        },
+        "required": [
+          "kind",
+          "country",
+          "historic_mean"
+        ],
+        "type": "object"
+      },
+      "context_type": "CropContext",
+      "id": "crc:cooling_degree_days_crop_yield",
+      "input": {
+        "kind": "measurement",
+        "quantity": "degree_days",
+        "unit": "K.d"
+      },
+      "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+      "measurement_schema": {
+        "additionalProperties": false,
+        "description": "Integrated temperature departures from a declared threshold over a declared duration.",
+        "properties": {
+          "duration": {
+            "additionalProperties": false,
+            "properties": {
+              "unit": {
+                "enum": [
+                  "s",
+                  "h",
+                  "d",
+                  "month",
+                  "yr"
+                ],
+                "type": "string"
+              },
+              "value": {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "value",
+              "unit"
+            ],
+            "type": "object"
+          },
+          "kind": {
+            "const": "degree_days"
+          },
+          "threshold": {
+            "additionalProperties": false,
+            "properties": {
+              "unit": {
+                "minLength": 1,
+                "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                "type": "string"
+              },
+              "value": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "value",
+              "unit"
+            ],
+            "type": "object"
+          },
+          "unit": {
+            "enum": [
+              "K.d",
+              "degC.d"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "unit",
+          "threshold",
+          "duration"
+        ],
+        "title": "DegreeDays",
+        "type": "object",
+        "x-crc-calibration": {
+          "quantity": "degree_days",
+          "unit_field": "unit"
+        }
+      },
+      "measurement_type": "DegreeDays",
+      "output": {
+        "kind": "measurement",
+        "quantity": "crop_yield_change",
+        "unit": "1"
+      },
+      "unestablished_facts": [
+        "temperature threshold",
+        "accumulation duration",
+        "calibration reference period"
+      ],
+      "version": "2026.10.1"
+    },
+    {
+      "accepted_units": [
+        "count"
+      ],
+      "context_fields": [
+        {
+          "annotation": "ContextValue | str",
+          "choices": [
+            "AUS",
+            "BGR",
+            "BRA",
+            "HUN",
+            "ISR",
+            "LTU",
+            "POL",
+            "ROU",
+            "RUS",
+            "THA",
+            "UKR",
+            "USA"
+          ],
+          "name": "country",
+          "required": true
+        },
+        {
+          "annotation": "ContextValue | float",
+          "choices": [],
+          "name": "historic_mean",
+          "required": true
+        }
+      ],
+      "context_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "country": {
+            "oneOf": [
+              {
+                "enum": [
+                  "AUS",
+                  "BGR",
+                  "BRA",
+                  "HUN",
+                  "ISR",
+                  "LTU",
+                  "POL",
+                  "ROU",
+                  "RUS",
+                  "THA",
+                  "UKR",
+                  "USA"
+                ]
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "column": {
+                    "minLength": 1,
+                    "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "column"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "historic_mean": {
+            "oneOf": [
+              {
+                "type": "number"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "column": {
+                    "minLength": 1,
+                    "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "column"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "kind": {
+            "const": "crop_context"
+          }
+        },
+        "required": [
+          "kind",
+          "country",
+          "historic_mean"
+        ],
+        "type": "object"
+      },
+      "context_type": "CropContext",
+      "id": "crc:consecutive_dry_days",
+      "input": {
+        "aggregation": "maximum",
+        "event": "dry_day",
+        "kind": "event_count"
+      },
+      "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+      "measurement_schema": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "event": {
+                  "enum": [
+                    "frost_day",
+                    "hot_day",
+                    "freeze_thaw_cycle"
+                  ]
+                }
+              },
+              "required": [
+                "event"
+              ]
+            },
+            "then": {
+              "properties": {
+                "threshold": {
+                  "properties": {
+                    "unit": {
+                      "enum": [
+                        "degC",
+                        "K",
+                        "degF"
+                      ],
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "description": "Count of explicitly identified events, with optional threshold and counting duration.",
+        "properties": {
+          "aggregation": {
+            "enum": [
+              "maximum",
+              "minimum",
+              "mean",
+              "sum",
+              "count"
+            ],
+            "type": "string"
+          },
+          "duration": {
+            "additionalProperties": false,
+            "properties": {
+              "unit": {
+                "enum": [
+                  "s",
+                  "h",
+                  "d",
+                  "month",
+                  "yr"
+                ],
+                "type": "string"
+              },
+              "value": {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "value",
+              "unit"
+            ],
+            "type": "object"
+          },
+          "event": {
+            "enum": [
+              "freeze_thaw_cycle",
+              "frost_day",
+              "hot_day",
+              "dry_day"
+            ],
+            "type": "string"
+          },
+          "kind": {
+            "const": "event_count"
+          },
+          "threshold": {
+            "additionalProperties": false,
+            "properties": {
+              "unit": {
+                "minLength": 1,
+                "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                "type": "string"
+              },
+              "value": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "value",
+              "unit"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "kind",
+          "event",
+          "aggregation"
+        ],
+        "title": "EventCount",
+        "type": "object",
+        "x-crc-calibration": {
+          "fixed_unit": "count",
+          "quantity": "event_count"
+        }
+      },
+      "measurement_type": "EventCount",
+      "output": {
+        "kind": "measurement",
+        "quantity": "crop_yield_change",
+        "unit": "1"
+      },
+      "unestablished_facts": [
+        "dry-day precipitation threshold",
+        "consecutive-event reduction",
+        "calibration reference period"
+      ],
+      "version": "2026.10.1"
+    }
+  ],
+  "schema_version": "1.0"
+}

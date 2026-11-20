@@ -37,8 +37,8 @@
   "files": [
     {
       "path": "catalogs/error-codes.json",
-      "sha256": "0f34f334aafa2b56bb1897fe24c824888f3f88daec345ef84bbe7ae802733af7",
-      "bytes": 4843
+      "sha256": "dd8f2df38611da4da7484115cdf80d0c9255e3885a92e74846fc55fddc51bfdb",
+      "bytes": 4847
     },
     {
       "path": "catalogs/hazard-exposures.json",
@@ -57,7 +57,7 @@
     },
     {
       "path": "catalogs/semantics-constants.json",
-      "sha256": "78e06b9a2206b520154756ad5b745a34468255e911eb242ed6916e0f92b0d535",
+      "sha256": "62d59fbccad5fa0454d6252e37fc62476586ff4080c8d2098bd871da280a5a16",
       "bytes": 3648
     },
     {
@@ -72,13 +72,13 @@
     },
     {
       "path": "fixtures/definitions.json",
-      "sha256": "970e1d95c574978e49233038b1db398cfc04ec5639cb1d6e697fd53defc77ea3",
-      "bytes": 91034
+      "sha256": "cc36c4111cd0e8fac5cabec80856debd6fb1f28ac325e774a75d07dd2f9e6a3f",
+      "bytes": 89617
     },
     {
       "path": "fixtures/evaluation-records.json",
-      "sha256": "ab1a5e9c2f7771573d8602f19c143c0c4e3f61f923998028e4011c465a8ae9dd",
-      "bytes": 99840
+      "sha256": "5fcaf560fa85694c8ee93762bc9e6d0347b04f452f1a8a45e1e9db79d5fc64ec",
+      "bytes": 99776
     },
     {
       "path": "fixtures/monotonicity.json",
@@ -87,18 +87,18 @@
     },
     {
       "path": "fixtures/operations.json",
-      "sha256": "954e2c53b9f4e626a191b78be57855011ea9ff0af9028aa4c319d655ce651f9a",
-      "bytes": 43721
+      "sha256": "891e958a63f3f5f038e579e5519cc2407407345a3c2819d0ce213133b3822a84",
+      "bytes": 43707
     },
     {
       "path": "fixtures/point-evaluations.json",
-      "sha256": "ab61709297a787bca80bc3da1c61fc238007982715cfa1d8405d46ae6510c880",
-      "bytes": 32673
+      "sha256": "1ef6791e36c69af8c773080875d897491a033d81e97a1bdef44fdf3fc0c013b1",
+      "bytes": 34669
     },
     {
       "path": "fixtures/registry-references.json",
-      "sha256": "dcd2123acdbc9fb76d9a6cb391ac89b6d095b8113c0fa0e287bd1871a1bf844c",
-      "bytes": 19302
+      "sha256": "0ae54cb24bcb99d29ed1fa5d85993dd4576530f63ed343fb92f1495c1a978c88",
+      "bytes": 16061
     },
     {
       "path": "fixtures/spatial-policies.json",
@@ -112,18 +112,18 @@
     },
     {
       "path": "schemas/impact-definition-1.0.schema.json",
-      "sha256": "3932c5b3b9730e6d0d8f28589b43e6d50749276dc404b160c061b2c6ddb1d717",
-      "bytes": 46298
+      "sha256": "b57ae74672743670ced0f775bf2b7b5266ed45d33f871761b475122f6d9cb468",
+      "bytes": 44637
     },
     {
       "path": "schemas/impact-evaluation-record-1.0.schema.json",
-      "sha256": "86a5fed1d4c5a03ea232288da4eb4b45c4d7f770ee6b05ce8c63a5c3140c1140",
-      "bytes": 51317
+      "sha256": "36e7170908c15fac492907aa35aad78e096740481a29a1bc6492b7f7db6ad6da",
+      "bytes": 51191
     },
     {
       "path": "schemas/registry-impact-reference-1.0.schema.json",
-      "sha256": "9ff7d2dc1d1dab2e50bb233b5c1e3305a4a9fbda885e8548cf8cdd76865f3fff",
-      "bytes": 13347
+      "sha256": "878d6515206b73eb642edfdc01045e87d71d11dd58a94d010ef8ed23a7134ca0",
+      "bytes": 9718
     },
     {
       "path": "schemas/spatial-combination-policy-1.0.schema.json",

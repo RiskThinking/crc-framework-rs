@@ -1,14 +1,16 @@
 pub mod canonical;
-pub use canonical::{CanonicalCurve, CurveParameters};
+pub use canonical::Numerical;
 pub mod constants;
+pub mod dataset;
 pub mod distribution;
 pub mod error;
 pub mod impact;
 pub mod metrics;
+pub mod numerical;
+pub mod rank;
 mod reference;
 pub mod risk;
 pub mod spatial;
-pub mod transform;
 
 pub use distribution::{
     CensoredQuantileFitDiagnostics, CensoredQuantileFitResult, DiagnosticMetrics, Distribution,
@@ -20,9 +22,8 @@ pub use distribution::{
 pub use error::{CrcError, Result};
 pub use impact::{
     DiscreteDistribution, Expectation, GaussKronrodOptions, HistogramExposure, ImpactAtom,
-    ImpactContractError, ImpactDefinition, ImpactDistribution, ImpactEvaluationRecord,
-    ImpactSource, MethodRequest, RecordedSource, RegistryImpactReference, RequestedMethod,
-    ResolutionContext, ResolvedMethod, SnapshotRef, array_content_sha256, manifest_json,
+    ImpactContractError, ImpactDefinition, ImpactDistribution, ImpactSource, MethodRequest,
+    RegistryImpactReference, RequestedMethod, ResolutionContext, ResolvedMethod, manifest_json,
     registry_identity,
 };
 pub use metrics::{
@@ -30,6 +31,3 @@ pub use metrics::{
     generate_microscores,
 };
 pub use risk::{RiskAttribution, RiskResult, SpanningBranch, compute_risk, compute_spanning_set};
-pub use transform::{
-    ImpactContext, ImpactRegistry, LinearImpact, PiecewiseLinearImpact, SigmoidImpact, Transform,
-};

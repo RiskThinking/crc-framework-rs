@@ -585,6 +585,48 @@
           "slope": 1e+308,
           "intercept": 0.0
         },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:17d7b5a103928e2ba9b1a98589a1aa254133a0a507eca5d2f44c0d645380ab85",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": 0.5,
+          "expected": 5e+307
+        },
+        {
+          "x": 10.0,
+          "error": "non_finite_result"
+        }
+      ],
+      "note": "An unbounded result outside binary64 remains an error."
+    },
+    {
+      "name": "linear-clamped-overflow",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "linear",
+          "slope": 1e+308,
+          "intercept": 0.0
+        },
         "clamp": {
           "minimum": 0.0,
           "maximum": 1.0
@@ -604,15 +646,57 @@
       },
       "cases": [
         {
+          "x": -10.0,
+          "expected": 0.0
+        },
+        {
           "x": 0.5,
           "expected": 1.0
         },
         {
           "x": 10.0,
-          "error": "non_finite_result"
+          "expected": 1.0
         }
       ],
-      "note": "A final clamp must not conceal an overflow in the raw response."
+      "note": "A finite clamp bounds an affine result before the finite-output check."
+    },
+    {
+      "name": "linear-cancelled-overflow",
+      "definition": {
+        "schema_version": "1.0",
+        "semantics_version": "crc-impact/1",
+        "calibration": {
+          "exposure_variable": "value",
+          "exposure_unit": "1",
+          "impact_metric": "response",
+          "impact_unit": "1"
+        },
+        "model": {
+          "kind": "linear",
+          "slope": 2.0,
+          "intercept": -1e+308
+        },
+        "clamp": null,
+        "provenance": {
+          "origin": {
+            "kind": "user_defined"
+          },
+          "sources": [],
+          "derived_from": []
+        }
+      },
+      "definition_hash": "sha256:060f638c2ca9b2b343bea13cb0eaf0948e3e390a4d4bfd7d573d96675aa86643",
+      "tolerance": {
+        "absolute": 1e-12,
+        "relative": 1e-12
+      },
+      "cases": [
+        {
+          "x": 1e+308,
+          "expected": 1e+308
+        }
+      ],
+      "note": "The affine product and intercept are combined before rounding."
     },
     {
       "name": "sigmoid-plain",
@@ -1088,14 +1172,11 @@
             "overrides": {
               "maximum_damage": 0.8
             },
-            "fallback_policy": "error",
             "lookups": [
               {
                 "table_id": "wind.cyclone_params",
                 "table_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-                "requested_key": "PHL",
-                "resolved_key": "PHL",
-                "status": "exact"
+                "key": "PHL"
               }
             ]
           },
@@ -1103,7 +1184,7 @@
           "derived_from": []
         }
       },
-      "definition_hash": "sha256:0e052a65e9260393ef4bc3f702ff6471966eb55b62433fc406694e19c5a9834b",
+      "definition_hash": "sha256:9e729bbc4ccc444cf3851eab651cbdd86de7741660dc4c4cd1a18689250de049",
       "tolerance": {
         "absolute": 1e-12,
         "relative": 1e-12

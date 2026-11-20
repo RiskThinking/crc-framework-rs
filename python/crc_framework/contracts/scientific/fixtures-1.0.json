@@ -1,0 +1,1094 @@
+{
+  "cases": [
+    {
+      "document": {
+        "kind": "measurement"
+      },
+      "name": "Measurement",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "fields": {
+          "definition": {
+            "custom": true
+          }
+        },
+        "kind": "measurement",
+        "quantity": "user:quantity",
+        "unit": "user:unit"
+      },
+      "name": "Measurement",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "kind": "depth_above_ground",
+        "unit": "m"
+      },
+      "name": "DepthAboveGround",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "datum": "user:vertical-datum",
+        "kind": "water_surface_elevation",
+        "unit": "ft"
+      },
+      "name": "WaterSurfaceElevation",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "kind": "ratio",
+        "unit": "1"
+      },
+      "name": "Ratio",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "kind": "time_duration",
+        "unit": "d"
+      },
+      "name": "TimeDuration",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "kind": "temperature",
+        "unit": "degC"
+      },
+      "name": "Temperature",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "aggregation": "maximum",
+        "averaging_duration": {
+          "unit": "s",
+          "value": 3
+        },
+        "kind": "wind_speed",
+        "unit": "m/s"
+      },
+      "name": "WindSpeed",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "accumulation_duration": {
+          "unit": "d",
+          "value": 1
+        },
+        "aggregation": "maximum",
+        "kind": "precipitation_rate",
+        "unit": "mm/day"
+      },
+      "name": "PrecipitationRate",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "accumulation_duration": {
+          "unit": "d",
+          "value": 1
+        },
+        "kind": "precipitation_amount",
+        "unit": "mm"
+      },
+      "name": "PrecipitationAmount",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "aggregation": "count",
+        "duration": {
+          "unit": "yr",
+          "value": 1
+        },
+        "event": "frost_day",
+        "kind": "event_count",
+        "threshold": {
+          "unit": "degC",
+          "value": 0
+        }
+      },
+      "name": "EventCount",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "accumulation_duration": {
+          "unit": "month",
+          "value": 3
+        },
+        "index": "standardized_precipitation_evapotranspiration_index",
+        "kind": "climate_index",
+        "reference_period": {
+          "end": 2010,
+          "start": 1981
+        }
+      },
+      "name": "ClimateIndex",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "duration": {
+          "unit": "yr",
+          "value": 1
+        },
+        "kind": "degree_days",
+        "threshold": {
+          "unit": "degC",
+          "value": 18
+        },
+        "unit": "K.d"
+      },
+      "name": "DegreeDays",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "kind": "empty_context"
+      },
+      "name": "EmptyContext",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "cell": 599686042433355775,
+        "kind": "cell_context"
+      },
+      "name": "CellContext",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "country": "CAN",
+        "kind": "country_context"
+      },
+      "name": "CountryContext",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "asset_type": "industrial",
+        "kind": "inundation_context",
+        "region": "europe"
+      },
+      "name": "InundationContext",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "asset_type": "commercial",
+        "country": "CAN",
+        "kind": "water_cost_context"
+      },
+      "name": "WaterCostContext",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "asset_type": "residential",
+        "country": "CAN",
+        "historic_mean": 20,
+        "kind": "cooling_cost_context"
+      },
+      "name": "CoolingCostContext",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "country": "USA",
+        "historic_mean": 20,
+        "kind": "crop_context"
+      },
+      "name": "CropContext",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "kind": "depth_above_ground",
+        "unit": "metres"
+      },
+      "name": "invalid-measurement-0",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": false
+    },
+    {
+      "document": {
+        "datum": "sea_level",
+        "kind": "depth_above_ground",
+        "unit": "m"
+      },
+      "name": "invalid-measurement-1",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": false
+    },
+    {
+      "document": {
+        "kind": "water_surface_elevation",
+        "unit": "m"
+      },
+      "name": "invalid-measurement-2",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": false
+    },
+    {
+      "document": {
+        "kind": "time_duration",
+        "unit": "days"
+      },
+      "name": "invalid-measurement-3",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": false
+    },
+    {
+      "document": {
+        "averaging_duration": {
+          "unit": "s",
+          "value": 0
+        },
+        "kind": "wind_speed",
+        "unit": "m/s"
+      },
+      "name": "invalid-measurement-4",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": false
+    },
+    {
+      "document": {
+        "aggregation": "count",
+        "event": "frost_day",
+        "kind": "event_count",
+        "threshold": {
+          "operator": "<",
+          "unit": "degC",
+          "value": 0
+        }
+      },
+      "name": "invalid-measurement-5",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": false
+    },
+    {
+      "document": {
+        "kind": "measurement",
+        "quantity": " spaced "
+      },
+      "name": "invalid-measurement-6",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": false
+    },
+    {
+      "document": {
+        "fields": [],
+        "kind": "measurement",
+        "schema": {}
+      },
+      "name": "invalid-measurement-7",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": false
+    },
+    {
+      "document": {
+        "kind": "measurement",
+        "quantity": null
+      },
+      "name": "invalid-measurement-8",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": false
+    },
+    {
+      "document": {
+        "cell": "852b83b3fffffff",
+        "kind": "cell_context"
+      },
+      "name": "invalid-context-0",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "valid": false
+    },
+    {
+      "document": {
+        "building_type": "residential",
+        "continent": "Europe",
+        "kind": "inundation_context"
+      },
+      "name": "invalid-context-1",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "valid": false
+    },
+    {
+      "document": {
+        "asset_type": "residential",
+        "kind": "inundation_context",
+        "region": "EUROPE"
+      },
+      "name": "invalid-context-2",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "valid": false
+    },
+    {
+      "document": {
+        "asset_type": "agricultural_building",
+        "country": "USA",
+        "historic_mean": 20,
+        "kind": "crop_context"
+      },
+      "name": "invalid-context-3",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "valid": false
+    },
+    {
+      "document": {
+        "asset_type": "agricultural_building",
+        "country": "USA",
+        "historic_mean": 20,
+        "kind": "cooling_cost_context"
+      },
+      "name": "invalid-context-4",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "valid": false
+    },
+    {
+      "document": {
+        "fields": {
+          "duration": 0
+        },
+        "kind": "measurement",
+        "schema": {
+          "properties": {
+            "duration": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "name": "custom-fields-violate-schema",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "schema_valid": true,
+      "valid": false
+    },
+    {
+      "document": {
+        "kind": "measurement",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        }
+      },
+      "name": "custom-schema-invalid-dialect",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "schema_valid": true,
+      "valid": false
+    },
+    {
+      "document": {
+        "kind": "measurement",
+        "schema": {
+          "$ref": "https://example.invalid/remote"
+        }
+      },
+      "name": "custom-schema-external-ref",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "schema_valid": true,
+      "valid": false
+    },
+    {
+      "document": {
+        "index": "standardized_precipitation_evapotranspiration_index",
+        "kind": "climate_index",
+        "reference_period": {
+          "end": 1981,
+          "start": 2010
+        }
+      },
+      "name": "unordered-reference-period",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "schema_valid": true,
+      "valid": false
+    },
+    {
+      "document": {
+        "cell": 1,
+        "kind": "cell_context"
+      },
+      "name": "invalid-h3-context",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "schema_valid": true,
+      "valid": false
+    },
+    {
+      "document": {
+        "index": "standardized_precipitation_evapotranspiration_index",
+        "kind": "climate_index",
+        "reference_period": {
+          "end": 2010.0,
+          "start": 1981.0
+        }
+      },
+      "name": "integral-reference-years",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "id": "crc:freeze_thaw_cycles",
+        "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+        "schema_version": "2.0",
+        "version": "2026.10.1"
+      },
+      "name": "reference-FREEZE_THAW_CYCLES",
+      "schema": "https://climateriskcommons.org/schemas/impact-reference-2.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "id": "crc:frost_days",
+        "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+        "schema_version": "2.0",
+        "version": "2026.10.1"
+      },
+      "name": "reference-FROST_DAYS",
+      "schema": "https://climateriskcommons.org/schemas/impact-reference-2.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "id": "crc:maximum_daily_precipitation",
+        "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+        "schema_version": "2.0",
+        "version": "2026.10.1"
+      },
+      "name": "reference-MAXIMUM_DAILY_PRECIPITATION",
+      "schema": "https://climateriskcommons.org/schemas/impact-reference-2.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "id": "crc:cyclone",
+        "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+        "schema_version": "2.0",
+        "version": "2026.10.1"
+      },
+      "name": "reference-CYCLONE",
+      "schema": "https://climateriskcommons.org/schemas/impact-reference-2.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "id": "crc:maximum_daily_wind_speed",
+        "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+        "schema_version": "2.0",
+        "version": "2026.10.1"
+      },
+      "name": "reference-MAXIMUM_DAILY_WIND_SPEED",
+      "schema": "https://climateriskcommons.org/schemas/impact-reference-2.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "id": "crc:fire_weather_index",
+        "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+        "schema_version": "2.0",
+        "version": "2026.10.1"
+      },
+      "name": "reference-FIRE_WEATHER_INDEX",
+      "schema": "https://climateriskcommons.org/schemas/impact-reference-2.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "id": "crc:hot_days",
+        "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+        "schema_version": "2.0",
+        "version": "2026.10.1"
+      },
+      "name": "reference-HOT_DAYS",
+      "schema": "https://climateriskcommons.org/schemas/impact-reference-2.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "id": "crc:coastal_flood",
+        "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+        "schema_version": "2.0",
+        "version": "2026.10.1"
+      },
+      "name": "reference-COASTAL_FLOOD",
+      "schema": "https://climateriskcommons.org/schemas/impact-reference-2.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "id": "crc:river_flood",
+        "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+        "schema_version": "2.0",
+        "version": "2026.10.1"
+      },
+      "name": "reference-RIVER_FLOOD",
+      "schema": "https://climateriskcommons.org/schemas/impact-reference-2.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "id": "crc:inundation",
+        "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+        "schema_version": "2.0",
+        "version": "2026.10.1"
+      },
+      "name": "reference-INUNDATION",
+      "schema": "https://climateriskcommons.org/schemas/impact-reference-2.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "id": "crc:standardized_precipitation_evapotranspiration_index",
+        "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+        "schema_version": "2.0",
+        "version": "2026.10.1"
+      },
+      "name": "reference-STANDARDIZED_PRECIPITATION_EVAPOTRANSPIRATION_INDEX",
+      "schema": "https://climateriskcommons.org/schemas/impact-reference-2.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "id": "crc:cooling_degree_days",
+        "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+        "schema_version": "2.0",
+        "version": "2026.10.1"
+      },
+      "name": "reference-COOLING_DEGREE_DAYS",
+      "schema": "https://climateriskcommons.org/schemas/impact-reference-2.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "id": "crc:cooling_degree_days_crop_yield",
+        "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+        "schema_version": "2.0",
+        "version": "2026.10.1"
+      },
+      "name": "reference-COOLING_DEGREE_DAYS_CROP_YIELD",
+      "schema": "https://climateriskcommons.org/schemas/impact-reference-2.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "id": "crc:consecutive_dry_days",
+        "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+        "schema_version": "2.0",
+        "version": "2026.10.1"
+      },
+      "name": "reference-CONSECUTIVE_DRY_DAYS",
+      "schema": "https://climateriskcommons.org/schemas/impact-reference-2.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "input": {
+          "kind": "ratio",
+          "unit": "1"
+        },
+        "model": {
+          "intercept": 0,
+          "kind": "linear",
+          "slope": 2
+        },
+        "output": {
+          "kind": "ratio",
+          "unit": "1"
+        },
+        "schema_version": "2.0"
+      },
+      "name": "impact-0",
+      "schema": "https://climateriskcommons.org/schemas/impact-2.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "input": {
+          "kind": "ratio",
+          "unit": "1"
+        },
+        "model": {
+          "amplitude": 1,
+          "kind": "sigmoid",
+          "midpoint": 0,
+          "offset": 0,
+          "steepness": 1
+        },
+        "output": {
+          "kind": "ratio",
+          "unit": "1"
+        },
+        "schema_version": "2.0"
+      },
+      "name": "impact-1",
+      "schema": "https://climateriskcommons.org/schemas/impact-2.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "input": {
+          "kind": "ratio",
+          "unit": "1"
+        },
+        "model": {
+          "interpolation": "linear",
+          "kind": "tabulated",
+          "outside_domain": "error",
+          "points": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 1,
+              "y": 1
+            }
+          ]
+        },
+        "output": {
+          "kind": "ratio",
+          "unit": "1"
+        },
+        "schema_version": "2.0"
+      },
+      "name": "impact-2",
+      "schema": "https://climateriskcommons.org/schemas/impact-2.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "input": {
+          "kind": "ratio",
+          "unit": "1"
+        },
+        "model": {
+          "bin_edges": [
+            0,
+            1
+          ],
+          "kind": "binned",
+          "outside_domain": "error",
+          "values": [
+            0.5
+          ]
+        },
+        "output": {
+          "kind": "ratio",
+          "unit": "1"
+        },
+        "schema_version": "2.0"
+      },
+      "name": "impact-3",
+      "schema": "https://climateriskcommons.org/schemas/impact-2.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "input": {
+          "accumulation_duration": {
+            "unit": "d",
+            "value": 1
+          },
+          "kind": "precipitation_amount",
+          "unit": "mm"
+        },
+        "model": {
+          "amplitude": 0.3737,
+          "kind": "sigmoid",
+          "midpoint": 515.1000003814697,
+          "offset": 0,
+          "origin_adjustment": "subtract_at_zero",
+          "steepness": 0.010916281354689056
+        },
+        "output": {
+          "kind": "ratio",
+          "unit": "1"
+        },
+        "provenance": {
+          "context": {
+            "cell": 594475159402840063,
+            "kind": "cell_context"
+          },
+          "model": {
+            "id": "crc:maximum_daily_precipitation",
+            "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+            "schema_version": "2.0",
+            "version": "2026.10.1"
+          }
+        },
+        "schema_version": "2.0"
+      },
+      "name": "impact-4",
+      "schema": "https://climateriskcommons.org/schemas/impact-2.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "input": {
+          "kind": "depth_above_ground",
+          "unit": "m"
+        },
+        "model": {
+          "interpolation": "linear",
+          "kind": "tabulated",
+          "outside_domain": "clamp",
+          "points": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 0.5,
+              "y": 0.25
+            },
+            {
+              "x": 1,
+              "y": 0.4000000059604645
+            },
+            {
+              "x": 1.5,
+              "y": 0.5
+            },
+            {
+              "x": 2,
+              "y": 0.6000000238418579
+            },
+            {
+              "x": 3,
+              "y": 0.75
+            },
+            {
+              "x": 4,
+              "y": 0.8500000238418579
+            },
+            {
+              "x": 5,
+              "y": 0.949999988079071
+            },
+            {
+              "x": 6,
+              "y": 1
+            }
+          ]
+        },
+        "output": {
+          "kind": "ratio",
+          "unit": "1"
+        },
+        "provenance": {
+          "context": {
+            "asset_type": "residential",
+            "kind": "inundation_context",
+            "region": "europe"
+          },
+          "model": {
+            "id": "crc:inundation",
+            "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+            "schema_version": "2.0",
+            "version": "2026.10.1"
+          }
+        },
+        "schema_version": "2.0"
+      },
+      "name": "impact-5",
+      "schema": "https://climateriskcommons.org/schemas/impact-2.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "input": {
+          "kind": "measurement",
+          "quantity": "degree_days",
+          "unit": "K.d"
+        },
+        "model": {
+          "country": {
+            "maize": -37.586936950683594,
+            "rice": -49.58870315551758,
+            "wheat": -10.742522239685059
+          },
+          "historic_mean": 25,
+          "index": {
+            "maize": -3.999999989900971e-06,
+            "rice": -2.499999936844688e-05,
+            "wheat": -3.999999989900971e-06
+          },
+          "kind": "crop",
+          "weights": {
+            "maize": 0.8305072784423828,
+            "rice": 0.03595444932579994,
+            "wheat": 0.13353824615478516
+          },
+          "yearly": {
+            "maize": 0.01978999935090542,
+            "rice": 0.02582699991762638,
+            "wheat": 0.006107000168412924
+          }
+        },
+        "output": {
+          "kind": "measurement",
+          "quantity": "crop_yield_change",
+          "unit": "1"
+        },
+        "provenance": {
+          "context": {
+            "country": "USA",
+            "historic_mean": 25,
+            "kind": "crop_context"
+          },
+          "model": {
+            "id": "crc:cooling_degree_days_crop_yield",
+            "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+            "schema_version": "2.0",
+            "version": "2026.10.1"
+          }
+        },
+        "schema_version": "2.0"
+      },
+      "name": "impact-cooling-degree-days-crop-yield",
+      "schema": "https://climateriskcommons.org/schemas/impact-2.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "input": {
+          "kind": "measurement",
+          "quantity": "degree_days",
+          "unit": "K.d"
+        },
+        "model": {
+          "country": {
+            "maize": -37.586936950683594,
+            "rice": -49.58870315551758,
+            "wheat": -10.742522239685059
+          },
+          "historic_mean": 25,
+          "index": {
+            "maize": -3.999999989900971e-06,
+            "rice": -2.499999936844688e-05,
+            "wheat": -3.999999989900971e-06
+          },
+          "kind": "crop",
+          "weights": {
+            "maize": 0.8305072784423828,
+            "rice": 0.03595444932579994,
+            "wheat": 0.13353824615478516
+          },
+          "yearly": {
+            "maize": 0.01978999935090542,
+            "rice": 0.02582699991762638,
+            "wheat": 0.006107000168412924
+          }
+        },
+        "output": {
+          "kind": "measurement",
+          "quantity": "normalized_cooling_cost",
+          "unit": "1"
+        },
+        "provenance": {
+          "context": {
+            "country": "USA",
+            "historic_mean": 25,
+            "kind": "crop_context"
+          },
+          "model": {
+            "id": "crc:cooling_degree_days_crop_yield",
+            "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+            "schema_version": "2.0",
+            "version": "2026.10.1"
+          }
+        },
+        "schema_version": "2.0"
+      },
+      "name": "impact-crop-yield-labelled-cooling-cost",
+      "schema": "https://climateriskcommons.org/schemas/impact-2.0.schema.json",
+      "schema_valid": true,
+      "valid": false
+    },
+    {
+      "document": {
+        "id": "crc:inundation",
+        "manifest_sha256": "aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+        "schema_version": "2.0",
+        "version": "2026.10.1"
+      },
+      "name": "reference-raw-digest",
+      "schema": "https://climateriskcommons.org/schemas/impact-reference-2.0.schema.json",
+      "valid": false
+    },
+    {
+      "document": {
+        "input": {
+          "kind": "ratio",
+          "unit": "1"
+        },
+        "model": {
+          "intercept": 0,
+          "kind": "linear",
+          "slope": 2,
+          "unrecognized": true
+        },
+        "output": {
+          "kind": "ratio",
+          "unit": "1"
+        },
+        "schema_version": "2.0"
+      },
+      "name": "impact-unknown-model-field",
+      "schema": "https://climateriskcommons.org/schemas/impact-2.0.schema.json",
+      "valid": false
+    },
+    {
+      "document": {
+        "input": {
+          "kind": "depth_above_ground",
+          "unit": "m"
+        },
+        "model": {
+          "interpolation": "linear",
+          "kind": "tabulated",
+          "outside_domain": "clamp",
+          "points": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 0.5,
+              "y": 0.26
+            },
+            {
+              "x": 1,
+              "y": 0.4000000059604645
+            },
+            {
+              "x": 1.5,
+              "y": 0.5
+            },
+            {
+              "x": 2,
+              "y": 0.6000000238418579
+            },
+            {
+              "x": 3,
+              "y": 0.75
+            },
+            {
+              "x": 4,
+              "y": 0.8500000238418579
+            },
+            {
+              "x": 5,
+              "y": 0.949999988079071
+            },
+            {
+              "x": 6,
+              "y": 1
+            }
+          ]
+        },
+        "output": {
+          "kind": "ratio",
+          "unit": "1"
+        },
+        "provenance": {
+          "context": {
+            "asset_type": "residential",
+            "kind": "inundation_context",
+            "region": "europe"
+          },
+          "model": {
+            "id": "crc:inundation",
+            "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
+            "schema_version": "2.0",
+            "version": "2026.10.1"
+          }
+        },
+        "schema_version": "2.0"
+      },
+      "name": "impact-provenance-mismatch",
+      "schema": "https://climateriskcommons.org/schemas/impact-2.0.schema.json",
+      "schema_valid": true,
+      "valid": false
+    },
+    {
+      "document": {
+        "asset_type": {
+          "column": "use"
+        },
+        "kind": "inundation_context",
+        "region": {
+          "column": "region"
+        }
+      },
+      "name": "bound-context-columns",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "fields": {
+          "payload": {
+            "$ref": "literal-user-value",
+            "kind": "measurement",
+            "schema": {
+              "$schema": "user-data"
+            }
+          }
+        },
+        "kind": "measurement",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "const": {
+                "$ref": "literal-user-value",
+                "kind": "measurement",
+                "schema": {
+                  "$schema": "user-data"
+                }
+              }
+            }
+          },
+          "required": [
+            "payload"
+          ],
+          "type": "object"
+        }
+      },
+      "name": "custom-schema-literal-record-keys",
+      "schema": "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
+      "valid": true
+    }
+  ],
+  "schema_version": "1.0"
+}

@@ -42,6 +42,82 @@ fn skew_normal_cdf_and_ppf_match_scipy() {
 }
 
 #[test]
+fn skew_normal_inverts_ranks_in_standardized_coordinates() {
+    let standard = fitted(DistributionFamily::SkewNormal, Some(3.0));
+    let narrow =
+        FittedDistribution::from_parameters(DistributionFamily::SkewNormal, Some(3.0), 0.0, 1e-100)
+            .unwrap();
+    for q in [0.01, 0.1, 0.5, 0.9, 0.99] {
+        let actual = narrow.ppf(q).unwrap();
+        assert!(relative_error(actual, 1e-100 * standard.ppf(q).unwrap()) < 1e-14);
+        assert!(relative_error(narrow.cdf(actual), q) < 1e-12);
+        let reflected = narrow.isf(q).unwrap();
+        assert!(relative_error(narrow.sf(reflected), q) < 1e-12);
+    }
+
+    let wide = FittedDistribution::from_parameters(
+        DistributionFamily::SkewNormal,
+        Some(0.0),
+        -1e308,
+        1e308,
+    )
+    .unwrap();
+    assert_eq!(wide.ppf(0.5).unwrap(), -1e308);
+    assert_eq!(wide.isf(0.5).unwrap(), -1e308);
+}
+
+#[test]
+fn skew_normal_inverse_retains_rare_upper_and_near_zero_ranks() {
+    let normal = fitted(DistributionFamily::SkewNormal, Some(0.0));
+    let q = f64::from_bits(1.0_f64.to_bits() - 1);
+    let x = normal.ppf(q).unwrap();
+    assert!(relative_error(normal.sf(x), 1.0 - q) < 1e-12);
+
+    let skewed = fitted(DistributionFamily::SkewNormal, Some(1e100));
+    for q in [1e-101, 1e-100] {
+        let x = skewed.ppf(q).unwrap();
+        assert!(x.abs() < 1e-99);
+        assert!(relative_error(skewed.cdf(x), q) < 1e-11);
+    }
+}
+
+#[test]
+fn skew_normal_median_preserves_very_small_nonzero_skew() {
+    for shape in [-1e-100, 1e-100] {
+        let law = FittedDistribution::from_parameters(
+            DistributionFamily::SkewNormal,
+            Some(shape),
+            0.0,
+            1e200,
+        )
+        .unwrap();
+        // The standard skew-normal median is sqrt(2/pi) * shape + O(shape^3).
+        let expected = (2.0 / std::f64::consts::PI).sqrt() * shape * 1e200;
+        assert!(relative_error(law.ppf(0.5).unwrap(), expected) < 1e-14);
+        assert!(relative_error(law.isf(0.5).unwrap(), expected) < 1e-14);
+    }
+}
+
+#[test]
+fn gev_cdf_and_survival_match_inverse_ranks_at_small_shapes() {
+    for shape in [-1e-12, 1e-12] {
+        let law = fitted(DistributionFamily::GenExtreme, Some(shape));
+        for q in [0.1, 0.5, 0.9] {
+            let x = law.ppf(q).unwrap();
+            assert!(relative_error(law.cdf(x), q) < 1e-12);
+            assert!(relative_error(law.sf(x), 1.0 - q) < 1e-12);
+        }
+    }
+}
+
+#[test]
+fn gev_queries_preserve_probability_when_the_standardized_product_overflows() {
+    let law = fitted(DistributionFamily::GenExtreme, Some(-1e308));
+    assert_eq!(law.cdf(10.0), (-1.0_f64).exp());
+    assert_eq!(law.sf(10.0), -(-1.0_f64).exp_m1());
+}
+
+#[test]
 fn ks_pvalue_is_one_for_a_perfect_large_sample() {
     let distribution = fitted(DistributionFamily::GumbelRight, None);
     for count in [100usize, 10_000, 100_000] {

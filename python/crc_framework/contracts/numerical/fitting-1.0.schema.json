@@ -1,0 +1,886 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://climateriskcommons.org/schemas/fitting/1.0",
+  "$defs": {
+    "samples_fit_specification": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "samples"
+        },
+        "family": {
+          "enum": [
+            "genextreme",
+            "weibull_min",
+            "weibull_max",
+            "skewnorm",
+            "gumbel_r",
+            "gumbel_l",
+            "genpareto"
+          ]
+        },
+        "constraints": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "minimum_value": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": -1.7976931348623157e+308,
+                      "maximum": 1.7976931348623157e+308
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "maximum_value": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": -1.7976931348623157e+308,
+                      "maximum": 1.7976931348623157e+308
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "probability": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "require_sample_support": {
+                  "type": "boolean"
+                }
+              },
+              "required": [],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "estimator": {
+          "enum": [
+            "mle",
+            "lmoments"
+          ]
+        },
+        "minimum_samples": {
+          "type": "integer",
+          "minimum": 3
+        },
+        "fallbacks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/samples_fit_specification"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "family"
+      ],
+      "additionalProperties": false
+    },
+    "quantiles_fit_specification": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "quantiles"
+        },
+        "family": {
+          "enum": [
+            "genextreme",
+            "weibull_min",
+            "weibull_max",
+            "skewnorm",
+            "gumbel_r",
+            "gumbel_l",
+            "genpareto"
+          ]
+        },
+        "constraints": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "minimum_value": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": -1.7976931348623157e+308,
+                      "maximum": 1.7976931348623157e+308
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "maximum_value": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": -1.7976931348623157e+308,
+                      "maximum": 1.7976931348623157e+308
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "probability": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "require_sample_support": {
+                  "type": "boolean"
+                }
+              },
+              "required": [],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "weights": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1.7976931348623157e+308
+              },
+              "minItems": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "minimum_knots": {
+          "type": "integer",
+          "minimum": 4
+        }
+      },
+      "required": [
+        "kind",
+        "family"
+      ],
+      "additionalProperties": false
+    },
+    "censored_quantiles_fit_specification": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "censored_quantiles"
+        },
+        "family": {
+          "enum": [
+            "genextreme",
+            "weibull_min",
+            "weibull_max",
+            "skewnorm",
+            "gumbel_r",
+            "gumbel_l",
+            "genpareto"
+          ]
+        },
+        "constraints": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "minimum_value": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": -1.7976931348623157e+308,
+                      "maximum": 1.7976931348623157e+308
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "maximum_value": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": -1.7976931348623157e+308,
+                      "maximum": 1.7976931348623157e+308
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "probability": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "require_sample_support": {
+                  "type": "boolean"
+                }
+              },
+              "required": [],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "censor_location": {
+          "type": "number",
+          "minimum": -1.7976931348623157e+308,
+          "maximum": 1.7976931348623157e+308
+        },
+        "residual_scale_floor_ratio": {
+          "type": "number",
+          "minimum": -1.7976931348623157e+308,
+          "maximum": 1.7976931348623157e+308,
+          "exclusiveMinimum": 0
+        },
+        "minimum_knots": {
+          "type": "integer",
+          "minimum": 4
+        }
+      },
+      "required": [
+        "kind",
+        "family",
+        "censor_location"
+      ],
+      "additionalProperties": false
+    },
+    "hurdle_quantiles_fit_specification": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "hurdle_quantiles"
+        },
+        "family": {
+          "enum": [
+            "genextreme",
+            "weibull_min",
+            "weibull_max",
+            "skewnorm",
+            "gumbel_r",
+            "gumbel_l",
+            "genpareto"
+          ]
+        },
+        "constraints": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "minimum_value": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": -1.7976931348623157e+308,
+                      "maximum": 1.7976931348623157e+308
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "maximum_value": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": -1.7976931348623157e+308,
+                      "maximum": 1.7976931348623157e+308
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "probability": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "require_sample_support": {
+                  "type": "boolean"
+                }
+              },
+              "required": [],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "atom_probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "atom_location": {
+          "type": "number",
+          "minimum": -1.7976931348623157e+308,
+          "maximum": 1.7976931348623157e+308
+        },
+        "minimum_knots": {
+          "type": "integer",
+          "minimum": 4
+        }
+      },
+      "required": [
+        "kind",
+        "family",
+        "atom_probability"
+      ],
+      "additionalProperties": false
+    },
+    "concrete_specification": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/samples_fit_specification"
+        },
+        {
+          "$ref": "#/$defs/quantiles_fit_specification"
+        },
+        {
+          "$ref": "#/$defs/censored_quantiles_fit_specification"
+        },
+        {
+          "$ref": "#/$defs/hurdle_quantiles_fit_specification"
+        }
+      ]
+    },
+    "model_selection": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "model_selection"
+        },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/concrete_specification"
+          },
+          "minItems": 1
+        },
+        "criterion": {
+          "enum": [
+            "ks",
+            "normalized_rmse"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "candidates"
+      ],
+      "additionalProperties": false
+    },
+    "specification": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/concrete_specification"
+        },
+        {
+          "$ref": "#/$defs/model_selection"
+        }
+      ]
+    }
+  },
+  "type": "object",
+  "properties": {
+    "specification": {
+      "$ref": "#/$defs/specification"
+    },
+    "attempts": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "specification": {
+                "$ref": "#/$defs/samples_fit_specification"
+              },
+              "status": {
+                "const": "converged"
+              },
+              "diagnostic": {
+                "type": "object",
+                "properties": {
+                  "ks_statistic": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "ks_pvalue": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "rmse": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "r_squared": {
+                    "type": "number",
+                    "minimum": -1.7976931348623157e+308,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "iterations": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "evaluations": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "ks_statistic",
+                  "ks_pvalue",
+                  "rmse",
+                  "r_squared",
+                  "iterations",
+                  "evaluations"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "specification",
+              "status",
+              "diagnostic"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "specification": {
+                "$ref": "#/$defs/quantiles_fit_specification"
+              },
+              "status": {
+                "const": "converged"
+              },
+              "diagnostic": {
+                "type": "object",
+                "properties": {
+                  "rmse": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "weighted_r_squared": {
+                    "type": "number",
+                    "minimum": -1.7976931348623157e+308,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "maximum_absolute_residual": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "normalized_rmse": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "normalization_scale": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308,
+                    "exclusiveMinimum": 0
+                  },
+                  "iterations": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "evaluations": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "rmse",
+                  "weighted_r_squared",
+                  "maximum_absolute_residual",
+                  "normalized_rmse",
+                  "normalization_scale",
+                  "iterations",
+                  "evaluations"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "specification",
+              "status",
+              "diagnostic"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "specification": {
+                "$ref": "#/$defs/censored_quantiles_fit_specification"
+              },
+              "status": {
+                "const": "converged"
+              },
+              "diagnostic": {
+                "type": "object",
+                "properties": {
+                  "rmse": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "weighted_r_squared": {
+                    "type": "number",
+                    "minimum": -1.7976931348623157e+308,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "maximum_absolute_residual": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "normalized_rmse": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "normalization_scale": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308,
+                    "exclusiveMinimum": 0
+                  },
+                  "negative_log_likelihood": {
+                    "type": "number",
+                    "minimum": -1.7976931348623157e+308,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "residual_scale": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308,
+                    "exclusiveMinimum": 0
+                  },
+                  "residual_scale_floor": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308,
+                    "exclusiveMinimum": 0
+                  },
+                  "censored_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "uncensored_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "iterations": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "evaluations": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "rmse",
+                  "weighted_r_squared",
+                  "maximum_absolute_residual",
+                  "normalized_rmse",
+                  "normalization_scale",
+                  "negative_log_likelihood",
+                  "residual_scale",
+                  "residual_scale_floor",
+                  "censored_count",
+                  "uncensored_count",
+                  "iterations",
+                  "evaluations"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "specification",
+              "status",
+              "diagnostic"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "specification": {
+                "$ref": "#/$defs/hurdle_quantiles_fit_specification"
+              },
+              "status": {
+                "const": "converged"
+              },
+              "diagnostic": {
+                "type": "object",
+                "properties": {
+                  "normalized_rmse": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "normalization_scale": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308,
+                    "exclusiveMinimum": 0
+                  },
+                  "tail_rmse": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "tail_weighted_r_squared": {
+                    "type": "number",
+                    "minimum": -1.7976931348623157e+308,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "tail_maximum_absolute_residual": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "atom_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "tail_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "iterations": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "evaluations": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "normalized_rmse",
+                  "normalization_scale",
+                  "tail_rmse",
+                  "tail_weighted_r_squared",
+                  "tail_maximum_absolute_residual",
+                  "atom_count",
+                  "tail_count",
+                  "iterations",
+                  "evaluations"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "specification",
+              "status",
+              "diagnostic"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "specification": {
+                "$ref": "#/$defs/concrete_specification"
+              },
+              "status": {
+                "enum": [
+                  "rejected",
+                  "failed"
+                ]
+              },
+              "diagnostic": {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "message"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "specification",
+              "status",
+              "diagnostic"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "minItems": 1
+    },
+    "selected_attempt": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "estimator": {
+      "anyOf": [
+        {
+          "enum": [
+            "mle",
+            "lmoments"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "converged": {
+      "type": "boolean"
+    },
+    "evidence_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "used_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "excluded_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "weights": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "value_interval": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": -1.7976931348623157e+308,
+            "maximum": 1.7976931348623157e+308
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "probability_interval": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "engine_version": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "specification",
+    "attempts",
+    "selected_attempt",
+    "estimator",
+    "converged",
+    "evidence_count",
+    "used_count",
+    "excluded_count",
+    "weights",
+    "value_interval",
+    "probability_interval",
+    "engine_version"
+  ],
+  "additionalProperties": false
+}
