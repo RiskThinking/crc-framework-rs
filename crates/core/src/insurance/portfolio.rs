@@ -268,17 +268,18 @@ mod tests {
                 ],
             ),
         ];
-        let matrix = Some(&[vec![1.0, 0.8], vec![0.8, 1.0]][..]);
-        let spatial = simulate_separate_peril_losses(&across_locations, matrix, &spec, &options)
-            .unwrap()
-            .components
-            .unwrap();
+        let matrix = [vec![1.0, 0.8], vec![0.8, 1.0]];
+        let spatial =
+            simulate_separate_peril_losses(&across_locations, Some(&matrix), &spec, &options)
+                .unwrap()
+                .components
+                .unwrap();
         let expected = 6.0 * (0.8 * spec.peak_correlation / 2.0).asin() / std::f64::consts::PI;
         assert!((correlation(&spatial[0].1, &spatial[1].1) - expected).abs() < 0.03);
 
         let result = simulate_separate_peril_losses(
             &books([0.5, 0.5]),
-            Some(&[vec![1.0, 0.8], vec![0.8, 1.0]]),
+            Some(&matrix),
             &AnnualLossSpec::default(),
             &options,
         )
