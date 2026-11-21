@@ -284,6 +284,36 @@ def test_a_decreasing_map_skips_zero_mass_support_gaps() -> None:
     assert image.quantile(0.5) == -2.0
 
 
+@pytest.mark.parametrize(
+    ("direction", "upper_cvar", "lower_cvar"),
+    [(1, 2.0, 1 / 18), (-1, -1 / 18, -2.0)],
+)
+def test_piecewise_linear_segment_moments_cover_both_tail_directions(
+    direction: int, upper_cvar: float, lower_cvar: float, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = Distribution.hurdle(
+        Distribution.histogram([0, 4], [1]), atom_probability=0.25, atom_location=0
+    )
+    response = Impact.tabulated(
+        [(0, 0), (2, direction), (4, 3 * direction)], input=Ratio(), output=Ratio()
+    )
+    image = response.pushforward(source)
+
+    def unexpected_source_rebuild(*args: object) -> None:
+        pytest.fail("the native pushforward already contains the source")
+
+    monkeypatch.setattr(Distribution, "from_json", unexpected_source_rebuild)
+    upper = image.statistics(
+        metrics=[Statistic.MEAN, Statistic.VARIANCE, Statistic.CVAR], level=0.625
+    )
+    mean = direction * 15 / 16
+    assert upper.values[Statistic.MEAN].value == pytest.approx(mean)
+    assert upper.values[Statistic.VARIANCE].value == pytest.approx(7 / 4 - mean**2)
+    assert upper.values[Statistic.CVAR].value == pytest.approx(upper_cvar)
+    lower = image.statistics(metrics=[Statistic.CVAR], level=0.625, tail=Tail.LOWER)
+    assert lower.values[Statistic.CVAR].value == pytest.approx(lower_cvar)
+
+
 def test_partial_evidence_cannot_be_used_as_a_law() -> None:
     evidence = QuantileCurve([0.9, 0.99], [1, 3])
     with pytest.raises(TypeError, match="Distribution"):
