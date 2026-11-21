@@ -1,12 +1,14 @@
 use std::sync::Arc;
 
 use super::PolicyTerms;
-use super::dependence::{CorrelationRepair, factor_coordinates, validate_dependence};
+use super::dependence::{
+    CorrelationFactor, CorrelationRepair, factor_coordinates, validate_dependence,
+};
 use super::sampling::{Draws, SeededDraws, normal_rank};
 use crate::numerical::{CompensatedSum, compensated};
 use crate::{CrcError, Distribution, Interpolation, Result, TabulatedDistribution};
 
-/// Scientific and random-stream settings for a single peril.
+/// Scientific and random-stream settings shared by the modeled perils.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AnnualLossSpec {
     pub trials: usize,
@@ -105,9 +107,15 @@ impl InsuredInterest {
         }
         Ok(())
     }
+
+    pub(super) fn simulate(&self, normal: f64, cv: f64, draws: &mut impl Draws) -> Result<f64> {
+        let mean = self.damage_curve.0.ppf(normal_rank(normal))?;
+        let ratio = draws.damage_ratio(mean, cv)?;
+        self.terms.insured_loss(self.total_insured_value, ratio)
+    }
 }
 
-/// Execution limits and optional per-interest output.
+/// Execution limits and optional aligned component output.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SimulationOptions {
     /// Vary this between paired runs to separate secondary uncertainty while
@@ -140,25 +148,43 @@ pub struct AnnualLossSimulation {
     pub correlation_repair: Option<CorrelationRepair>,
 }
 
-fn invalid(message: impl Into<String>) -> CrcError {
+pub(super) fn invalid(message: impl Into<String>) -> CrcError {
     CrcError::InvalidInput(message.into())
 }
 
-fn check_budget(count: usize, spec: &AnnualLossSpec, options: &SimulationOptions) -> Result<()> {
+pub(super) fn check_budget(
+    interests: usize,
+    perils: usize,
+    cross_correlated: bool,
+    spec: &AnnualLossSpec,
+    options: &SimulationOptions,
+) -> Result<()> {
     if options.block_size == 0 || options.memory_limit == 0 || options.work_limit == 0 {
         return Err(invalid(
             "block_size, memory_limit, and work_limit must be positive",
         ));
     }
 
-    let n = count as u128;
+    let n = interests as u128;
+    let p = perils as u128;
     let trials = spec.trials as u128;
-    let outputs = trials * (1 + if options.include_components { n } else { 0 });
+    let component_count = if p == 1 { n } else { p };
+    let outputs = trials.saturating_mul(
+        1 + if options.include_components {
+            component_count
+        } else {
+            0
+        },
+    );
     // Include one output copy for transfer and the reusable vectors, sorted
     // interest references, and per-component vector headers.
-    let vectors = 16 * n;
+    let mut vectors = n.saturating_mul(p).saturating_mul(16);
+    if p > 1 {
+        let stream_words = size_of::<SeededDraws>().div_ceil(size_of::<f64>()) as u128;
+        vectors = vectors.saturating_add(p.saturating_mul(stream_words + 16));
+    }
     let dense = n > 1 && spec.peak_correlation > 0.0;
-    let (matrix, work) = if dense {
+    let (mut matrix, mut work) = if dense {
         let square = n * n;
         let (buffers, passes) = if spec.repair_tolerance.is_some() {
             (5, 5)
@@ -170,37 +196,85 @@ fn check_budget(count: usize, spec: &AnnualLossSpec, options: &SimulationOptions
             square
                 .saturating_mul(n)
                 .saturating_mul(passes)
-                .saturating_add(trials.saturating_mul(n * (n + 1) / 2)),
+                .saturating_add(trials.saturating_mul(p).saturating_mul(n * (n + 1) / 2)),
         )
     } else {
         (0, 0)
     };
+    if cross_correlated {
+        let square = p * p;
+        matrix = matrix.saturating_add(square.saturating_mul(2));
+        work = work
+            .saturating_add(square.saturating_mul(p))
+            .saturating_add(trials.saturating_mul(n).saturating_mul(p * (p + 1) / 2));
+    }
     let bytes = matrix
         .saturating_add(vectors)
         .saturating_add(outputs.saturating_mul(2))
         .saturating_mul(size_of::<f64>() as u128);
     if bytes > options.memory_limit as u128 {
         return Err(invalid(format!(
-            "estimated simulation memory {bytes} bytes exceeds memory_limit={}; reduce trials, interests, or component output",
+            "estimated simulation memory {bytes} bytes exceeds memory_limit={}; reduce trials, book size, or component output",
             options.memory_limit,
         )));
     }
-    let work = work.saturating_add(n.saturating_mul(trials).saturating_mul(3));
+    let work = work.saturating_add(n.saturating_mul(p).saturating_mul(trials).saturating_mul(3));
     if work > options.work_limit as u128 {
         return Err(invalid(format!(
-            "estimated simulation work {work} exceeds work_limit={}; reduce trials or interests",
+            "estimated simulation work {work} exceeds work_limit={}; reduce trials or book size",
             options.work_limit,
         )));
     }
     Ok(())
 }
 
-fn reserve_trials(count: usize) -> Result<Vec<f64>> {
+pub(super) fn reserve_trials(count: usize) -> Result<Vec<f64>> {
     let mut losses = Vec::new();
     losses
         .try_reserve_exact(count)
         .map_err(|_| invalid("could not allocate annual output"))?;
     Ok(losses)
+}
+
+pub(super) fn ordered_interests(interests: &[InsuredInterest]) -> Result<Vec<&InsuredInterest>> {
+    let mut ordered = interests.iter().collect::<Vec<_>>();
+    ordered.sort_unstable_by(|left, right| left.id.cmp(&right.id));
+    for interest in &ordered {
+        interest.validate()?;
+    }
+    if let Some(pair) = ordered.windows(2).find(|pair| pair[0].id == pair[1].id) {
+        return Err(invalid(format!(
+            "duplicate insured interest ID {:?}",
+            pair[0].id
+        )));
+    }
+    Ok(ordered)
+}
+
+pub(super) fn book_value(interests: &[&InsuredInterest]) -> Result<f64> {
+    let total = compensated(interests.iter().map(|item| item.total_insured_value));
+    if !total.is_finite() {
+        return Err(invalid(
+            "portfolio total insured value exceeds the representable range",
+        ));
+    }
+    Ok(total)
+}
+
+pub(super) fn spatial_factor(
+    interests: &[&InsuredInterest],
+    spec: &AnnualLossSpec,
+) -> Result<(CorrelationFactor, Option<CorrelationRepair>)> {
+    let coordinates = interests
+        .iter()
+        .map(|item| (item.longitude, item.latitude))
+        .collect::<Vec<_>>();
+    factor_coordinates(
+        &coordinates,
+        spec.peak_correlation,
+        spec.decay_length_km,
+        spec.repair_tolerance,
+    )
 }
 
 /// Simulate a book in one currency and valuation basis for a single peril.
@@ -229,34 +303,10 @@ fn simulate_with_draws(
             "annual loss simulation requires at least one insured interest",
         ));
     }
-    check_budget(interests.len(), spec, options)?;
-    let mut interests = interests.iter().collect::<Vec<_>>();
-    interests.sort_unstable_by(|left, right| left.id.cmp(&right.id));
-    for interest in &interests {
-        interest.validate()?;
-    }
-    if let Some(pair) = interests.windows(2).find(|pair| pair[0].id == pair[1].id) {
-        return Err(invalid(format!(
-            "duplicate insured interest ID {:?}",
-            pair[0].id
-        )));
-    }
-    let total_insured_value = compensated(interests.iter().map(|item| item.total_insured_value));
-    if !total_insured_value.is_finite() {
-        return Err(invalid(
-            "portfolio total insured value exceeds the representable range",
-        ));
-    }
-    let coordinates = interests
-        .iter()
-        .map(|item| (item.longitude, item.latitude))
-        .collect::<Vec<_>>();
-    let (factor, correlation_repair) = factor_coordinates(
-        &coordinates,
-        spec.peak_correlation,
-        spec.decay_length_km,
-        spec.repair_tolerance,
-    )?;
+    check_budget(interests.len(), 1, false, spec, options)?;
+    let interests = ordered_interests(interests)?;
+    let total_insured_value = book_value(&interests)?;
+    let (factor, correlation_repair) = spatial_factor(&interests, spec)?;
     let mut totals = reserve_trials(spec.trials)?;
     let mut components = options
         .include_components
@@ -276,11 +326,7 @@ fn simulate_with_draws(
             factor.apply(&independent, &mut correlated);
             let mut annual = CompensatedSum::default();
             for (position, (interest, &normal)) in interests.iter().zip(&correlated).enumerate() {
-                let mean = interest.damage_curve.0.ppf(normal_rank(normal))?;
-                let ratio = draws.damage_ratio(mean, spec.damage_cv)?;
-                let loss = interest
-                    .terms
-                    .insured_loss(interest.total_insured_value, ratio)?;
+                let loss = interest.simulate(normal, spec.damage_cv, draws)?;
                 annual.add(loss);
                 if let Some(components) = &mut components {
                     components[position].1.push(loss);

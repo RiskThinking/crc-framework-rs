@@ -1,6 +1,8 @@
 use crc_framework_core::insurance::{
-    ANNUAL_LOSS_RNG_ALGORITHM, AnnualLossSpec, DamageCurve, InsuredInterest, PolicyTerms,
-    SimulationOptions, simulate_annual_losses as simulate, summarize_annual_losses as summarize,
+    ANNUAL_LOSS_RNG_ALGORITHM, AnnualLossSimulation, AnnualLossSpec, DamageCurve, InsuredInterest,
+    PolicyTerms, SEPARATE_PERIL_RNG_ALGORITHM, SimulationOptions,
+    simulate_annual_losses as simulate, simulate_separate_peril_losses as simulate_separate,
+    summarize_annual_losses as summarize, validate_peril_correlation as validate_correlation,
 };
 use pyo3::{
     prelude::*,
@@ -30,6 +32,7 @@ type NativeSummary = (
     Vec<NativeExceedance>,
 );
 type NativeSimulationOptions = (bool, u64, usize, usize, u64);
+type NativePerils = Vec<(String, Vec<Py<PyInsuredInterest>>)>;
 type NativeSimulation<'py> = (
     Bound<'py, PyBytes>,
     Option<Vec<(String, Bound<'py, PyBytes>)>>,
@@ -142,21 +145,66 @@ fn simulate_annual_losses<'py>(
     execution: NativeSimulationOptions,
 ) -> PyResult<NativeSimulation<'py>> {
     let spec = spec.0;
+    let options = simulation_options(execution);
+    let interests = owned_interests(py, interests);
+    let result = py
+        .detach(move || simulate(&interests, &spec, &options))
+        .map_err(super::py_error)?;
+    snapshot_result(py, result, ANNUAL_LOSS_RNG_ALGORITHM)
+}
+
+#[pyfunction]
+#[pyo3(signature = (perils, cross_peril_correlation, spec, execution))]
+fn simulate_separate_peril_losses<'py>(
+    py: Python<'py>,
+    perils: NativePerils,
+    cross_peril_correlation: Option<Vec<Vec<f64>>>,
+    spec: PyRef<'_, PyAnnualLossSpec>,
+    execution: NativeSimulationOptions,
+) -> PyResult<NativeSimulation<'py>> {
+    let spec = spec.0;
+    let options = simulation_options(execution);
+    let perils: Vec<_> = perils
+        .into_iter()
+        .map(|(name, interests)| (name, owned_interests(py, interests)))
+        .collect();
+    let result = py
+        .detach(move || {
+            simulate_separate(&perils, cross_peril_correlation.as_deref(), &spec, &options)
+        })
+        .map_err(super::py_error)?;
+    snapshot_result(py, result, SEPARATE_PERIL_RNG_ALGORITHM)
+}
+
+#[pyfunction]
+fn validate_peril_correlation(py: Python<'_>, correlation: Vec<Vec<f64>>) -> PyResult<()> {
+    py.detach(move || validate_correlation(&correlation))
+        .map_err(super::py_error)
+}
+
+fn owned_interests(py: Python<'_>, interests: Vec<Py<PyInsuredInterest>>) -> Vec<InsuredInterest> {
+    interests
+        .into_iter()
+        .map(|interest| interest.bind(py).borrow().0.clone())
+        .collect()
+}
+
+fn simulation_options(execution: NativeSimulationOptions) -> SimulationOptions {
     let (include_components, secondary_stream, block_size, memory_limit, work_limit) = execution;
-    let options = SimulationOptions {
+    SimulationOptions {
         secondary_stream,
         include_components,
         block_size,
         memory_limit,
         work_limit,
-    };
-    let interests: Vec<_> = interests
-        .into_iter()
-        .map(|interest| interest.bind(py).borrow().0.clone())
-        .collect();
-    let result = py
-        .detach(move || simulate(&interests, &spec, &options))
-        .map_err(super::py_error)?;
+    }
+}
+
+fn snapshot_result<'py>(
+    py: Python<'py>,
+    result: AnnualLossSimulation,
+    rng_algorithm: &'static str,
+) -> PyResult<NativeSimulation<'py>> {
     let totals = snapshot(py, result.totals)?;
     let components = result
         .components
@@ -174,7 +222,7 @@ fn simulate_annual_losses<'py>(
         totals,
         components,
         result.total_insured_value,
-        ANNUAL_LOSS_RNG_ALGORITHM,
+        rng_algorithm,
         correlation_repair,
     ))
 }
@@ -245,6 +293,8 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyAnnualLossSpec>()?;
     module.add_class::<PyInsuredInterest>()?;
     module.add_function(wrap_pyfunction!(simulate_annual_losses, module)?)?;
+    module.add_function(wrap_pyfunction!(simulate_separate_peril_losses, module)?)?;
+    module.add_function(wrap_pyfunction!(validate_peril_correlation, module)?)?;
     module.add_function(wrap_pyfunction!(summarize_annual_losses, module)?)?;
     Ok(())
 }

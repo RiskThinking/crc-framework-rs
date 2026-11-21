@@ -60,8 +60,10 @@ from ._insurance import (
     AnnualLossSummary,
     CorrelationRepair,
     InsuredInterest,
+    PerilDependence,
     PolicyTerms,
     simulate_annual_losses,
+    simulate_separate_peril_losses,
     summarize_annual_losses,
 )
 from ._measurement import (
@@ -169,6 +171,7 @@ __all__ = [
     "LengthUnit",
     "Measurement",
     "ModelSelection",
+    "PerilDependence",
     "PolicyTerms",
     "PrecipitationAmount",
     "PrecipitationRate",
@@ -210,5 +213,6 @@ __all__ = [
     "lookup_ipcc_region",
     "rank_scenarios",
     "simulate_annual_losses",
+    "simulate_separate_peril_losses",
     "summarize_annual_losses",
 ]

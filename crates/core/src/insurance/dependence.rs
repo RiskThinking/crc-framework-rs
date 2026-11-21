@@ -42,6 +42,71 @@ impl CorrelationFactor {
             }
         }
     }
+
+    /// Mix one peril's independent spatial innovations with corresponding
+    /// innovations from earlier rows of the peril factor.
+    pub(super) fn mix_row<'a>(
+        &self,
+        independent: &'a [Vec<f64>],
+        row: usize,
+        buffer: &'a mut [f64],
+    ) -> &'a [f64] {
+        match self {
+            Self::Independent => &independent[row],
+            Self::Cholesky(factor) => {
+                buffer.fill(0.0);
+                for (column, values) in independent[..=row].iter().enumerate() {
+                    let coefficient = factor[(row, column)];
+                    if coefficient != 0.0 {
+                        for (output, &value) in buffer.iter_mut().zip(values) {
+                            *output = coefficient.mul_add(value, *output);
+                        }
+                    }
+                }
+                buffer
+            }
+        }
+    }
+}
+
+/// Validate an explicit latent Gaussian correlation matrix across perils.
+/// Singular and indefinite matrices require a new declaration or calibration.
+pub fn validate_peril_correlation(matrix: &[Vec<f64>]) -> Result<()> {
+    factor_perils(matrix, &(0..matrix.len()).collect::<Vec<_>>()).map(|_| ())
+}
+
+pub(super) fn factor_perils(matrix: &[Vec<f64>], order: &[usize]) -> Result<CorrelationFactor> {
+    let size = order.len();
+    if size < 2 || matrix.len() != size || matrix.iter().any(|row| row.len() != size) {
+        return Err(CrcError::InvalidInput(
+            "cross-peril correlation requires a square matrix for at least two perils".into(),
+        ));
+    }
+    for (row, values) in matrix.iter().enumerate() {
+        if values[row] != 1.0 {
+            return Err(CrcError::InvalidInput(
+                "cross-peril correlation requires a unit diagonal".into(),
+            ));
+        }
+        for (column, &value) in values[..row].iter().enumerate() {
+            if !(-1.0..=1.0).contains(&value) || value != matrix[column][row] {
+                return Err(CrcError::InvalidInput(
+                    "cross-peril correlation must be finite, symmetric and in [-1, 1]".into(),
+                ));
+            }
+            if value.abs() == 1.0 {
+                return Err(CrcError::InvalidInput(
+                    "cross-peril correlation must be positive definite".into(),
+                ));
+            }
+        }
+    }
+    let ordered = DMatrix::from_fn(size, size, |row, column| matrix[order[row]][order[column]]);
+    Cholesky::new(ordered)
+        .map(|factor| CorrelationFactor::Cholesky(factor.unpack_dirty()))
+        .ok_or_else(|| {
+            CrcError::InvalidInput("cross-peril correlation must be positive definite".into())
+        })
 }
 
 pub(super) fn validate_dependence(

@@ -7,6 +7,7 @@
     "Values": "float | ArrayLike",
     "ValueResult": "float | FloatArray",
     "FloatArray": "numpy.typing.NDArray[numpy.float64]",
+    "MatrixLike": "Sequence[Sequence[float]] | FloatArray",
     "Unit": "LengthUnit | TimeUnit | RatioUnit | TemperatureUnit | SpeedUnit | PrecipitationRateUnit | DegreeDayUnit",
     "ScientificValue": "None | bool | int | float | str | Sequence[ScientificValue] | Mapping[str, ScientificValue]",
     "ConvergedFitDiagnostic": "SampleFitDiagnostic | QuantileFitDiagnostic | CensoredQuantileFitDiagnostic | HurdleQuantileFitDiagnostic"
@@ -55,6 +56,8 @@
         "secondary_stream": "int",
         "rng_algorithm": "str",
         "correlation_repair": "CorrelationRepair | None",
+        "perils": "tuple[str, ...]",
+        "dependence": "PerilDependence | None",
         "trial_ids": "range"
       }
     },
@@ -1772,6 +1775,81 @@
         "criterion": "SelectionCriterion"
       }
     },
+    "PerilDependence": {
+      "kind": "class",
+      "methods": {
+        "independent": {
+          "parameters": [],
+          "returns": "PerilDependence",
+          "binding": "class"
+        },
+        "from_correlation": {
+          "parameters": [
+            {
+              "name": "perils",
+              "kind": "positional_or_keyword",
+              "annotation": "Sequence[str]"
+            },
+            {
+              "name": "correlation",
+              "kind": "positional_or_keyword",
+              "annotation": "MatrixLike"
+            },
+            {
+              "name": "calibration_source",
+              "kind": "keyword_only",
+              "annotation": "str"
+            }
+          ],
+          "returns": "PerilDependence",
+          "binding": "class"
+        },
+        "calibrate": {
+          "parameters": [
+            {
+              "name": "perils",
+              "kind": "positional_or_keyword",
+              "annotation": "Sequence[str]"
+            },
+            {
+              "name": "annual_ranks",
+              "kind": "positional_or_keyword",
+              "annotation": "MatrixLike"
+            },
+            {
+              "name": "calibration_source",
+              "kind": "keyword_only",
+              "annotation": "str"
+            }
+          ],
+          "returns": "PerilDependence",
+          "binding": "class"
+        },
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "PerilDependence",
+          "binding": "class"
+        }
+      },
+      "properties": {
+        "perils": "tuple[str, ...]",
+        "correlation": "tuple[tuple[float, ...], ...] | None",
+        "calibration_source": "str | None",
+        "observation_count": "int | None",
+        "observations_sha256": "str | None"
+      }
+    },
     "PolicyTerms": {
       "kind": "class",
       "constructor": {
@@ -2779,6 +2857,58 @@
       ],
       "returns": "AnnualLossSimulation"
     },
+    "simulate_separate_peril_losses": {
+      "kind": "function",
+      "parameters": [
+        {
+          "name": "perils",
+          "kind": "positional_or_keyword",
+          "annotation": "Mapping[str, Sequence[InsuredInterest]]"
+        },
+        {
+          "name": "dependence",
+          "kind": "keyword_only",
+          "annotation": "PerilDependence"
+        },
+        {
+          "name": "spec",
+          "kind": "keyword_only",
+          "annotation": "AnnualLossSpec | None",
+          "default": null
+        },
+        {
+          "name": "include_components",
+          "kind": "keyword_only",
+          "annotation": "bool",
+          "default": false
+        },
+        {
+          "name": "secondary_stream",
+          "kind": "keyword_only",
+          "annotation": "int",
+          "default": 0
+        },
+        {
+          "name": "block_size",
+          "kind": "keyword_only",
+          "annotation": "int",
+          "default": 256
+        },
+        {
+          "name": "memory_limit",
+          "kind": "keyword_only",
+          "annotation": "int",
+          "default": 536870912
+        },
+        {
+          "name": "work_limit",
+          "kind": "keyword_only",
+          "annotation": "int",
+          "default": 10000000000
+        }
+      ],
+      "returns": "AnnualLossSimulation"
+    },
     "summarize_annual_losses": {
       "kind": "function",
       "parameters": [
@@ -2832,6 +2962,7 @@
     "enum_inputs": "Closed Python choices require the declared enum; schema loaders hydrate canonical serialized values without aliases.",
     "risk_aggregation": "Independent binary outcomes contribute additive impacts in their supplied units; there is no implicit weighting or averaging. Tied VaR states use probability-weighted attribution.",
     "annual_loss": "Annual losses and optional components are aligned by year in a common currency. Empirical upper-tail mass is shared uniformly across years tied at the cutoff.",
+    "separate_peril_loss": "Multi-peril annual loss requires explicit cross-peril dependence, identical insured interests across perils, and terms applied separately to each peril. Portfolio total insured value counts each interest once.",
     "hurdle": "The base is conditioned strictly above atom_location before mixing the declared atom. For atom_probability < 1 a positive base survival mass is required; the truncation is explicit in the representation.",
     "selection_criterion": "Kolmogorov-Smirnov selection applies only to observed samples. Quantile model selection explicitly requests normalized RMSE; probability-labelled evidence is not treated as an empirical sample.",
     "model_requirements": "Typed named measurement and context records share authoritative schemas. Model-owned unestablished calibration facts prevent binding, never trigger invented defaults. Numerical resolution remains separate from scientific data binding."

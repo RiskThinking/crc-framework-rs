@@ -345,6 +345,71 @@ component arrays share the same trial IDs. NumPy reference comparisons use
 independent RNG streams and sampling tolerances. CVaR uses the exact
 requested tail mass, including fractional mass at a tied cutoff.
 
+## Combine annual losses with separate peril terms
+
+Use `simulate_separate_peril_losses` for a book whose coverages apply their
+deductible, limit, and share separately to each peril. Every peril must have
+the same interests, coordinates, and insured values in a common currency
+and valuation basis. Each peril supplies its own damage curves and terms.
+The portfolio counts each interest's insured value once. The insured losses
+from separately responsive coverages can sum to more than that value.
+
+Choose cross-peril dependence explicitly. Use `PerilDependence.independent()`
+when the model assumes independent perils. For a calibrated model, supply a
+positive definite latent Gaussian matrix with `from_correlation`, or estimate
+one with `calibrate` from aligned annual non-exceedance ranks observed at the
+same scale. Each row represents the same observation year across perils.
+Ranks must be strictly inside `(0, 1)`. The observed sequence must vary for
+every peril and have more years than perils. `calibrate` correlates the
+standard-normal scores and records the calibration label, observation count,
+and rank checksum. Perfect or linearly dependent ranks require a separately
+justified positive definite calibration before simulation.
+
+```python
+from crc_framework import PerilDependence, simulate_separate_peril_losses
+
+flood = "river-flood"
+wind = "windstorm"
+wind_book = [
+    InsuredInterest(
+        "warehouse",
+        longitude=-75.0,
+        latitude=45.0,
+        total_insured_value=100_000,
+        damage_curve=QuantileCurve([0, 0.9, 1], [0, 0.1, 0.5]),
+        terms=PolicyTerms(deductible=10_000, limit=25_000),
+    ),
+]
+dependence = PerilDependence.calibrate(
+    [flood, wind],
+    [[0.1, 0.2], [0.25, 0.5], [0.5, 0.3], [0.7, 0.65], [0.9, 0.85]],
+    calibration_source="illustrative aligned annual ranks",
+)
+combined = simulate_separate_peril_losses(
+    {flood: book, wind: wind_book},
+    dependence=dependence,
+    spec=spec,
+    include_components=True,
+)
+assert combined.total_insured_value == 100_000
+assert combined.components is not None and set(combined.components) == {flood, wind}
+```
+
+One `AnnualLossSpec` supplies the common spatial correlation law and damage
+variability. The joint model multiplies the latent correlation between
+perils by the spatial correlation between locations. Secondary draws use
+distinct streams for each peril. Keep the book, peril identities, dependence,
+and simulation specification fixed for paired runs, and choose a distinct
+secondary stream for each run. Optional components carry each peril's
+insured annual totals. Passing them to `summarize_annual_losses` attributes
+the portfolio tail to perils.
+
+For a dense book, the spatial factorization is shared across perils. Drawing
+annual ranks still requires a dense spatial transform per peril and trial.
+The work and memory checks account for the full combined run. The
+[synthetic benchmark](../tools/benchmark_annual_loss.py) exercises the same
+simulator and reports runtime, sample size, and rejections at the default limits.
+
 ## Serialization and reference geography
 
 `Distribution`, `QuantileCurve`, fitting specifications, and impacts have typed

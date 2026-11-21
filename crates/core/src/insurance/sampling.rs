@@ -10,6 +10,7 @@ use crate::reference::curve_fitting::ndtr_cephes;
 use crate::{CrcError, Result};
 
 pub const ANNUAL_LOSS_RNG_ALGORITHM: &str = "crc-chacha12-ziggurat-gamma-v1";
+pub const SEPARATE_PERIL_RNG_ALGORITHM: &str = "crc-chacha12-ziggurat-gamma-separate-perils-v1";
 const VARIANCE_FRACTION_CAP: f64 = 1.0 - 1e-6;
 // A unit-mean Gamma has a relative deviation of 1 / sqrt(shape).
 // Beyond exp(80) its fluctuations are below binary64 resolution.
@@ -29,6 +30,22 @@ impl SeededDraws {
     pub(super) fn new(seed: u64, secondary_stream: u64) -> Self {
         let primary = seeded_stream(seed, b"primary");
         let mut secondary = seeded_stream(seed, b"secondary");
+        secondary.set_stream(secondary_stream);
+        Self { primary, secondary }
+    }
+
+    pub(super) fn for_peril(seed: u64, secondary_stream: u64, peril: &str) -> Self {
+        let stream = |role: &[u8]| {
+            let mut key = Sha256::new();
+            key.update(SEPARATE_PERIL_RNG_ALGORITHM.as_bytes());
+            key.update(seed.to_le_bytes());
+            key.update(role);
+            key.update([0]);
+            key.update(peril.as_bytes());
+            ChaCha12Rng::from_seed(key.finalize().into())
+        };
+        let primary = stream(b"primary");
+        let mut secondary = stream(b"secondary");
         secondary.set_stream(secondary_stream);
         Self { primary, secondary }
     }

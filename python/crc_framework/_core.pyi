@@ -80,13 +80,22 @@ class NativeInsuredInterest:
         terms: NativePolicyTerms,
     ) -> None: ...
 
+_NativeAnnualLossSimulation: TypeAlias = tuple[
+    bytes, list[tuple[str, bytes]] | None, float, str, tuple[float, float] | None
+]
+
 def simulate_annual_losses(
     interests: Sequence[NativeInsuredInterest],
     spec: NativeAnnualLossSpec,
     execution: tuple[bool, int, int, int, int],
-) -> tuple[
-    bytes, list[tuple[str, bytes]] | None, float, str, tuple[float, float] | None
-]: ...
+) -> _NativeAnnualLossSimulation: ...
+def simulate_separate_peril_losses(
+    perils: Sequence[tuple[str, Sequence[NativeInsuredInterest]]],
+    cross_peril_correlation: Sequence[Sequence[float]] | None,
+    spec: NativeAnnualLossSpec,
+    execution: tuple[bool, int, int, int, int],
+) -> _NativeAnnualLossSimulation: ...
+def validate_peril_correlation(correlation: Sequence[Sequence[float]]) -> None: ...
 
 _NativeAnnualLossLevel: TypeAlias = tuple[
     float, float, float, float | None, list[tuple[str, float]] | None, float, int, float

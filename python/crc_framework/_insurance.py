@@ -1,13 +1,16 @@
-"""Primary insurance terms, one-peril simulation, and annual loss summaries."""
+"""Primary insurance terms, annual simulation, and loss summaries."""
 
 from __future__ import annotations
 
+import hashlib
 import operator
+import re
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from statistics import NormalDist
 from types import MappingProxyType
-from typing import cast
+from typing import TypeAlias, cast
 
 import numpy
 
@@ -21,13 +24,22 @@ from ._distribution import (
     QuantileCurve,
     ValueResult,
     Values,
+    _dump,
+    _fields,
     _finite,
     _output,
+    _parse,
     _real_array,
     _vector,
 )
+from ._measurement import _identifier
 
 _U64_MAX = (1 << 64) - 1
+MatrixLike: TypeAlias = Sequence[Sequence[float]] | FloatArray
+_ExecutionOptions: TypeAlias = tuple[bool, int, int, int, int]
+_NativeSimulation: TypeAlias = tuple[
+    bytes, list[tuple[str, bytes]] | None, float, str, tuple[float, float] | None
+]
 
 
 def _integer(value: int, label: str, *, minimum: int, maximum: int) -> int:
@@ -73,7 +85,7 @@ class PolicyTerms:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class AnnualLossSpec:
-    """Scientific configuration for a one-peril annual loss simulation."""
+    """Scientific configuration shared by the simulated perils in an annual run."""
 
     trials: int = 20_000
     seed: int = 20_261_027
@@ -116,6 +128,195 @@ class AnnualLossSpec:
     def reference(cls) -> AnnualLossSpec:
         """Use the reference annual simulation parameters."""
         return cls()
+
+
+def _peril_names(values: Sequence[str]) -> tuple[str, ...]:
+    if isinstance(values, str) or not isinstance(values, Sequence):
+        raise TypeError("perils must be a sequence of peril IDs")
+    names = tuple(_identifier(value, "peril ID") for value in values)
+    if len(names) < 2 or len(set(names)) != len(names):
+        raise ValueError("multi-peril dependence requires at least two distinct perils")
+    return names
+
+
+def _matrix(values: MatrixLike, label: str) -> FloatArray:
+    array = _real_array(cast(ArrayLike, values), label)
+    if array.ndim != 2 or not numpy.isfinite(array).all():
+        raise ValueError(f"{label} must be a finite two-dimensional array")
+    return array
+
+
+@dataclass(frozen=True, slots=True, init=False)
+class PerilDependence:
+    """Explicit dependence for annual losses with separately applied peril terms."""
+
+    perils: tuple[str, ...]
+    correlation: tuple[tuple[float, ...], ...] | None
+    calibration_source: str | None
+    observation_count: int | None
+    observations_sha256: str | None
+
+    def __init__(self) -> None:
+        raise TypeError("construct a PerilDependence with a named constructor")
+
+    @classmethod
+    def _create(
+        cls,
+        perils: tuple[str, ...],
+        correlation: tuple[tuple[float, ...], ...] | None,
+        calibration_source: str | None,
+        *,
+        observation_count: int | None = None,
+        observations_sha256: str | None = None,
+    ) -> PerilDependence:
+        result = object.__new__(cls)
+        object.__setattr__(result, "perils", perils)
+        object.__setattr__(result, "correlation", correlation)
+        object.__setattr__(result, "calibration_source", calibration_source)
+        object.__setattr__(result, "observation_count", observation_count)
+        object.__setattr__(result, "observations_sha256", observations_sha256)
+        return result
+
+    @classmethod
+    def independent(cls) -> PerilDependence:
+        """Use independently seeded primary and secondary shocks for each peril."""
+        return cls._create((), None, None)
+
+    @classmethod
+    def from_correlation(
+        cls,
+        perils: Sequence[str],
+        correlation: MatrixLike,
+        *,
+        calibration_source: str,
+    ) -> PerilDependence:
+        """Use a declared latent Gaussian correlation matrix in the given peril order."""
+        names = _peril_names(perils)
+        source = _identifier(calibration_source, "calibration_source")
+        matrix = _matrix(correlation, "correlation")
+        if matrix.shape != (len(names), len(names)):
+            raise ValueError("correlation must have one row and column per peril")
+        order = sorted(range(len(names)), key=names.__getitem__)
+        matrix = matrix[numpy.ix_(order, order)]
+        native = matrix.tolist()
+        _core.validate_peril_correlation(native)
+        return cls._create(
+            tuple(names[index] for index in order),
+            tuple(tuple(row) for row in native),
+            source,
+        )
+
+    @classmethod
+    def calibrate(
+        cls,
+        perils: Sequence[str],
+        annual_ranks: MatrixLike,
+        *,
+        calibration_source: str,
+    ) -> PerilDependence:
+        """Fit latent Gaussian correlation to same-year non-exceedance ranks."""
+        names = _peril_names(perils)
+        source = _identifier(calibration_source, "calibration_source")
+        ranks = _matrix(annual_ranks, "annual_ranks")
+        count = len(ranks)
+        if ranks.shape[1] != len(names) or count <= len(names):
+            raise ValueError(
+                "annual_ranks must have one column per peril and more years than perils"
+            )
+        if not ((ranks > 0.0) & (ranks < 1.0)).all():
+            raise ValueError("annual_ranks must lie strictly between zero and one")
+        if numpy.any(numpy.ptp(ranks, axis=0) == 0.0):
+            raise ValueError("annual_ranks must vary over years for every peril")
+        order = sorted(range(len(names)), key=names.__getitem__)
+        names = tuple(names[index] for index in order)
+        ranks = ranks[:, order]
+        inverse_normal = NormalDist().inv_cdf
+        gaussian = numpy.fromiter(
+            (inverse_normal(float(rank)) for rank in ranks.flat),
+            dtype=numpy.float64,
+            count=ranks.size,
+        ).reshape(ranks.shape)
+        matrix = cast(FloatArray, numpy.corrcoef(gaussian, rowvar=False))
+        # Pearson correlation is symmetric with a unit diagonal. Remove floating
+        # point asymmetry without altering its eigenstructure through a repair.
+        matrix = (matrix + matrix.T) / 2.0
+        numpy.fill_diagonal(matrix, 1.0)
+        minimum = numpy.linalg.eigvalsh(matrix)[0]
+        if minimum <= numpy.finfo(numpy.float64).eps * len(names):
+            raise ValueError(
+                "calibration must yield a positive definite correlation matrix"
+            )
+        resolved = cls.from_correlation(names, matrix, calibration_source=source)
+        digest = hashlib.sha256(_dump(names).encode() + b"\n")
+        digest.update(ranks.astype("<f8", copy=False).tobytes())
+        return cls._create(
+            resolved.perils,
+            resolved.correlation,
+            source,
+            observation_count=count,
+            observations_sha256=f"sha256:{digest.hexdigest()}",
+        )
+
+    def to_json(self) -> str:
+        """Serialize the declared peril order, dependence, and calibration evidence."""
+        return _dump(
+            {
+                "perils": self.perils,
+                "correlation": self.correlation,
+                "calibration_source": self.calibration_source,
+                "observation_count": self.observation_count,
+                "observations_sha256": self.observations_sha256,
+            }
+        )
+
+    @classmethod
+    def from_json(cls, text: str) -> PerilDependence:
+        """Load a declared or calibrated model with the same admission checks."""
+        data = _parse(text)
+        _fields(
+            data,
+            {
+                "perils",
+                "correlation",
+                "calibration_source",
+                "observation_count",
+                "observations_sha256",
+            },
+        )
+        names = data["perils"]
+        correlation = data["correlation"]
+        source = data["calibration_source"]
+        count = data["observation_count"]
+        digest = data["observations_sha256"]
+        if correlation is None:
+            if names != [] or any(
+                value is not None for value in (source, count, digest)
+            ):
+                raise ValueError(
+                    "independent peril dependence admits no calibration data"
+                )
+            return cls.independent()
+        if not isinstance(names, list) or not isinstance(correlation, list):
+            raise TypeError("expected peril IDs and a correlation matrix")
+        if not isinstance(source, str):
+            raise TypeError("correlated peril dependence requires a calibration_source")
+        resolved = cls.from_correlation(names, correlation, calibration_source=source)
+        if count is None and digest is None:
+            return resolved
+        if (
+            type(count) is not int
+            or not len(resolved.perils) < count <= sys.maxsize
+            or not isinstance(digest, str)
+            or re.fullmatch(r"sha256:[a-f0-9]{64}", digest) is None
+        ):
+            raise ValueError("invalid peril calibration observation count or digest")
+        return cls._create(
+            resolved.perils,
+            resolved.correlation,
+            source,
+            observation_count=count,
+            observations_sha256=digest,
+        )
 
 
 @dataclass(frozen=True, slots=True, init=False)
@@ -190,7 +391,7 @@ class CorrelationRepair:
 
 @dataclass(frozen=True, slots=True, init=False, eq=False)
 class AnnualLossSimulation:
-    """Insured losses indexed by simulated year and optional interest ID."""
+    """Insured losses indexed by simulated year and optional component ID."""
 
     totals: FloatArray
     components: Mapping[str, FloatArray] | None
@@ -199,9 +400,11 @@ class AnnualLossSimulation:
     secondary_stream: int
     rng_algorithm: str
     correlation_repair: CorrelationRepair | None
+    perils: tuple[str, ...]
+    dependence: PerilDependence | None
 
     def __init__(self) -> None:
-        raise TypeError("construct AnnualLossSimulation with simulate_annual_losses")
+        raise TypeError("obtain an AnnualLossSimulation from an annual loss simulator")
 
     @property
     def trial_ids(self) -> range:
@@ -209,17 +412,15 @@ class AnnualLossSimulation:
         return range(len(self.totals))
 
 
-def simulate_annual_losses(
-    interests: Sequence[InsuredInterest],
+def _simulation_options(
     *,
-    spec: AnnualLossSpec | None = None,
-    include_components: bool = False,
-    secondary_stream: int = 0,
-    block_size: int = 256,
-    memory_limit: int = 536_870_912,
-    work_limit: int = 10_000_000_000,
-) -> AnnualLossSimulation:
-    """Simulate aligned annual losses for one peril in a common valuation basis."""
+    spec: AnnualLossSpec | None,
+    include_components: bool,
+    secondary_stream: int,
+    block_size: int,
+    memory_limit: int,
+    work_limit: int,
+) -> tuple[AnnualLossSpec, _ExecutionOptions]:
     if spec is None:
         spec = AnnualLossSpec.reference()
     elif not isinstance(spec, AnnualLossSpec):
@@ -234,17 +435,35 @@ def simulate_annual_losses(
         memory_limit, "memory_limit", minimum=1, maximum=sys.maxsize
     )
     work_limit = _integer(work_limit, "work_limit", minimum=1, maximum=_U64_MAX)
-    native_interests = []
+    return spec, (
+        include_components,
+        secondary_stream,
+        block_size,
+        memory_limit,
+        work_limit,
+    )
+
+
+def _native_interests(
+    interests: Sequence[InsuredInterest],
+) -> list[_core.NativeInsuredInterest]:
+    native = []
     for interest in interests:
         if not isinstance(interest, InsuredInterest):
             raise TypeError("interests must contain InsuredInterest objects")
-        native_interests.append(interest._native)
+        native.append(interest._native)
+    return native
 
-    totals, components, insured_value, algorithm, repair = _core.simulate_annual_losses(
-        native_interests,
-        spec._native,
-        (include_components, secondary_stream, block_size, memory_limit, work_limit),
-    )
+
+def _simulation_result(
+    native: _NativeSimulation,
+    spec: AnnualLossSpec,
+    secondary_stream: int,
+    *,
+    perils: tuple[str, ...] = (),
+    dependence: PerilDependence | None = None,
+) -> AnnualLossSimulation:
+    totals, components, insured_value, algorithm, repair = native
     result = object.__new__(AnnualLossSimulation)
     object.__setattr__(result, "totals", numpy.frombuffer(totals, dtype=numpy.float64))
     object.__setattr__(
@@ -268,7 +487,73 @@ def simulate_annual_losses(
         "correlation_repair",
         None if repair is None else CorrelationRepair(*repair),
     )
+    object.__setattr__(result, "perils", perils)
+    object.__setattr__(result, "dependence", dependence)
     return result
+
+
+def simulate_annual_losses(
+    interests: Sequence[InsuredInterest],
+    *,
+    spec: AnnualLossSpec | None = None,
+    include_components: bool = False,
+    secondary_stream: int = 0,
+    block_size: int = 256,
+    memory_limit: int = 536_870_912,
+    work_limit: int = 10_000_000_000,
+) -> AnnualLossSimulation:
+    """Simulate aligned annual losses for one peril in a common valuation basis."""
+    spec, execution = _simulation_options(
+        spec=spec,
+        include_components=include_components,
+        secondary_stream=secondary_stream,
+        block_size=block_size,
+        memory_limit=memory_limit,
+        work_limit=work_limit,
+    )
+    native = _core.simulate_annual_losses(
+        _native_interests(interests), spec._native, execution
+    )
+    return _simulation_result(native, spec, execution[1])
+
+
+def simulate_separate_peril_losses(
+    perils: Mapping[str, Sequence[InsuredInterest]],
+    *,
+    dependence: PerilDependence,
+    spec: AnnualLossSpec | None = None,
+    include_components: bool = False,
+    secondary_stream: int = 0,
+    block_size: int = 256,
+    memory_limit: int = 536_870_912,
+    work_limit: int = 10_000_000_000,
+) -> AnnualLossSimulation:
+    """Simulate aligned annual totals for a fixed book with separate peril terms."""
+    if not isinstance(perils, Mapping):
+        raise TypeError("perils must map peril IDs to sequences of insured interests")
+    if not isinstance(dependence, PerilDependence):
+        raise TypeError("dependence must be PerilDependence")
+    names = tuple(sorted(_peril_names(tuple(perils))))
+    if dependence.perils and dependence.perils != names:
+        raise ValueError("peril dependence must declare the same peril IDs as the book")
+    spec, execution = _simulation_options(
+        spec=spec,
+        include_components=include_components,
+        secondary_stream=secondary_stream,
+        block_size=block_size,
+        memory_limit=memory_limit,
+        work_limit=work_limit,
+    )
+    matrix = dependence.correlation
+    native = _core.simulate_separate_peril_losses(
+        [(name, _native_interests(perils[name])) for name in names],
+        None if matrix is None else [list(row) for row in matrix],
+        spec._native,
+        execution,
+    )
+    return _simulation_result(
+        native, spec, execution[1], perils=names, dependence=dependence
+    )
 
 
 @dataclass(frozen=True, slots=True)
