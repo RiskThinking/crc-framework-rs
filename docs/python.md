@@ -195,9 +195,11 @@ assert response.mass(0.5) == 0.25
 ```
 
 `Impact.sigmoid`, `Impact.tabulated`, and `Impact.binned` share these same
-operations. Pushforwards preserve atoms, including decreasing functions at atom
-boundaries. An unsupported exact operation raises a capability error; it does
-not silently tabulate an approximation.
+operations. `Impact.expectation` uses an exact calculation when available and
+adaptive quadrature otherwise. Pass `method=ExpectationMethod.EXACT` to require
+an exact calculation. Unsupported exact requests raise `ImpactError` with
+code `exact_method_unavailable`. Pushforwards preserve atoms, including at atom
+boundaries for decreasing functions.
 
 Built-in references are selected with `Impact.builtin(BuiltinImpact.INUNDATION)`.
 Inspect `reference.requirements` for the input measurement, accepted units,

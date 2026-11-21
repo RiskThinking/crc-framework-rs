@@ -890,6 +890,13 @@
         }
       }
     },
+    "ExpectationMethod": {
+      "kind": "enum",
+      "members": {
+        "AUTO": "auto",
+        "EXACT": "exact"
+      }
+    },
     "FitAttempt": {
       "kind": "class",
       "properties": {
@@ -1288,6 +1295,14 @@
               "name": "distribution",
               "kind": "positional_or_keyword",
               "annotation": "Distribution"
+            },
+            {
+              "name": "method",
+              "kind": "keyword_only",
+              "annotation": "ExpectationMethod",
+              "default": {
+                "enum": "ExpectationMethod.AUTO"
+              }
             }
           ],
           "returns": "float",
@@ -2491,7 +2506,7 @@
     "empirical_law": "Empirical observations always form the ECDF; interpolated sample quantiles form a QuantileCurve explicitly.",
     "partial_curve": "A QuantileCurve has no whole-law statistics or sampling; queries outside its actual interval fail.",
     "statistics": "Statistics use the complete law, preserve atoms and rare masses, and explicitly represent divergent or undefined outcomes.",
-    "impacts": "Event evaluation, expectation, and exact pushforward are separate operations; approximate transforms and context resolution are never implicit.",
+    "impacts": "Event evaluation, expectation, and exact pushforward are separate operations. Expectation uses exact calculation where available and adaptive quadrature otherwise; callers can require an exact calculation. Approximate transforms and context resolution are never implicit.",
     "mle": "An MLE result requires successful likelihood optimization; alternative estimators run only when explicitly configured and appear in the fit record.",
     "fitting_scope": "Only the requested family or explicit candidate specifications execute.",
     "measurement": "Custom quantity and unit identifiers are data; specialized measurement requirements apply only to operations that need them.",

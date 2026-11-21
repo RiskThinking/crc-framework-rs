@@ -93,6 +93,7 @@ from ._risk import (
 from ._impacts import (
     BuiltinImpact,
     ContextField,
+    ExpectationMethod,
     Impact,
     ImpactError,
     ImpactReference,
@@ -126,6 +127,7 @@ __all__ = [
     "EmptyContext",
     "Event",
     "EventCount",
+    "ExpectationMethod",
     "FitAttempt",
     "FitConstraints",
     "FitError",

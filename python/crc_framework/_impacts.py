@@ -66,6 +66,13 @@ from ._measurement import (
 )
 
 
+class ExpectationMethod(Enum):
+    """Select how the expected response is computed."""
+
+    AUTO = "auto"
+    EXACT = "exact"
+
+
 class ImpactError(Exception):
     """A calibrated response cannot perform the requested operation."""
 
@@ -534,15 +541,23 @@ class Impact:
         original = Distribution.from_json(_dumps(distribution._data["source"]))
         return combined._operation(original)
 
-    def expectation(self, distribution: Distribution) -> float:
+    def expectation(
+        self,
+        distribution: Distribution,
+        *,
+        method: ExpectationMethod = ExpectationMethod.AUTO,
+    ) -> float:
+        """Return the expected response, using quadrature when needed by default."""
         if not isinstance(distribution, Distribution):
             raise TypeError("distribution must be Distribution")
+        if not isinstance(method, ExpectationMethod):
+            raise TypeError("method must be ExpectationMethod")
         try:
             native, source = self._operation(distribution)
         except (TypeError, ValueError) as error:
             raise ImpactError("exact_method_unavailable", "", str(error)) from error
         try:
-            return native.expectation(source)
+            return native.expectation(source, method is ExpectationMethod.EXACT)
         except Exception as error:
             raise _error(error) from error
 

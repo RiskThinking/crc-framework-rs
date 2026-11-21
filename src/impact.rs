@@ -73,9 +73,19 @@ impl PyExpression {
         .map_err(|error| impact_error(py, error))
     }
 
-    fn expectation(&self, py: Python<'_>, source: PyRef<'_, PyImpactSource>) -> PyResult<f64> {
+    fn expectation(
+        &self,
+        py: Python<'_>,
+        source: PyRef<'_, PyImpactSource>,
+        exact: bool,
+    ) -> PyResult<f64> {
         let (definition, exposure) = (&self.inner, &source.inner);
-        py.detach(|| definition.expectation(exposure, MethodRequest::Exact))
+        let method = if exact {
+            MethodRequest::Exact
+        } else {
+            MethodRequest::Auto
+        };
+        py.detach(|| definition.expectation(exposure, method))
             .map(|result| result.value)
             .map_err(|error| impact_error(py, error))
     }
