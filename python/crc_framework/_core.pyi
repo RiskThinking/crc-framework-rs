@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from typing import TypeAlias
 
 __version__: str
 
@@ -49,6 +50,37 @@ def rank_risk(
     levels: Sequence[float],
     max_branches: int | None = ...,
 ) -> tuple[int, list[tuple[float, float, float, list[tuple[str, float, float]]]]]: ...
+
+class NativePolicyTerms:
+    def __init__(
+        self, deductible: float, limit: float | None, share: float
+    ) -> None: ...
+    def insured_losses(
+        self, total_insured_value: float, damage_ratios: Sequence[float]
+    ) -> list[float]: ...
+
+_NativeAnnualLossLevel: TypeAlias = tuple[
+    float, float, float, float | None, list[tuple[str, float]] | None, float, int, float
+]
+_NativeAnnualLossExceedance: TypeAlias = tuple[float, float, float, float, float]
+_NativeAnnualLossSummary: TypeAlias = tuple[
+    int,
+    float,
+    float,
+    float,
+    float,
+    float | None,
+    list[_NativeAnnualLossLevel],
+    list[_NativeAnnualLossExceedance],
+]
+
+def summarize_annual_losses(
+    totals: Sequence[float],
+    total_insured_value: float,
+    levels: Sequence[float],
+    return_periods: Sequence[float],
+    components: Sequence[tuple[str, Sequence[float]]] | None = ...,
+) -> _NativeAnnualLossSummary: ...
 
 class NativeFitParameters:
     family: str

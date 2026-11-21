@@ -43,6 +43,22 @@ from ._geography import (
     lookup_geography,
     lookup_ipcc_region,
 )
+from ._impacts import (
+    BuiltinImpact,
+    ContextField,
+    ExpectationMethod,
+    Impact,
+    ImpactError,
+    ImpactReference,
+    ImpactRequirements,
+)
+from ._insurance import (
+    AnnualLossExceedance,
+    AnnualLossLevel,
+    AnnualLossSummary,
+    PolicyTerms,
+    summarize_annual_losses,
+)
 from ._measurement import (
     Aggregation,
     AssetType,
@@ -90,18 +106,12 @@ from ._risk import (
     compute_risk,
     rank_scenarios,
 )
-from ._impacts import (
-    BuiltinImpact,
-    ContextField,
-    ExpectationMethod,
-    Impact,
-    ImpactError,
-    ImpactReference,
-    ImpactRequirements,
-)
 
 __all__ = [
     "Aggregation",
+    "AnnualLossExceedance",
+    "AnnualLossLevel",
+    "AnnualLossSummary",
     "AssetType",
     "BinaryOutcome",
     "BuiltinImpact",
@@ -150,6 +160,7 @@ __all__ = [
     "LengthUnit",
     "Measurement",
     "ModelSelection",
+    "PolicyTerms",
     "PrecipitationAmount",
     "PrecipitationRate",
     "PrecipitationRateUnit",
@@ -189,4 +200,5 @@ __all__ = [
     "lookup_geography",
     "lookup_ipcc_region",
     "rank_scenarios",
+    "summarize_annual_losses",
 ]

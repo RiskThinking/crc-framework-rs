@@ -5,6 +5,7 @@ pub mod dataset;
 pub mod distribution;
 pub mod error;
 pub mod impact;
+pub mod insurance;
 pub mod metrics;
 pub mod numerical;
 pub mod rank;

@@ -341,6 +341,10 @@ pub struct EmpiricalDistribution {
     samples: Vec<f64>,
 }
 
+pub(crate) fn empirical_rank(cumulative_count: usize, sample_count: usize) -> f64 {
+    cumulative_count as f64 / sample_count as f64
+}
+
 impl EmpiricalDistribution {
     pub fn new(mut samples: Vec<f64>) -> Result<Self> {
         if samples.is_empty() || samples.iter().any(|value| !value.is_finite()) {
@@ -355,6 +359,26 @@ impl EmpiricalDistribution {
     pub fn samples(&self) -> &[f64] {
         &self.samples
     }
+
+    /// Lowest loss whose strict exceedance is at most the requested probability.
+    pub(crate) fn upper_loss_threshold(&self, exceedance: f64) -> Result<f64> {
+        validate_probability(exceedance)?;
+        let size = self.samples.len();
+        Ok(self.sample_at_rank(|count| empirical_rank(size - count, size) > exceedance))
+    }
+
+    fn sample_at_rank(&self, before_cutoff: impl Fn(usize) -> bool) -> f64 {
+        let (mut lower, mut upper) = (0, self.samples.len() - 1);
+        while lower < upper {
+            let mid = lower + (upper - lower) / 2;
+            if before_cutoff(mid + 1) {
+                lower = mid + 1;
+            } else {
+                upper = mid;
+            }
+        }
+        self.samples[lower]
+    }
 }
 
 impl Distribution for EmpiricalDistribution {
@@ -362,21 +386,24 @@ impl Distribution for EmpiricalDistribution {
         if x.is_nan() {
             return f64::NAN;
         }
-        self.samples.partition_point(|sample| *sample <= x) as f64 / self.samples.len() as f64
+        empirical_rank(
+            self.samples.partition_point(|sample| *sample <= x),
+            self.samples.len(),
+        )
     }
 
     fn ppf(&self, q: f64) -> Result<f64> {
         validate_probability(q)?;
-        // Generalized inverse of the ECDF: ties remain their observed atoms.
-        let index = (q * self.samples.len() as f64).ceil() as usize;
-        Ok(self.samples[index.saturating_sub(1).min(self.samples.len() - 1)])
+        // Compare the same rounded ranks returned by the CDF. The product
+        // q * n can round to the wrong side of an observation boundary.
+        Ok(self.sample_at_rank(|count| empirical_rank(count, self.samples.len()) < q))
     }
 
     fn probability_atom(&self, x: f64) -> f64 {
         // Samples are sorted, so the atom is the run of values equal to `x`.
         let upper = self.samples.partition_point(|sample| *sample <= x);
         let lower = self.samples[..upper].partition_point(|sample| *sample < x);
-        (upper - lower) as f64 / self.samples.len() as f64
+        empirical_rank(upper - lower, self.samples.len())
     }
 }
 
@@ -2206,6 +2233,22 @@ mod tests {
         );
     }
     use super::*;
+
+    #[test]
+    fn empirical_quantiles_use_the_same_rounded_ranks_as_the_ecdf() {
+        let law = EmpiricalDistribution::new(vec![0.0, 0.0, 2.0, 4.0, 4.0, 7.0]).unwrap();
+        let cutoff = 5.0_f64 / 6.0;
+        assert_eq!(law.cdf(4.0), cutoff);
+        assert_eq!(law.ppf(cutoff.next_down()).unwrap(), 4.0);
+        assert_eq!(law.ppf(cutoff).unwrap(), 4.0);
+        assert_eq!(law.ppf(cutoff.next_up()).unwrap(), 7.0);
+
+        let law = EmpiricalDistribution::new((0..25).map(f64::from).collect()).unwrap();
+        assert_eq!(law.ppf(law.cdf(6.0)).unwrap(), 6.0);
+
+        let law = EmpiricalDistribution::new(vec![0.0, 1.0, 2.0]).unwrap();
+        assert_eq!(law.ppf(law.cdf(0.0).next_up()).unwrap(), 1.0);
+    }
 
     #[test]
     fn censor_transition_allows_one_ulp_on_a_large_bound() {

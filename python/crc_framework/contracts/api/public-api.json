@@ -22,6 +22,56 @@
         "COUNT": "count"
       }
     },
+    "AnnualLossExceedance": {
+      "kind": "class",
+      "properties": {
+        "return_period": "float",
+        "loss": "float",
+        "nominal_exceedance_probability": "float",
+        "exceedance_probability": "float",
+        "nominal_tail_years": "float"
+      }
+    },
+    "AnnualLossLevel": {
+      "kind": "class",
+      "properties": {
+        "level": "float",
+        "value_at_risk": "float",
+        "conditional_value_at_risk": "float",
+        "diversification_benefit": "float | None",
+        "contributions": "Mapping[str, float] | None",
+        "nominal_tail_years": "float",
+        "boundary_years": "int",
+        "boundary_weight": "float"
+      }
+    },
+    "AnnualLossSummary": {
+      "kind": "class",
+      "methods": {
+        "at": {
+          "parameters": [
+            {
+              "name": "level",
+              "kind": "positional_or_keyword",
+              "annotation": "float"
+            }
+          ],
+          "returns": "AnnualLossLevel",
+          "binding": "instance"
+        }
+      },
+      "properties": {
+        "trial_count": "int",
+        "total_insured_value": "float",
+        "average_annual_loss": "float",
+        "standard_deviation": "float",
+        "coefficient_of_variation": "float",
+        "loss_cost": "float | None",
+        "levels": "tuple[AnnualLossLevel, ...]",
+        "aep": "tuple[AnnualLossExceedance, ...]",
+        "diagnostics": "tuple[Diagnostic, ...]"
+      }
+    },
     "AssetType": {
       "kind": "enum",
       "members": {
@@ -1589,6 +1639,55 @@
         "criterion": "SelectionCriterion"
       }
     },
+    "PolicyTerms": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "deductible",
+            "kind": "keyword_only",
+            "annotation": "float",
+            "default": 0.0
+          },
+          {
+            "name": "limit",
+            "kind": "keyword_only",
+            "annotation": "float | None",
+            "default": null
+          },
+          {
+            "name": "share",
+            "kind": "keyword_only",
+            "annotation": "float",
+            "default": 1.0
+          }
+        ],
+        "returns": "PolicyTerms"
+      },
+      "methods": {
+        "insured_loss": {
+          "parameters": [
+            {
+              "name": "total_insured_value",
+              "kind": "positional_or_keyword",
+              "annotation": "float"
+            },
+            {
+              "name": "damage_ratio",
+              "kind": "positional_or_keyword",
+              "annotation": "Values"
+            }
+          ],
+          "returns": "ValueResult",
+          "binding": "instance"
+        }
+      },
+      "properties": {
+        "deductible": "float",
+        "limit": "float | None",
+        "share": "float"
+      }
+    },
     "PrecipitationAmount": {
       "kind": "class",
       "constructor": {
@@ -2499,6 +2598,44 @@
         }
       ],
       "returns": "tuple[RankScenario, ...]"
+    },
+    "summarize_annual_losses": {
+      "kind": "function",
+      "parameters": [
+        {
+          "name": "totals",
+          "kind": "positional_or_keyword",
+          "annotation": "ArrayLike"
+        },
+        {
+          "name": "total_insured_value",
+          "kind": "keyword_only",
+          "annotation": "float"
+        },
+        {
+          "name": "levels",
+          "kind": "keyword_only",
+          "annotation": "Sequence[float]",
+          "default": {
+            "tuple": [0.95, 0.99, 0.995]
+          }
+        },
+        {
+          "name": "return_periods",
+          "kind": "keyword_only",
+          "annotation": "Sequence[float]",
+          "default": {
+            "tuple": [10, 25, 50, 100, 200, 250]
+          }
+        },
+        {
+          "name": "components",
+          "kind": "keyword_only",
+          "annotation": "Mapping[str, ArrayLike] | None",
+          "default": null
+        }
+      ],
+      "returns": "AnnualLossSummary"
     }
   },
   "semantics": {
@@ -2514,6 +2651,7 @@
     "protocols": "Unresolved context references and resolved point functions have distinct call contracts.",
     "enum_inputs": "Closed Python choices require the declared enum; schema loaders hydrate canonical serialized values without aliases.",
     "risk_aggregation": "Independent binary outcomes contribute additive impacts in their supplied units; there is no implicit weighting or averaging. Tied VaR states use probability-weighted attribution.",
+    "annual_loss": "Annual losses and optional components are aligned by year in a common currency. Empirical upper-tail mass is shared uniformly across years tied at the cutoff.",
     "hurdle": "The base is conditioned strictly above atom_location before mixing the declared atom. For atom_probability < 1 a positive base survival mass is required; the truncation is explicit in the representation.",
     "selection_criterion": "Kolmogorov-Smirnov selection applies only to observed samples. Quantile model selection explicitly requests normalized RMSE; probability-labelled evidence is not treated as an empirical sample.",
     "model_requirements": "Typed named measurement and context records share authoritative schemas. Model-owned unestablished calibration facts prevent binding, never trigger invented defaults. Numerical resolution remains separate from scientific data binding."

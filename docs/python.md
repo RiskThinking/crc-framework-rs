@@ -237,6 +237,50 @@ the CVaR cutoff includes only part of a tied value's mass, each tied state
 contributes the same fraction of its mass. Branch limits are enforced before
 allocation. Outcome identities must be unique.
 
+## Summarize insured annual losses
+
+`PolicyTerms` applies a monetary deductible and limit, then multiplies by the
+insurer's share. The default terms pass through ground-up loss. If the
+deductible is a fraction of total insured value, multiply by that value first.
+Use a common currency and valuation basis for every interest.
+
+```python
+from crc_framework import PolicyTerms, summarize_annual_losses
+
+terms = PolicyTerms(deductible=5_000, limit=15_000, share=0.8)
+assert terms.insured_loss(100_000, 0.26) == 12_000
+
+# Each entry represents the same year in the portfolio and component samples.
+warehouse = [0, 0, 0, 10, 0, 20, 0, 20]
+office = [0, 0, 0, 0, 10, 10, 30, 30]
+totals = [left + right for left, right in zip(warehouse, office, strict=True)]
+summary = summarize_annual_losses(
+    totals,
+    total_insured_value=200_000,
+    levels=[0.8125],
+    return_periods=[100, 250],
+    components={"warehouse": warehouse, "office": office},
+)
+
+assert summary.average_annual_loss == 16.25
+tail = summary.at(0.8125)
+assert tail.value_at_risk == 30
+assert tail.contributions is not None
+assert abs(sum(tail.contributions.values()) - tail.conditional_value_at_risk) < 1e-12
+```
+
+The summary retains zero-loss years and selects VaR and aggregate exceedance
+probability (AEP) return levels from cumulative annual counts. At a rank of
+`5 / 6`, it selects the fifth ordered loss from six years. Each AEP point
+reports the nominal probability `1 / T` and the observed probability of a
+loss strictly greater than its threshold. CVaR averages the requested upper
+rank mass. `boundary_years` counts the years tied at VaR, and `boundary_weight`
+is the fraction of each such year included in CVaR. `nominal_tail_years` scales
+the requested tail probability by the trial count. Aligned components also
+give the signed difference between the sum of standalone VaRs and portfolio
+VaR. When total insured value is zero, `loss_cost` is `None` and `diagnostics`
+records the reason.
+
 ## Serialization and reference geography
 
 `Distribution`, `QuantileCurve`, fitting specifications, and impacts have typed

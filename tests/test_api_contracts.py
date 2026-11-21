@@ -117,6 +117,19 @@ def test_enum_default_must_match_declared_type() -> None:
         CHECK.validate_contract(contract, release)
 
 
+def test_tuple_default_items_must_match_sequence_type() -> None:
+    contract, release = CHECK.load_contracts()
+    parameters = contract["exports"]["summarize_annual_losses"]["parameters"]
+    levels = next(
+        parameter for parameter in parameters if parameter["name"] == "levels"
+    )
+    levels["default"] = {"tuple": [0.95, False]}
+    with pytest.raises(
+        CHECK.ContractError, match="boolean default contradicts annotation"
+    ):
+        CHECK.validate_contract(contract, release)
+
+
 def test_release_ledger_must_match_owned_formats() -> None:
     _, release = CHECK.load_contracts()
     release["formats"]["impact"] = "3.0"
