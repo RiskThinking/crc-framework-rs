@@ -288,7 +288,13 @@ fn mass_intervals(probabilities: &[f64]) -> Vec<(f64, f64, f64)> {
         .collect()
 }
 
-fn local_interval(lo: f64, hi: f64, left: f64, right: f64, mass: f64) -> (f64, f64, f64) {
+pub(crate) fn local_interval(
+    lo: f64,
+    hi: f64,
+    left: f64,
+    right: f64,
+    mass: f64,
+) -> (f64, f64, f64) {
     if left > right || (left == right && (lo + hi) * 0.5 > 0.5) {
         let a = ((1.0 - lo) - right).clamp(0.0, mass);
         let b = ((1.0 - hi) - right).clamp(0.0, mass);

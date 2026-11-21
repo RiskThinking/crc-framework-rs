@@ -538,10 +538,10 @@ class Distribution:
         if self._transformed is not None:
             if (exact := self._transformed.exact_mean_deviation()) is not None:
                 return exact
-            impact, source = self._impact_source()
-            exact = impact._mean_deviation(source, self)
-            if exact is not None:
-                return exact
+            if (affine := self._affine_impact_source()) is not None:
+                impact, source = affine
+                if (exact := impact._mean_deviation(source, self)) is not None:
+                    return exact
         mean = self._integral(0.0, 1.0)
         if not math.isfinite(mean):
             return mean, math.nan
@@ -583,18 +583,22 @@ class Distribution:
         # Transformed finite laws retain all exact probability atoms. General
         # transformed laws are integrated adaptively by the native engine.
         assert self._transformed is not None
-        impact, source = self._impact_source()
-        exact = impact._integral(
-            source, lo, hi, center=center, square=square, survival=survival, scale=scale
-        )
-        if exact is not None:
-            return exact
+        if (affine := self._affine_impact_source()) is not None:
+            impact, source = affine
+            exact = impact._integral(
+                source, lo, hi, center=center, square=square, survival=survival, scale=scale
+            )
+            if exact is not None:
+                return exact
         return self._transformed.integral(lo, hi, moment, survival)
 
-    def _impact_source(self) -> tuple[Impact, Distribution]:
+    def _affine_impact_source(self) -> tuple[Impact, Distribution] | None:
         from ._impacts import Impact
 
-        return Impact.from_json(_dump(self._data["impact"])), Distribution.from_json(
+        impact = cast(dict[str, object], self._data["impact"])
+        if cast(dict[str, object], impact["model"])["kind"] != "linear":
+            return None
+        return Impact.from_json(_dump(impact)), Distribution.from_json(
             _dump(self._data["source"])
         )
 

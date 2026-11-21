@@ -7,7 +7,7 @@ use std::borrow::Cow;
 
 use crate::numerical::{
     CompensatedSum, ProbabilitySegment, affine_fitted_mean_deviation, interval_fraction,
-    linear_interpolate, segment_inverse_survival, segment_probability, segment_quantile,
+    linear_interpolate, segment_probability,
 };
 use crate::{
     Distribution, EmpiricalDistribution, FittedDistribution, HurdleDistribution,
@@ -314,11 +314,127 @@ impl DiscreteDistribution {
 
 /// Ordered finite intervals and atoms with their own probability masses.
 #[derive(Clone, Debug)]
-pub struct WeightedSegments(Vec<ProbabilitySegment>);
+pub struct WeightedSegments {
+    segments: Vec<ProbabilitySegment>,
+    // Independent sums retain small probabilities in both tails.
+    prefix: Vec<f64>,
+    suffix: Vec<f64>,
+}
 
 impl WeightedSegments {
+    fn new(segments: Vec<ProbabilitySegment>) -> Self {
+        let mut prefix = Vec::with_capacity(segments.len() + 1);
+        let mut suffix = vec![0.0; segments.len() + 1];
+        let mut forward = CompensatedSum::default();
+        let mut backward = CompensatedSum::default();
+        prefix.push(0.0);
+        for (index, &(_, _, mass)) in segments.iter().enumerate() {
+            let reverse = segments.len() - 1 - index;
+            forward.add(mass);
+            prefix.push(forward.total());
+            backward.add(segments[reverse].2);
+            suffix[reverse] = backward.total();
+        }
+        Self {
+            segments,
+            prefix,
+            suffix,
+        }
+    }
+
+    pub(super) fn intervals(&self) -> impl Iterator<Item = (ProbabilitySegment, f64, f64)> + '_ {
+        self.segments
+            .iter()
+            .enumerate()
+            .map(|(index, &segment)| (segment, self.prefix[index], self.suffix[index + 1]))
+    }
+
     fn probability(&self, start: f64, end: f64, start_closed: bool, end_closed: bool) -> f64 {
-        segment_probability(&self.0, start, end, start_closed, end_closed)
+        let first = self.lower_count(start, !start_closed);
+        let end_index = self.upper_start(end, !end_closed);
+        if first >= end_index {
+            return 0.0;
+        }
+        // Sum only the intersected pieces, keeping small interior masses
+        // representable even when both cumulative boundaries round together.
+        segment_probability(
+            &self.segments[first..end_index],
+            start,
+            end,
+            start_closed,
+            end_closed,
+        )
+    }
+
+    fn lower_count(&self, x: f64, inclusive: bool) -> usize {
+        self.segments
+            .partition_point(|&(lo, hi, _)| hi < x || (hi == x && (inclusive || lo < hi)))
+    }
+
+    fn upper_start(&self, x: f64, inclusive: bool) -> usize {
+        self.segments
+            .partition_point(|&(lo, hi, _)| lo < x || (lo == x && !inclusive && lo == hi))
+    }
+
+    fn cdf(&self, x: f64, inclusive: bool) -> f64 {
+        let index = self.lower_count(x, inclusive);
+        let partial = self
+            .segments
+            .get(index)
+            .map_or(0.0, |&(a, b, mass)| mass * interval_fraction(a, b, a, x));
+        (self.prefix[index] + partial).min(1.0)
+    }
+
+    fn survival(&self, x: f64, inclusive: bool) -> f64 {
+        let index = self.upper_start(x, inclusive);
+        let partial = index.checked_sub(1).map_or(0.0, |prior| {
+            let (a, b, mass) = self.segments[prior];
+            mass * interval_fraction(a, b, x, b)
+        });
+        (self.suffix[index] + partial).min(1.0)
+    }
+
+    fn quantile(&self, probability: f64, upper: bool) -> f64 {
+        if probability == 0.0 {
+            return self.segments[0].0;
+        }
+        if probability == 1.0 {
+            return self.segments.last().unwrap().1;
+        }
+        let index = self.prefix[1..]
+            .partition_point(|&end| end < probability || (upper && end == probability));
+        let Some(&(a, b, mass)) = self.segments.get(index) else {
+            return self.segments.last().unwrap().1;
+        };
+        if probability == self.prefix[index + 1] {
+            return b;
+        }
+        linear_interpolate(
+            a,
+            b,
+            ((probability - self.prefix[index]) / mass).clamp(0.0, 1.0),
+        )
+    }
+
+    fn inverse_survival(&self, survival: f64, upper: bool) -> f64 {
+        if survival == 0.0 {
+            return self.segments.last().unwrap().1;
+        }
+        let count = self.suffix[..self.segments.len()]
+            .partition_point(|&start| start > survival || (upper && start == survival));
+        if survival == 1.0 || count == 0 {
+            return self.segments[0].0;
+        }
+        let index = count - 1;
+        let (a, b, mass) = self.segments[index];
+        if survival == self.suffix[index] {
+            return a;
+        }
+        linear_interpolate(
+            b,
+            a,
+            ((survival - self.suffix[index + 1]) / mass).clamp(0.0, 1.0),
+        )
     }
 }
 
@@ -369,12 +485,12 @@ impl ImpactSource {
         for (_, _, mass) in &mut segments {
             *mass /= total;
         }
-        Ok(Self::Segments(WeightedSegments(segments)))
+        Ok(Self::Segments(WeightedSegments::new(segments)))
     }
 
     pub(crate) fn weighted_segments(&self) -> Option<Cow<'_, [ProbabilitySegment]>> {
         match self {
-            Self::Segments(segments) => Some(Cow::Borrowed(&segments.0)),
+            Self::Segments(segments) => Some(Cow::Borrowed(&segments.segments)),
             Self::Histogram(histogram) => Some(Cow::Owned(
                 histogram
                     .edges
@@ -496,7 +612,7 @@ impl ImpactSource {
             Self::Hurdle(distribution) => {
                 distribution.ppf(probability).map_err(distribution_error)?
             }
-            Self::Segments(segments) => segment_quantile(&segments.0, probability, false),
+            Self::Segments(segments) => segments.quantile(probability, false),
         };
         if value.is_finite() {
             Ok(value)
@@ -525,7 +641,7 @@ impl ImpactSource {
             Self::Segments(segments)
                 if probability.is_finite() && (0.0..=1.0).contains(&probability) =>
             {
-                Ok(segment_quantile(&segments.0, probability, true))
+                Ok(segments.quantile(probability, true))
             }
             Self::Hurdle(distribution) if probability == distribution.atom_probability() => {
                 hurdle_tail_lower_bound(distribution)
@@ -553,7 +669,7 @@ impl ImpactSource {
                 Ok(tabulated_inverse_survival(distribution, survival, false))
             }
             Self::PointMass(distribution) => Ok(distribution.location()),
-            Self::Segments(segments) => Ok(segment_inverse_survival(&segments.0, survival, false)),
+            Self::Segments(segments) => Ok(segments.inverse_survival(survival, false)),
             Self::Discrete(_) | Self::Empirical(_) => {
                 let atoms = self.point_atoms();
                 let mut suffix = CompensatedSum::default();
@@ -570,7 +686,7 @@ impl ImpactSource {
 
     pub(crate) fn upper_quantile_from_survival(&self, survival: f64) -> ContractResult<f64> {
         match self {
-            Self::Segments(segments) => Ok(segment_inverse_survival(&segments.0, survival, true)),
+            Self::Segments(segments) => Ok(segments.inverse_survival(survival, true)),
             Self::Histogram(histogram) => Ok(histogram.inverse_survival(survival, true)),
             Self::Hurdle(distribution) if survival == 1.0 - distribution.atom_probability() => {
                 hurdle_tail_lower_bound(distribution)
@@ -641,7 +757,7 @@ impl ImpactSource {
                     .filter(|(v, _)| if inclusive { *v >= x } else { *v > x })
                     .map(|(_, p)| *p),
             ),
-            Self::Segments(segments) => segments.probability(x, f64::INFINITY, inclusive, false),
+            Self::Segments(segments) => segments.survival(x, inclusive),
         }
     }
 
@@ -654,7 +770,7 @@ impl ImpactSource {
             Self::Fitted(distribution) => distribution.cdf(x),
             Self::Hurdle(distribution) => distribution.cdf(x),
             Self::Empirical(distribution) => distribution.cdf(x),
-            Self::Segments(segments) => segments.probability(f64::NEG_INFINITY, x, false, true),
+            Self::Segments(segments) => segments.cdf(x, true),
         }
     }
 
@@ -667,7 +783,7 @@ impl ImpactSource {
             Self::Fitted(distribution) => distribution.cdf_below(x),
             Self::Hurdle(distribution) => distribution.cdf_below(x),
             Self::Empirical(distribution) => distribution.cdf_below(x),
-            Self::Segments(segments) => segments.probability(f64::NEG_INFINITY, x, false, false),
+            Self::Segments(segments) => segments.cdf(x, false),
         }
     }
 
@@ -702,9 +818,12 @@ impl ImpactSource {
             }
             Self::Histogram(_) | Self::Fitted(_) => Vec::new(),
             Self::Segments(segments) => segments
-                .0
-                .iter()
-                .filter_map(|&(lo, hi, mass)| (lo == hi).then_some((lo, mass)))
+                .segments
+                .chunk_by(|&(lo, hi, _), &(next_lo, next_hi, _)| {
+                    lo == hi && hi == next_lo && lo == next_hi
+                })
+                .filter(|group| group[0].0 == group[0].1)
+                .map(|group| (group[0].0, neumaier(group.iter().map(|segment| segment.2))))
                 .collect(),
         }
     }
@@ -732,14 +851,23 @@ impl ImpactSource {
             }
             Self::Fitted(_) | Self::Hurdle(_) => vec![0.0, 1.0],
             Self::Segments(segments) => {
-                let mut knots = vec![0.0];
-                for &(_, _, mass) in &segments.0 {
-                    knots.push(knots.last().unwrap() + mass);
-                }
+                let mut knots = segments.prefix.clone();
                 *knots.last_mut().unwrap() = 1.0;
                 knots
             }
         }
+    }
+
+    pub(super) fn survival_knots(&self) -> Vec<f64> {
+        if let Self::Segments(segments) = self {
+            let mut knots = segments.suffix.clone();
+            knots[0] = 1.0;
+            return knots;
+        }
+        self.probability_knots()
+            .into_iter()
+            .map(|probability| 1.0 - probability)
+            .collect()
     }
 
     pub(crate) fn support(&self) -> (Tail, Tail) {
@@ -783,8 +911,8 @@ impl ImpactSource {
                 (Tail::Finite(distribution.atom_location()), upper)
             }
             Self::Segments(segments) => (
-                Tail::Finite(segments.0[0].0),
-                Tail::Finite(segments.0.last().unwrap().1),
+                Tail::Finite(segments.segments[0].0),
+                Tail::Finite(segments.segments.last().unwrap().1),
             ),
         }
     }
@@ -894,5 +1022,68 @@ fn fitted_mean_is_finite(distribution: &FittedDistribution) -> bool {
         GenExtreme => distribution.shape.expect("validated shape") > -1.0,
         GenPareto => distribution.shape.expect("validated shape") < 1.0,
         _ => true,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::numerical::{segment_inverse_survival, segment_quantile};
+
+    #[test]
+    fn indexed_segments_match_scans_at_gaps_atoms_and_tiny_tails() {
+        let segments = vec![
+            (0.0, 1.0, 0.125),
+            (1.0, 1.0, 0.125),
+            (1.0, 1.0, 0.25),
+            (2.0, 3.0, 0.5),
+            (4.0, 4.0, 1e-21),
+        ];
+        let indexed = WeightedSegments::new(segments.clone());
+        for rank in [0.0, 1e-22, 1e-21, 0.125, 0.25, 0.5, 0.75, 1.0] {
+            for upper in [false, true] {
+                assert_eq!(
+                    indexed.quantile(rank, upper),
+                    segment_quantile(&segments, rank, upper),
+                );
+                assert_eq!(
+                    indexed.inverse_survival(rank, upper),
+                    segment_inverse_survival(&segments, rank, upper),
+                );
+            }
+        }
+        let thresholds = [
+            f64::NEG_INFINITY,
+            0.0,
+            0.5,
+            1.0,
+            1.5,
+            2.0,
+            2.5,
+            3.0,
+            4.0,
+            f64::INFINITY,
+        ];
+        for (index, &x) in thresholds.iter().enumerate() {
+            for closed in [false, true] {
+                assert_eq!(
+                    indexed.cdf(x, closed),
+                    segment_probability(&segments, f64::NEG_INFINITY, x, false, closed),
+                );
+                assert_eq!(
+                    indexed.survival(x, closed),
+                    segment_probability(&segments, x, f64::INFINITY, closed, false),
+                );
+                for &y in &thresholds[index..] {
+                    for end_closed in [false, true] {
+                        assert_eq!(
+                            indexed.probability(x, y, closed, end_closed),
+                            segment_probability(&segments, x, y, closed, end_closed),
+                        );
+                    }
+                }
+            }
+        }
+        assert_eq!(indexed.survival(3.0, false), 1e-21);
     }
 }

@@ -8,7 +8,8 @@
 use crate::Interpolation;
 use crate::numerical::{
     CompensatedSum, IntegralMoment, NumericalLaw, ProbabilitySegment, affine_fitted_mean_deviation,
-    affine_segment_mean_deviation, compensated, segment_integral,
+    affine_segment_mean_deviation, compensated, interval_fraction, linear_interpolate,
+    local_interval, segment_integral,
 };
 
 use super::definition::{
@@ -17,7 +18,7 @@ use super::definition::{
 use super::error::{ContractResult, fail};
 use super::kernel;
 use super::quadrature::neumaier;
-use super::source::{ImpactSource, Tail};
+use super::source::{ImpactSource, Tail, WeightedSegments};
 
 pub const ALGORITHM: &str = "crc-pushforward/1";
 const MASS_COVER: f64 = 1e-12;
@@ -232,6 +233,75 @@ impl ImpactDistribution {
         }
     }
 
+    fn piecewise_linear(&self) -> bool {
+        self.source.has_piecewise_linear_quantile()
+            && matches!(
+                self.model,
+                Model::Linear { .. }
+                    | Model::Tabulated { .. }
+                    | Model::Binned { .. }
+                    | Model::Cooling { .. }
+            )
+    }
+
+    fn segment_moment(
+        &self,
+        segments: &WeightedSegments,
+        interval: (f64, f64),
+        from_upper: bool,
+        moment: IntegralMoment,
+    ) -> ContractResult<f64> {
+        let (lo, hi) = interval;
+        let breaks = super::expectation::response_breakpoints(&self.model, &self.clamp);
+        let mut cuts = breaks.into_iter().peekable();
+        let mut sum = CompensatedSum::default();
+        let evaluate = |exposure| kernel::evaluate(&self.model, &self.clamp, exposure);
+        for ((a, b, mass), prefix, suffix) in segments.intervals() {
+            let (start, end) = if from_upper {
+                (suffix, prefix)
+            } else {
+                (prefix, suffix)
+            };
+            let (weight, first, last) = local_interval(lo, hi, start, end, mass);
+            if weight == 0.0 {
+                continue;
+            }
+            let (a, b) = if from_upper {
+                (
+                    linear_interpolate(b, a, last),
+                    linear_interpolate(b, a, first),
+                )
+            } else {
+                (
+                    linear_interpolate(a, b, first),
+                    linear_interpolate(a, b, last),
+                )
+            };
+            if a == b {
+                let value = evaluate(a)?;
+                sum.add(moment.segment(weight, value, value));
+                continue;
+            }
+            // Source intervals and response cuts both advance in exposure order,
+            // even when the supplied percentile interval is an upper tail.
+            while cuts.next_if(|&cut| cut <= a).is_some() {}
+            let mut left = a;
+            loop {
+                let cut = cuts.next_if(|&cut| cut < b);
+                let right = cut.unwrap_or(b);
+                let width = weight * interval_fraction(a, b, left, right);
+                let first = evaluate(linear_interpolate(left, right, 0.25))?;
+                let third = evaluate(linear_interpolate(left, right, 0.75))?;
+                sum.add(moment.linear_quartiles(width, first, third));
+                if cut.is_none() {
+                    break;
+                }
+                left = right;
+            }
+        }
+        Ok(sum.total())
+    }
+
     fn integral_moment(&self, lo: f64, hi: f64, moment: IntegralMoment) -> ContractResult<f64> {
         if !lo.is_finite()
             || !hi.is_finite()
@@ -259,25 +329,51 @@ impl ImpactDistribution {
             ));
         }
         let decreasing = matches!(self.law, Law::Continuous { decreasing: true });
-        let source_atoms: Vec<(f64, f64, f64, f64)> = self
+        let exact_linear = self.piecewise_linear();
+        if let (true, ImpactSource::Segments(segments)) = (exact_linear, &self.source) {
+            return self.segment_moment(segments, (lo, hi), decreasing, moment);
+        }
+        let direct_survival = decreasing && matches!(self.source, ImpactSource::Segments(_));
+        let mut source_atoms: Vec<(f64, f64, f64, f64)> = self
             .source
             .point_atoms()
             .into_iter()
             .map(|(x, mass)| {
-                let (left, right) = (self.source.cdf_below(x), self.source.cdf(x));
-                if decreasing {
+                if direct_survival {
+                    (
+                        self.source.survival_at(x, false),
+                        self.source.survival_at(x, true),
+                        mass,
+                        x,
+                    )
+                } else if decreasing {
+                    let (left, right) = (self.source.cdf_below(x), self.source.cdf(x));
                     (1.0 - right, 1.0 - left, mass, x)
                 } else {
-                    (left, right, mass, x)
+                    (self.source.cdf_below(x), self.source.cdf(x), mass, x)
                 }
             })
             .collect();
-        let reflect = |q| if decreasing { 1.0 - q } else { q };
+        if decreasing {
+            source_atoms.reverse();
+        }
         let mut breaks = vec![lo, hi];
-        breaks.extend(self.source.probability_knots().into_iter().map(reflect));
+        breaks.extend(if decreasing {
+            self.source.survival_knots()
+        } else {
+            self.source.probability_knots()
+        });
         for exposure in super::expectation::response_breakpoints(&self.model, &self.clamp) {
-            breaks.push(reflect(self.source.cdf(exposure)));
-            breaks.push(reflect(self.source.cdf_below(exposure)));
+            if direct_survival {
+                breaks.push(self.source.survival_at(exposure, false));
+                breaks.push(self.source.survival_at(exposure, true));
+            } else if decreasing {
+                breaks.push(1.0 - self.source.cdf(exposure));
+                breaks.push(1.0 - self.source.cdf_below(exposure));
+            } else {
+                breaks.push(self.source.cdf(exposure));
+                breaks.push(self.source.cdf_below(exposure));
+            }
         }
         for &(left, right, _, _) in &source_atoms {
             breaks.extend([left, right]);
@@ -285,14 +381,7 @@ impl ImpactDistribution {
         breaks.retain(|q| q.is_finite() && *q >= lo && *q <= hi);
         breaks.sort_by(f64::total_cmp);
         breaks.dedup();
-        let exact_linear = self.source.has_piecewise_linear_quantile()
-            && matches!(
-                self.model,
-                Model::Linear { .. }
-                    | Model::Tabulated { .. }
-                    | Model::Binned { .. }
-                    | Model::Cooling { .. }
-            );
+        let mut source_atoms = source_atoms.into_iter().peekable();
         let mut contributions = Vec::new();
         let mut numerical = Vec::new();
         for pair in breaks.windows(2) {
@@ -300,9 +389,10 @@ impl ImpactDistribution {
             if right <= left {
                 continue;
             }
+            while source_atoms.next_if(|&(_, b, _, _)| b <= left).is_some() {}
             if let Some(&(atom_left, atom_right, mass, x)) = source_atoms
-                .iter()
-                .find(|&&(a, b, _, _)| a <= left && b >= right)
+                .peek()
+                .filter(|&&(a, b, _, _)| a <= left && b >= right)
             {
                 let width = if left == atom_left && right == atom_right {
                     mass
@@ -631,7 +721,11 @@ impl ImpactDistribution {
             ));
         }
         let decreasing = matches!(self.law, Law::Continuous { decreasing: true });
-        let source_atoms: Vec<_> = self
+        let exact_linear = self.piecewise_linear();
+        if let (true, ImpactSource::Segments(segments)) = (exact_linear, &self.source) {
+            return self.segment_moment(segments, (s_min, s_max), !decreasing, moment);
+        }
+        let mut source_atoms: Vec<_> = self
             .source
             .point_atoms()
             .into_iter()
@@ -644,10 +738,15 @@ impl ImpactDistribution {
                 (start, start + mass, mass, x)
             })
             .collect();
-        let mut breaks = vec![s_min, s_max];
-        for q in self.source.probability_knots() {
-            breaks.push(if decreasing { q } else { 1.0 - q });
+        if !decreasing {
+            source_atoms.reverse();
         }
+        let mut breaks = vec![s_min, s_max];
+        breaks.extend(if decreasing {
+            self.source.probability_knots()
+        } else {
+            self.source.survival_knots()
+        });
         for x in super::expectation::response_breakpoints(&self.model, &self.clamp) {
             breaks.push(if decreasing {
                 self.source.cdf(x)
@@ -666,23 +765,17 @@ impl ImpactDistribution {
         breaks.retain(|s| s.is_finite() && *s >= s_min && *s <= s_max);
         breaks.sort_by(f64::total_cmp);
         breaks.dedup();
-        let exact_linear = self.source.has_piecewise_linear_quantile()
-            && matches!(
-                self.model,
-                Model::Linear { .. }
-                    | Model::Tabulated { .. }
-                    | Model::Binned { .. }
-                    | Model::Cooling { .. }
-            );
+        let mut source_atoms = source_atoms.into_iter().peekable();
         let mut contributions = Vec::new();
         for pair in breaks.windows(2) {
             let (left, right) = (pair[0], pair[1]);
             if right <= left {
                 continue;
             }
+            while source_atoms.next_if(|&(_, b, _, _)| b <= left).is_some() {}
             if let Some(&(a, b, mass, x)) = source_atoms
-                .iter()
-                .find(|&&(a, b, _, _)| a <= left && b >= right)
+                .peek()
+                .filter(|&&(a, b, _, _)| a <= left && b >= right)
             {
                 let width = if left == a && right == b {
                     mass
