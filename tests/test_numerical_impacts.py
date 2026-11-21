@@ -15,6 +15,7 @@ from crc_framework import (
     Distribution,
     DistributionFamily,
     DistributionKind,
+    ExpectationMethod,
     FloodRegion,
     Impact,
     ImpactError,
@@ -293,12 +294,38 @@ def test_partial_evidence_cannot_be_used_as_a_law() -> None:
     assert math.isfinite(linear().expectation(completed))
 
 
-def test_unsupported_exact_expectation_is_an_explicit_capability_error() -> None:
-    response = Impact.sigmoid(midpoint=0, steepness=1, input=Ratio(), output=Ratio())
-    law = Distribution.parametric(DistributionFamily.GUMBEL_RIGHT, location=0, scale=1)
+def test_expectation_uses_numerical_integration_when_exact_is_unavailable() -> None:
+    response = Impact.sigmoid(
+        midpoint=1, steepness=2, input=Ratio(), output=Ratio()
+    )
+    law = Distribution.parametric(DistributionFamily.GUMBEL_RIGHT, location=1, scale=0.5)
+    image_mean = response.pushforward(law).statistics(metrics=[Statistic.MEAN])
+    assert response.expectation(law) == pytest.approx(0.5963473623297835)
+    assert response.expectation(law, method=ExpectationMethod.AUTO) == pytest.approx(
+        image_mean.values[Statistic.MEAN].value
+    )
     with pytest.raises(ImpactError) as error:
-        response.expectation(law)
+        response.expectation(law, method=ExpectationMethod.EXACT)
     assert error.value.code == "exact_method_unavailable"
+    with pytest.raises(TypeError, match="ExpectationMethod"):
+        response.expectation(law, method="auto")  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        linear(1, minimum=0, maximum=1),
+        Impact.builtin(BuiltinImpact.HOT_DAYS).resolve(),
+        Impact.builtin(BuiltinImpact.FIRE_WEATHER_INDEX).resolve(),
+    ],
+)
+def test_clamped_and_builtin_expectations_on_hurdle_laws(response: Impact) -> None:
+    base = Distribution.parametric(DistributionFamily.GUMBEL_RIGHT, location=3, scale=0.5)
+    law = Distribution.hurdle(base, atom_probability=0.25, atom_location=0)
+    image = response.pushforward(law).statistics(metrics=[Statistic.MEAN])
+    result = response.expectation(law)
+    assert math.isfinite(result)
+    assert result == pytest.approx(image.values[Statistic.MEAN].value)
 
 
 def test_impact_serialization_round_trips_current_format_only() -> None:
