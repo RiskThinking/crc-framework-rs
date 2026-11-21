@@ -267,20 +267,34 @@ impl ExactMasses {
         let (coefficient, exponent) = dyadic(q);
         (&self.total * coefficient, (-exponent) as usize)
     }
+
+    fn quantile_cutoffs(&self, q: f64) -> (BigUint, BigUint, usize) {
+        // Compare the normalized prefix with the midpoint between q and the
+        // preceding binary64 value without rounding the midpoint itself.
+        let previous = f64::from_bits(q.to_bits() - 1);
+        let (_, gap_exponent) = dyadic(q - previous);
+        let shift = (-gap_exponent + 1) as usize;
+        let (cutoff, cutoff_shift) = self.cutoff(q);
+        let cutoff = cutoff << (shift - cutoff_shift);
+        let midpoint = &cutoff - &self.total;
+        (cutoff, midpoint, shift)
+    }
 }
 
-fn quantile_index(
+fn quantile_indices(
     branches: &[Branch],
     total: f64,
     q: f64,
     factors: &Factors<'_>,
     exact: &mut Option<ExactMasses>,
-) -> usize {
+) -> (usize, usize) {
     let cutoff = q * total;
     let mut cumulative = CompensatedSum::default();
     let mut exact_prefix = BigUint::ZERO;
     let mut next_exact = 0;
-    let mut exact_cutoff = None;
+    let mut exact_cutoffs = None;
+    let mut var_index = None;
+    let round_midpoint_up = q.to_bits() & 1 == 0;
     // Each joint product has at most 26 factors. The guard accounts for
     // rounding on both sides, including products rounded into subnormals.
     let margin = 64.0 * f64::EPSILON * cutoff + 64.0 * f64::from_bits(1) * branches.len() as f64;
@@ -288,21 +302,36 @@ fn quantile_index(
         cumulative.add(branch.mass);
         let difference = cumulative.total() - cutoff;
         if difference > margin {
-            return index;
+            return (var_index.unwrap_or(index), index);
         }
         if difference >= -margin {
             let masses = exact.get_or_insert_with(|| ExactMasses::new(factors));
-            let (target, shift) = exact_cutoff.get_or_insert_with(|| masses.cutoff(q));
+            let (target, midpoint, shift) =
+                exact_cutoffs.get_or_insert_with(|| masses.quantile_cutoffs(q));
             for branch in &branches[next_exact..=index] {
                 exact_prefix += masses.at(branch.mask);
             }
             next_exact = index + 1;
-            if (&exact_prefix << *shift) >= *target {
-                return index;
+            let prefix = &exact_prefix << *shift;
+            if prefix >= *target {
+                return (var_index.unwrap_or(index), index);
+            }
+            if var_index.is_none()
+                && (prefix > *midpoint || round_midpoint_up && prefix == *midpoint)
+            {
+                var_index = Some(index);
             }
         }
     }
-    branches.len() - 1
+    let last = branches.len() - 1;
+    (var_index.unwrap_or(last), last)
+}
+
+fn impact_group(branches: &[Branch], index: usize, order: &ImpactOrder<'_>) -> (usize, usize) {
+    let lo = branches[..index].partition_point(|b| order.compare(b, &branches[index]).is_lt());
+    let hi =
+        index + branches[index..].partition_point(|b| order.compare(b, &branches[index]).is_eq());
+    (lo, hi)
 }
 
 fn add_state_masses(states: &mut [[CompensatedSum; 2]], mask: usize, mass: f64) {
@@ -534,12 +563,10 @@ pub fn compute_risk(
     let mut exact = None;
     let mut result = Vec::with_capacity(levels.len());
     for &q in levels {
-        let index = quantile_index(&branches, total, q, &factors, &mut exact);
+        let (index, tail_index) = quantile_indices(&branches, total, q, &factors, &mut exact);
         let quantile = branches[index].value;
         // Tied VaR states have probability-weighted attribution, independent of order.
-        let lo = branches[..index].partition_point(|b| order.compare(b, &branches[index]).is_lt());
-        let hi = index
-            + branches[index..].partition_point(|b| order.compare(b, &branches[index]).is_eq());
+        let (lo, hi) = impact_group(&branches, index, &order);
         let var_parts = var_attribution(&branches[lo..hi], &factors, &mut exact);
         let approximate = if q < 64.0 * f64::EPSILON || rounded_mass {
             None
@@ -548,6 +575,13 @@ pub fn compute_risk(
         };
         let (cvar, cvar_parts) = approximate.unwrap_or_else(|| {
             let exact = exact.get_or_insert_with(|| ExactMasses::new(&factors));
+            // CVaR integrates at the unrounded probability even if the VaR
+            // boundary rounds to q one impact group earlier.
+            let (lo, hi) = if tail_index == index {
+                (lo, hi)
+            } else {
+                impact_group(&branches, tail_index, &order)
+            };
             exact_tail(&branches[..hi], lo, q, &factors, exact)
         });
         result.push(RiskLevel {

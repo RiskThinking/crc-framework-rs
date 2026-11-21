@@ -225,8 +225,10 @@ statistics separately through `Distribution.statistics`.
 
 `BinaryOutcome` declares two states with explicit rank masses and impacts.
 `compute_risk(outcomes, levels=[...])` sums independent contributions in their
-supplied units and returns exact VaR, upper-tail CVaR, and attribution. VaR
-attribution averages equally valued states by their probability masses. When
+supplied units and returns VaR, upper-tail CVaR, and attribution. VaR selects
+the lowest impact whose cumulative probability, rounded to floating-point
+precision, reaches the requested level. VaR attribution averages equally
+valued states by their probability masses. CVaR uses the unrounded cutoff. When
 the CVaR cutoff includes only part of a tied value's mass, each tied state
 contributes the same fraction of its mass. Branch limits are enforced before
 allocation. Outcome identities must be unique.
