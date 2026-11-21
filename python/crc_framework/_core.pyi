@@ -59,6 +59,35 @@ class NativePolicyTerms:
         self, total_insured_value: float, damage_ratios: Sequence[float]
     ) -> list[float]: ...
 
+class NativeAnnualLossSpec:
+    def __init__(
+        self,
+        trials: int,
+        seed: int,
+        peak_correlation: float,
+        decay_length_km: float,
+        damage_cv: float,
+        repair_tolerance: float | None,
+    ) -> None: ...
+
+class NativeInsuredInterest:
+    def __init__(
+        self,
+        id: str,
+        coordinates: tuple[float, float],
+        total_insured_value: float,
+        knots: tuple[Sequence[float], Sequence[float]],
+        terms: NativePolicyTerms,
+    ) -> None: ...
+
+def simulate_annual_losses(
+    interests: Sequence[NativeInsuredInterest],
+    spec: NativeAnnualLossSpec,
+    execution: tuple[bool, int, int, int, int],
+) -> tuple[
+    bytes, list[tuple[str, bytes]] | None, float, str, tuple[float, float] | None
+]: ...
+
 _NativeAnnualLossLevel: TypeAlias = tuple[
     float, float, float, float | None, list[tuple[str, float]] | None, float, int, float
 ]

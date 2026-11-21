@@ -45,6 +45,85 @@
         "boundary_weight": "float"
       }
     },
+    "AnnualLossSimulation": {
+      "kind": "class",
+      "properties": {
+        "totals": "FloatArray",
+        "components": "Mapping[str, FloatArray] | None",
+        "total_insured_value": "float",
+        "spec": "AnnualLossSpec",
+        "secondary_stream": "int",
+        "rng_algorithm": "str",
+        "correlation_repair": "CorrelationRepair | None",
+        "trial_ids": "range"
+      }
+    },
+    "AnnualLossSpec": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "trials",
+            "kind": "keyword_only",
+            "annotation": "int",
+            "default": 20000
+          },
+          {
+            "name": "seed",
+            "kind": "keyword_only",
+            "annotation": "int",
+            "default": 20261027
+          },
+          {
+            "name": "peak_correlation",
+            "kind": "keyword_only",
+            "annotation": "float",
+            "default": 0.4
+          },
+          {
+            "name": "decay_length_km",
+            "kind": "keyword_only",
+            "annotation": "float",
+            "default": 150.0
+          },
+          {
+            "name": "damage_cv",
+            "kind": "keyword_only",
+            "annotation": "float",
+            "default": 0.3
+          },
+          {
+            "name": "repair_tolerance",
+            "kind": "keyword_only",
+            "annotation": "float | None",
+            "default": null
+          },
+          {
+            "name": "calibration_source",
+            "kind": "keyword_only",
+            "annotation": "str | None",
+            "default": null
+          }
+        ],
+        "returns": "AnnualLossSpec"
+      },
+      "methods": {
+        "reference": {
+          "parameters": [],
+          "returns": "AnnualLossSpec",
+          "binding": "class"
+        }
+      },
+      "properties": {
+        "trials": "int",
+        "seed": "int",
+        "peak_correlation": "float",
+        "decay_length_km": "float",
+        "damage_cv": "float",
+        "repair_tolerance": "float | None",
+        "calibration_source": "str | None"
+      }
+    },
     "AnnualLossSummary": {
       "kind": "class",
       "methods": {
@@ -377,6 +456,13 @@
           "returns": "ImpactContext",
           "binding": "class"
         }
+      }
+    },
+    "CorrelationRepair": {
+      "kind": "class",
+      "properties": {
+        "minimum_eigenvalue": "float",
+        "maximum_change": "float"
       }
     },
     "CountryContext": {
@@ -1489,6 +1575,53 @@
         }
       }
     },
+    "InsuredInterest": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "id",
+            "kind": "positional_or_keyword",
+            "annotation": "str"
+          },
+          {
+            "name": "longitude",
+            "kind": "keyword_only",
+            "annotation": "float"
+          },
+          {
+            "name": "latitude",
+            "kind": "keyword_only",
+            "annotation": "float"
+          },
+          {
+            "name": "total_insured_value",
+            "kind": "keyword_only",
+            "annotation": "float"
+          },
+          {
+            "name": "damage_curve",
+            "kind": "keyword_only",
+            "annotation": "QuantileCurve | Distribution"
+          },
+          {
+            "name": "terms",
+            "kind": "keyword_only",
+            "annotation": "PolicyTerms | None",
+            "default": null
+          }
+        ],
+        "returns": "InsuredInterest"
+      },
+      "properties": {
+        "id": "str",
+        "longitude": "float",
+        "latitude": "float",
+        "total_insured_value": "float",
+        "damage_curve": "QuantileCurve | Distribution",
+        "terms": "PolicyTerms"
+      }
+    },
     "InundationContext": {
       "kind": "class",
       "constructor": {
@@ -2598,6 +2731,53 @@
         }
       ],
       "returns": "tuple[RankScenario, ...]"
+    },
+    "simulate_annual_losses": {
+      "kind": "function",
+      "parameters": [
+        {
+          "name": "interests",
+          "kind": "positional_or_keyword",
+          "annotation": "Sequence[InsuredInterest]"
+        },
+        {
+          "name": "spec",
+          "kind": "keyword_only",
+          "annotation": "AnnualLossSpec | None",
+          "default": null
+        },
+        {
+          "name": "include_components",
+          "kind": "keyword_only",
+          "annotation": "bool",
+          "default": false
+        },
+        {
+          "name": "secondary_stream",
+          "kind": "keyword_only",
+          "annotation": "int",
+          "default": 0
+        },
+        {
+          "name": "block_size",
+          "kind": "keyword_only",
+          "annotation": "int",
+          "default": 256
+        },
+        {
+          "name": "memory_limit",
+          "kind": "keyword_only",
+          "annotation": "int",
+          "default": 536870912
+        },
+        {
+          "name": "work_limit",
+          "kind": "keyword_only",
+          "annotation": "int",
+          "default": 10000000000
+        }
+      ],
+      "returns": "AnnualLossSimulation"
     },
     "summarize_annual_losses": {
       "kind": "function",

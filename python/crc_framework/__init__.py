@@ -55,8 +55,13 @@ from ._impacts import (
 from ._insurance import (
     AnnualLossExceedance,
     AnnualLossLevel,
+    AnnualLossSimulation,
+    AnnualLossSpec,
     AnnualLossSummary,
+    CorrelationRepair,
+    InsuredInterest,
     PolicyTerms,
+    simulate_annual_losses,
     summarize_annual_losses,
 )
 from ._measurement import (
@@ -111,6 +116,8 @@ __all__ = [
     "Aggregation",
     "AnnualLossExceedance",
     "AnnualLossLevel",
+    "AnnualLossSimulation",
+    "AnnualLossSpec",
     "AnnualLossSummary",
     "AssetType",
     "BinaryOutcome",
@@ -123,6 +130,7 @@ __all__ = [
     "ContextField",
     "ContextValue",
     "CoolingCostContext",
+    "CorrelationRepair",
     "CountryContext",
     "CropContext",
     "DegreeDayUnit",
@@ -156,6 +164,7 @@ __all__ = [
     "ImpactError",
     "ImpactReference",
     "ImpactRequirements",
+    "InsuredInterest",
     "InundationContext",
     "LengthUnit",
     "Measurement",
@@ -200,5 +209,6 @@ __all__ = [
     "lookup_geography",
     "lookup_ipcc_region",
     "rank_scenarios",
+    "simulate_annual_losses",
     "summarize_annual_losses",
 ]

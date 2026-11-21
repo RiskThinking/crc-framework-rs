@@ -281,6 +281,70 @@ give the signed difference between the sum of standalone VaRs and portfolio
 VaR. When total insured value is zero, `loss_cost` is `None` and `diagnostics`
 records the reason.
 
+## Simulate annual losses for one peril
+
+Use `InsuredInterest` when you have a mean damage curve and resolved policy
+terms for each interest. Express the curve in non-exceedance ranks with damage
+ratios in `[0, 1]`, including both rank endpoints. Evaluate vulnerability at the
+hazard knots before constructing the damage curve. The simulator interpolates
+between those damage ratios. Supply explicit `TailCompletion` endpoints when
+completing partial evidence is appropriate for the book.
+
+```python
+from crc_framework import (
+    AnnualLossSpec,
+    InsuredInterest,
+    PolicyTerms,
+    QuantileCurve,
+    simulate_annual_losses,
+    summarize_annual_losses,
+)
+
+book = [
+    InsuredInterest(
+        "warehouse",
+        longitude=-75.0,
+        latitude=45.0,
+        total_insured_value=100_000,
+        damage_curve=QuantileCurve([0, 0.9, 1], [0, 0.2, 0.7]),
+        terms=PolicyTerms(deductible=5_000, limit=30_000, share=0.8),
+    ),
+]
+spec = AnnualLossSpec.reference()
+run = simulate_annual_losses(book, spec=spec, include_components=True)
+summary = summarize_annual_losses(
+    run.totals,
+    total_insured_value=run.total_insured_value,
+    components=run.components,
+)
+assert len(run.trial_ids) == summary.trial_count == 20_000
+```
+
+Use one currency and valuation basis for the book. Each simulated year draws
+one severity per location, applies primary policy terms, and sums the insured
+losses. This gives an annual aggregate loss proxy gross of reinsurance.
+
+The reference configuration uses 20,000 trials, seed `20261027`, peak latent
+correlation 0.4, decay length 150 km, and damage coefficient of variation 0.3.
+Dependence decays with great-circle distance. Set `repair_tolerance` to allow
+an eigenvalue floor of `1e-8` with the specified maximum change to any matrix
+entry. A repaired run reports its original minimum eigenvalue and maximum
+entry change. Set `damage_cv=0` to use the mean damage ratio directly. Supply
+`calibration_source` to record the label of a peril-specific calibration.
+
+For paired runs, reuse the same interest IDs, coordinates, and spec. The
+simulator sorts interests by ID and uses a versioned ChaCha12 primary stream.
+Select a different `secondary_stream` for independent damage uncertainty in
+the paired run. Trial IDs are zero-based. Replay has been verified across
+block sizes and input ordering on the same build.
+
+The dense simulator checks estimated numerical memory and work before
+factorization. `memory_limit` is in bytes. Keep `include_components` off
+when you need only the portfolio totals. With components enabled, all
+component arrays share the same trial IDs. NumPy reference comparisons use
+independent RNG streams and sampling tolerances. CVaR uses the exact
+requested tail mass, including fractional mass at a tied cutoff.
+
 ## Serialization and reference geography
 
 `Distribution`, `QuantileCurve`, fitting specifications, and impacts have typed

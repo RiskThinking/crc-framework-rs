@@ -33,6 +33,7 @@ _BUILTIN_TYPES = {
     "tuple",
     "list",
     "dict",
+    "range",
     "type",
     "Sequence",
     "Mapping",
@@ -476,6 +477,7 @@ def validate_release(release: Mapping[str, Any]) -> None:
         "numerical",
         "impact",
         "evidence",
+        "annual-loss",
     }
     _keys(release["packages"], packages, packages, "/release/packages")
     _keys(release["formats"], formats, formats, "/release/formats")
