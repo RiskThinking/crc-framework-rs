@@ -70,6 +70,37 @@ def test_risk_retains_rare_mass() -> None:
         result.at(0.951)
 
 
+@pytest.mark.parametrize("upper_mass", [0.1, 0.2, 0.05, 0.01])
+def test_decimal_rank_mass_cutoffs_match_discrete_quantiles(upper_mass: float) -> None:
+    cutoff = 1 - upper_mass
+    levels = [math.nextafter(cutoff, 0), cutoff, math.nextafter(cutoff, 1)]
+    binary = outcome("binary", upper_mass, 2)
+    discrete = Distribution.discrete([0, 2], [cutoff, upper_mass])
+    result = compute_risk([binary], levels=levels)
+    assert (
+        [result.at(q).value_at_risk for q in levels]
+        == [discrete.quantile(q) for q in levels]
+        == [0, 0, 2]
+    )
+
+
+def test_rounded_var_cutoff_does_not_shift_the_exact_tail() -> None:
+    binary = BinaryOutcome(
+        "binary",
+        lower_rank_mass=0.9,
+        lower_impact=-1e308,
+        upper_rank_mass=0.1,
+        upper_impact=2,
+    )
+    level = compute_risk([binary], levels=[0.9]).at(0.9)
+    assert level.value_at_risk == level.attribution[0].value_at_risk == -1e308
+    assert (
+        level.conditional_value_at_risk
+        == level.attribution[0].conditional_value_at_risk
+        == 2
+    )
+
+
 def test_var_keeps_the_lower_cutoff_when_prefix_mass_equals_level() -> None:
     a = BinaryOutcome(
         "a", lower_rank_mass=0.5, lower_impact=-1, upper_rank_mass=0.5, upper_impact=1
