@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { initialize } from './bindings.js';
 
-export { DocumentSchema, prepareNumerical, prepareNumericals, quantile, validateDocument } from './bindings.js';
+export { DocumentSchema, QuantileOutcome, prepareNumerical, prepareNumericals, quantile, validateDocument } from './bindings.js';
 
 export default function init(input) {
   return initialize(async () => {

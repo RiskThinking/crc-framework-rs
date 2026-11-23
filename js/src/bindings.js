@@ -85,17 +85,43 @@ export function quantile(text, probabilities) {
   }
 }
 
-/** Parse an array of numerical documents for repeated queries in one WASM call. */
+/** Per-document outcome codes of `prepareNumericals(...).quantile(...)`. */
+export const QuantileOutcome = Object.freeze({
+  VALUE: 0,
+  BELOW_SUPPORT: 1,
+  ABOVE_SUPPORT: 2,
+  INVALID_DOCUMENT: 3,
+  UNAVAILABLE: 4,
+});
+
+/**
+ * Parse an array of numerical documents for repeated queries in one WASM call.
+ * Each document has its own outcome: an invalid document or an out-of-support
+ * query yields NaN for that document only.
+ */
 export function prepareNumericals(text) {
   assertReady();
   assertText(text);
   const native = new PreparedNumericals(text);
+  const indices = native.invalidIndices();
+  const messages = native.invalidMessages();
+  const invalidDocuments = Object.freeze(
+    Array.from(indices, (index, i) => Object.freeze({ index, message: messages[i] })),
+  );
+  const length = native.length;
   let freed = false;
   return {
+    length,
+    invalidDocuments,
     quantile(probability) {
       if (freed) throw new Error('prepared numericals have been freed');
       assertNumber(probability);
-      return native.quantile(probability);
+      const batch = native.quantile(probability);
+      try {
+        return { values: batch.values, outcomes: batch.outcomes };
+      } finally {
+        batch.free();
+      }
     },
     free() {
       if (!freed) {
