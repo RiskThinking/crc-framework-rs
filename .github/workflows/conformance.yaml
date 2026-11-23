@@ -31,6 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
@@ -58,7 +59,8 @@ jobs:
           cargo test -p crc-framework-core --test canonical_consumer --test dataset_contract --test impact_contract_canonical --test impact_definition_conformance --test impact_registry_conformance --locked
           cargo test -p crc-framework-core --no-default-features --test canonical_consumer --test dataset_contract --test impact_contract_canonical --test impact_definition_conformance --test impact_registry_conformance --locked
   build:
-    needs: [lint, python-contracts, native-contracts]
+    # Independent of the other jobs; running it alongside them keeps the
+    # slowest job (WASM optimization and browser tests) off the critical path.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
