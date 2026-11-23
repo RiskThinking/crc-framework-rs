@@ -19,12 +19,31 @@ export interface PreparedNumerical {
   quantile(probabilities: readonly number[] | Float64Array): Float64Array;
   free(): void;
 }
+/** Why a document in a batch has, or lacks, a value. */
+export const QuantileOutcome: Readonly<{
+  VALUE: 0;
+  BELOW_SUPPORT: 1;
+  ABOVE_SUPPORT: 2;
+  INVALID_DOCUMENT: 3;
+  UNAVAILABLE: 4;
+}>;
+export type QuantileOutcome = (typeof QuantileOutcome)[keyof typeof QuantileOutcome];
+/** One entry per document: `values[i]` is NaN unless `outcomes[i]` is `VALUE`. */
+export interface QuantileBatch {
+  values: Float64Array;
+  outcomes: Uint8Array;
+}
 export interface PreparedNumericals {
-  quantile(probability: number): Float64Array;
+  readonly length: number;
+  /** Documents that failed validation; their outcome is `INVALID_DOCUMENT`. */
+  readonly invalidDocuments: ReadonlyArray<Readonly<{ index: number; message: string }>>;
+  /** Throws only for an invalid probability or after `free()`. */
+  quantile(probability: number): QuantileBatch;
   free(): void;
 }
 /** Prepare a numerical document for repeated queries. */
 export function prepareNumerical(text: string): PreparedNumerical;
+/** Prepare a JSON array of numerical documents; invalid documents become per-item failures. */
 export function prepareNumericals(text: string): PreparedNumericals;
 export function quantile(text: string, probability: number): number;
 export function quantile(text: string, probabilities: readonly number[] | Float64Array): Float64Array;

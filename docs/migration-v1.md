@@ -482,7 +482,7 @@ writes. Flat `curve_*` objects, including PMTiles/MVT feature properties in the
 | `evaluateCurves(rows, q)` | `prepareNumericals(arrayJSONText).quantile(q)` |
 | `prepareCurve(properties).evaluate(q)` | `prepareNumerical(text).quantile(q)` |
 | `prepareCurves(rows).evaluate(q)` | `prepareNumericals(arrayJSONText).quantile(q)` |
-| Returned `null` outside support or for no-data | Throws; missing data is a dataset failure, not a curve |
+| Returned `null` outside support or for no-data | Single documents throw. Batches return NaN with a per-document `QuantileOutcome`; missing data is a dataset failure, not a curve |
 | `initSync({ module })` | Removed; use `await init(bytesOrURL)` |
 | `init({ module_or_path: url })` | `init(url)` |
 
@@ -506,11 +506,18 @@ await init();
 // Each item is a numerical document, e.g. the output of Python's to_json().
 const curves = prepareNumericals(JSON.stringify(documents));
 try {
-  const values = curves.quantile(0.99); // Float64Array
+  // values[i] is NaN where outcomes[i] is not QuantileOutcome.VALUE.
+  const { values, outcomes } = curves.quantile(0.99);
 } finally {
   curves.free();
 }
 ```
+
+Where 0.x returned `null` for one feature, a batch reports that feature's
+outcome: `BELOW_SUPPORT` or `ABOVE_SUPPORT` for a query outside the curve's
+evidence (for example a 13-knot curve asked for p = 0.998), and
+`INVALID_DOCUMENT` for a document that fails validation. The other documents
+keep their values.
 
 `validateDocument(DocumentSchema.DATASET, text)` validates dataset, numerical,
 and impact documents with the same rules as Python.

@@ -41,10 +41,17 @@ Initialization loads the packaged WASM asset in Node and in browsers. It is
 shared and idempotent. To load a particular WASM file, pass its URL, bytes, or
 compiled module to `init(wasmInput)`.
 
-`quantile(text, probabilities)` performs a one-shot query. `prepareNumericals`
-accepts an array of numerical documents as JSON text and returns one result per
-document for each scalar probability query. Prepared handles own their native
-memory; `free()` is idempotent and further queries fail.
+`quantile(text, probabilities)` and `prepareNumerical(text)` are strict: an
+invalid document or an out-of-support query throws. `prepareNumericals` accepts
+a JSON array of numerical documents and answers every document on its own, for
+map tiles and other batches where one curve must not fail the rest.
+`quantile(probability)` returns `{ values, outcomes }`: a `Float64Array` and a
+`Uint8Array` with one entry per document. `values[i]` is NaN unless
+`outcomes[i]` is `QuantileOutcome.VALUE`; the other outcomes are
+`BELOW_SUPPORT`, `ABOVE_SUPPORT`, `INVALID_DOCUMENT`, and `UNAVAILABLE`.
+`invalidDocuments` lists each rejected document's index and validation message.
+Only text that is not a JSON array, or an invalid probability, throws. Prepared
+handles own their native memory; `free()` is idempotent and further queries fail.
 
 Partial evidence is queried only on its actual interval. Invalid coordinates,
 malformed documents, historical records, and out-of-support queries fail.

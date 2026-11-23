@@ -40,7 +40,7 @@ import init, * as crc from '${manifest.name}';
 
 const text = '${pointMass}';
 assert.deepEqual(Object.keys(crc).sort(), [
-  'DocumentSchema', 'default', 'prepareNumerical', 'prepareNumericals', 'quantile', 'validateDocument',
+  'DocumentSchema', 'QuantileOutcome', 'default', 'prepareNumerical', 'prepareNumericals', 'quantile', 'validateDocument',
 ]);
 assert.throws(() => crc.quantile(text, .5), /await init/);
 await assert.rejects(init(new Uint8Array(1)), WebAssembly.CompileError);
@@ -59,7 +59,7 @@ assert.equal(JSON.parse(await readFile(schemaPath, 'utf8')).$id, crc.DocumentSch
   execFileSync(process.execPath, ['node.mjs'], { cwd: directory, stdio: 'inherit' });
 
   await writeFile(path.join(directory, 'smoke.ts'), `
-import init, {quantile, prepareNumerical, prepareNumericals, DocumentSchema, validateDocument} from '${manifest.name}';
+import init, {quantile, prepareNumerical, prepareNumericals, DocumentSchema, QuantileOutcome, validateDocument} from '${manifest.name}';
 const text='${pointMass}';
 await init();
 await init(new URL('https://example.com/crc_framework_bg.wasm'));
@@ -71,7 +71,11 @@ const prepared = prepareNumerical(text);
 prepared.quantile([.1, .9]);
 prepared.free();
 const batch = prepareNumericals('[' + text + ']');
-const batchValues: Float64Array = batch.quantile(.5);
+const result = batch.quantile(.5);
+const batchValues: Float64Array = result.values;
+const batchOutcomes: Uint8Array = result.outcomes;
+const missing: boolean = batchOutcomes[0] !== QuantileOutcome.VALUE;
+const invalid: number[] = batch.invalidDocuments.map(item => item.index);
 batch.free();
 validateDocument(DocumentSchema.NUMERICAL, text);
 `);

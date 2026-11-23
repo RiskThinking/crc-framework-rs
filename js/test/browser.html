@@ -36,8 +36,8 @@ try {
  const documents=cases.accepted.filter(c=>c.document.object==='distribution').map(c=>c.document);
  const batch=prepareNumericals(JSON.stringify(documents));
  try {
-  const values=batch.quantile(.99);
-  documents.forEach((doc,index)=>{if(values[index]!==quantile(JSON.stringify(doc),.99)) throw new Error('batch mismatch');assertions++;});
+  const {values,outcomes}=batch.quantile(.99);
+  documents.forEach((doc,index)=>{if(outcomes[index]!==0||values[index]!==quantile(JSON.stringify(doc),.99)) throw new Error('batch mismatch');assertions++;});
  } finally {batch.free();}
  window.testResult={status:'passed',assertions,initMs};
  document.querySelector('#result').textContent=JSON.stringify(window.testResult);
