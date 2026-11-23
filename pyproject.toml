@@ -33,8 +33,11 @@ Homepage = "https://github.com/RiskThinking/crc-framework-rs"
 Repository = "https://github.com/RiskThinking/crc-framework-rs"
 Issues = "https://github.com/RiskThinking/crc-framework-rs/issues"
 
-[project.optional-dependencies]
+[dependency-groups]
+# Development tools are not published with the package. `uv sync` installs the
+# default `dev` group; CI installs only `test` next to a built wheel.
 test = ["mypy", "pytest", "rfc3339-validator>=0.1.4", "types-jsonschema"]
+dev = ["maturin>=1.4,<2.0", { include-group = "test" }]
 
 [tool.maturin]
 module-name = "crc_framework._core"

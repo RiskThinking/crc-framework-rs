@@ -69,9 +69,7 @@ remaining importable is not an acceptance requirement.
 Run these commands from the repository root:
 
 ```sh
-python -m venv .venv
-.venv/bin/python -m pip install --upgrade pip maturin
-.venv/bin/python -m pip install -e ".[test]"
+uv sync --locked
 
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
@@ -81,8 +79,11 @@ cargo test --workspace --locked
 .venv/bin/maturin build --release --locked
 ```
 
-After changing Rust code, run `.venv/bin/maturin develop` to rebuild the Python
-extension. Python-only edits are available directly from the editable install.
+`uv sync` creates `.venv` with the locked `dev` dependency group (maturin and
+the `test` group) and an editable install of the package. After changing Rust
+code, run `.venv/bin/maturin develop --release` to rebuild the Python extension.
+Python-only edits are available directly from the editable install. Without uv,
+pip 25.1 or later installs the same tools with `pip install --group dev`.
 
 ## Current interchange contracts
 
