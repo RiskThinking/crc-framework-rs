@@ -932,9 +932,10 @@ pub(crate) fn transform(
     // Any finite atomic source has an exact image, including under a
     // non-monotone response. Preserve every positive atom rather than sampling
     // the quantile law or discarding small probabilities.
-    if let ImpactSource::Discrete(discrete) = source
-        && let Some(ranks) = discrete.ranks()
-    {
+    if let Some((discrete, ranks)) = match source {
+        ImpactSource::Discrete(discrete) => discrete.ranks().map(|ranks| (discrete, ranks)),
+        _ => None,
+    } {
         // Counts move with their atoms, so the image of an empirical law is
         // again an empirical law with exact ranks.
         let mut counted = Vec::new();
