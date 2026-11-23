@@ -76,10 +76,20 @@ jobs:
     needs: release-contract
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
+        # The free-threaded build gets its own job: once setup-python installs
+        # 3.14t next to 3.14, `python3.14` resolves to the free-threaded
+        # interpreter and no regular 3.14 wheel is built (see the Windows job).
+        os: [macos-15-intel, macos-15]
+        build: [regular, free-threaded]
         include:
           - {os: macos-15-intel, target: x86_64}
           - {os: macos-15, target: aarch64}
+          - build: regular
+            python: "3.11 3.12 3.13 3.14"
+          - build: free-threaded
+            python: "3.14t"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
@@ -90,15 +100,21 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ matrix.target }}-${{ matrix.build }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Select interpreters
+        id: interpreters
+        env:
+          PYTHON_VERSIONS: ${{ matrix.python }}
+        run: |
+          {
+            echo "versions<<EOF"
+            tr ' ' '\n' <<< "$PYTHON_VERSIONS"
+            echo "EOF"
+            echo "names=$(printf 'python%s ' $PYTHON_VERSIONS)"
+          } >> "$GITHUB_OUTPUT"
       - uses: actions/setup-python@v5
         with:
-          python-version: |
-            3.11
-            3.12
-            3.13
-            3.14
-            3.14t
+          python-version: ${{ steps.interpreters.outputs.versions }}
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         env:
@@ -109,17 +125,17 @@ jobs:
             --release
             --locked
             --out dist
-            --interpreter python3.11 python3.12 python3.13 python3.14 python3.14t
+            --interpreter ${{ steps.interpreters.outputs.names }}
           sccache: "true"
           container: "off"
       - uses: ./.github/actions/check-wheel
         with:
-          python-versions: 3.11 3.12 3.13 3.14 3.14t
+          python-versions: ${{ matrix.python }}
           wheel-directory: dist
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-mac-${{ matrix.target }}
+          name: wheels-mac-${{ matrix.target }}-${{ matrix.build }}
           path: dist
 
   windows:
