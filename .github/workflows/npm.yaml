@@ -7,6 +7,11 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  # A new push to a pull request supersedes its running checks. Branch and tag
+  # runs get a group of their own, so they are never queued or cancelled.
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
 jobs:
   conformance:
     uses: ./.github/workflows/conformance.yaml
