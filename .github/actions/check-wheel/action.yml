@@ -10,7 +10,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: astral-sh/setup-uv@v10.2.0
+    - uses: astral-sh/setup-uv@v10.3.3
     - name: Test each installed wheel
       shell: bash
       env:

@@ -15,7 +15,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.2.0
+      - uses: astral-sh/setup-uv@v10.3.3
       - name: Validate release tag and declared contract
         env:
           RELEASE_REF_TYPE: ${{ github.ref_type }}
@@ -37,8 +37,8 @@ jobs:
       matrix:
         target: [x86_64]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/cache@v4
+      - uses: actions/checkout@v7
+      - uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/bin/
@@ -67,7 +67,7 @@ jobs:
           python-versions: 3.11 3.12 3.13 3.14 3.14t
           wheel-directory: dist
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-linux-${{ matrix.target }}
           path: dist
@@ -91,8 +91,8 @@ jobs:
           - build: free-threaded
             python: "3.14t"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/cache@v4
+      - uses: actions/checkout@v7
+      - uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/bin/
@@ -112,7 +112,7 @@ jobs:
             echo "EOF"
             echo "names=$(printf 'python%s ' $PYTHON_VERSIONS)"
           } >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ steps.interpreters.outputs.versions }}
       - name: Build wheels
@@ -133,7 +133,7 @@ jobs:
           python-versions: ${{ matrix.python }}
           wheel-directory: dist
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-mac-${{ matrix.target }}-${{ matrix.build }}
           path: dist
@@ -151,11 +151,11 @@ jobs:
         # (python/cpython#127294, PyO3/maturin-action#313).
         interpreter: ["3.11", "3.12", "3.13", "3.14", "3.14t"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Enable long paths
         run: |
           reg add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem /v LongPathsEnabled /t REG_DWORD /d 1 /f
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/bin/
@@ -164,7 +164,7 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-x64-${{ matrix.interpreter }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         id: setup-python
         with:
           python-version: ${{ matrix.interpreter }}
@@ -187,7 +187,7 @@ jobs:
           python-versions: ${{ matrix.interpreter }}
           wheel-directory: dist
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-windows-x64-${{ matrix.interpreter }}
           path: dist
@@ -196,7 +196,7 @@ jobs:
     needs: release-contract
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         env:
@@ -204,7 +204,7 @@ jobs:
         with:
           command: sdist
           args: --out dist
-      - uses: astral-sh/setup-uv@v10.2.0
+      - uses: astral-sh/setup-uv@v10.3.3
       - name: Build a wheel from the source distribution
         run: uv build --wheel --python 3.12 --out-dir "$RUNNER_TEMP/sdist-wheel" dist/*.tar.gz
       - uses: ./.github/actions/check-wheel
@@ -212,7 +212,7 @@ jobs:
           python-versions: "3.12"
           wheel-directory: ${{ runner.temp }}/sdist-wheel
       - name: Upload sdist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-dist
           path: dist
@@ -226,11 +226,11 @@ jobs:
       contents: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Download
         id: download
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: wheels-*
           path: dist
