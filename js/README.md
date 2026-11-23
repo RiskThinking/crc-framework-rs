@@ -38,7 +38,7 @@ both on and off GitHub using [All Contributors](https://allcontributors.org/).
 ## Installation and quick start
 
 ```sh
-npm install @climateriskcommons/crc-framework
+npm install @climateriskcommons/crc-framework@alpha
 ```
 
 Create numerical evidence in Python without authoring a serialization envelope:

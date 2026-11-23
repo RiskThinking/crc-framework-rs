@@ -63,7 +63,10 @@ contracts, and WebAssembly package.
 ## Publishing
 
 1. Set the one release number in the ledger and `Cargo.toml`. Refresh
-   `Cargo.lock` with Cargo and review generated package versions.
+   `Cargo.lock` with Cargo and review generated package versions. While 1.0
+   is a prerelease, the install commands in `README.md`, `js/README.md`, and
+   `docs/javascript.md` use `--pre` and `@alpha`; restore the plain commands
+   for the final release.
 2. Build and verify the Python wheel and JavaScript package for that exact
    version, including their public runtime contracts.
 3. Create the GitHub release from the tested commit using the exact Cargo tag,
