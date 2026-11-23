@@ -32,7 +32,9 @@ runs:
           if [[ "$RUNNER_OS" == Windows ]]; then
             wheel_python="$venv/Scripts/python.exe"
           fi
-          uv pip install --python "$wheel_python" "${wheels[0]}[test]"
+          # The test tools come from the checkout's `test` dependency group;
+          # they are not published as an extra of the wheel.
+          uv pip install --python "$wheel_python" "${wheels[0]}" --group test
           uv pip check --python "$wheel_python"
           (
             cd "$RUNNER_TEMP"
