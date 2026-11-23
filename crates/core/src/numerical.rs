@@ -1017,6 +1017,14 @@ impl NumericalLaw {
         if let Self::Parametric(d) = self {
             return d.isf(s);
         }
+        if let Self::Discrete {
+            values,
+            counts: Some(ranks),
+            ..
+        } = self
+        {
+            return Ok(values[ranks.survival_index(s)]);
+        }
         if let Some(segments) = self.finite_segments() {
             return Ok(segment_inverse_survival(&segments, s, false));
         }
@@ -1851,6 +1859,13 @@ mod tests {
         assert_eq!(law.quantile(0.9).unwrap(), 13.0);
         assert_eq!(
             law.quantile(f64::from_bits(0.9_f64.to_bits() + 1)).unwrap(),
+            20.0
+        );
+        // Upper-tail inversion uses the same ranks: 0.1 survives above 13.
+        assert_eq!(law.inverse_survival(0.1).unwrap(), 13.0);
+        assert_eq!(
+            law.inverse_survival(f64::from_bits(0.1_f64.to_bits() - 1))
+                .unwrap(),
             20.0
         );
         let ranks = CountRanks::new(&[21, 2, 1, 2, 1, 1, 1, 1]).unwrap();

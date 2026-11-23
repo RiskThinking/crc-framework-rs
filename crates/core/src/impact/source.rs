@@ -699,6 +699,10 @@ impl ImpactSource {
             }
             Self::PointMass(distribution) => Ok(distribution.location()),
             Self::Segments(segments) => Ok(segments.inverse_survival(survival, false)),
+            Self::Discrete(discrete) if discrete.ranks.is_some() => {
+                let ranks = discrete.ranks.as_ref().expect("checked by the guard");
+                Ok(discrete.pairs[ranks.survival_index(survival)].0)
+            }
             Self::Discrete(_) | Self::Empirical(_) => {
                 let atoms = self.point_atoms();
                 let mut suffix = CompensatedSum::default();
@@ -780,6 +784,13 @@ impl ImpactSource {
                         (q[1] - q[0]) * fraction
                     }),
             ),
+            Self::Discrete(DiscreteDistribution {
+                pairs,
+                ranks: Some(ranks),
+                ..
+            }) => {
+                ranks.from(pairs.partition_point(|(v, _)| if inclusive { *v < x } else { *v <= x }))
+            }
             Self::Discrete(_) | Self::Empirical(_) | Self::PointMass(_) => neumaier(
                 self.point_atoms()
                     .iter()
