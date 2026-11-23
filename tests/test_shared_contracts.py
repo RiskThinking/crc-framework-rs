@@ -101,16 +101,34 @@ def test_offline_contract_checks_enforce_timestamp_formats():
     assert not checker.conforms("2024-01-02 03:04:05Z", "date-time")
 
 
+def _assert_same_fixture(packaged, generated, path="$"):
+    if isinstance(packaged, float) or isinstance(generated, float):
+        # Fixture values come from the platform's libm, which differs in the last
+        # bits between Linux, macOS and Windows. Consumers compare them with this
+        # tolerance; conformance CI checks the exact bytes on Linux.
+        assert generated == pytest.approx(packaged, rel=1e-9, abs=1e-11), path
+    elif isinstance(packaged, dict) and isinstance(generated, dict):
+        assert packaged.keys() == generated.keys(), path
+        for key in packaged:
+            _assert_same_fixture(packaged[key], generated[key], f"{path}.{key}")
+    elif isinstance(packaged, list) and isinstance(generated, list):
+        assert len(packaged) == len(generated), path
+        for index, (left, right) in enumerate(zip(packaged, generated)):
+            _assert_same_fixture(left, right, f"{path}[{index}]")
+    else:
+        assert packaged == generated, path
+
+
 def test_packaged_numerical_resources_match_their_generators():
-    generated = {
-        **numerical_schemas(),
-        "fixtures-1.0.json": numerical_fixtures(),
-    }
-    for name, document in generated.items():
+    for name, document in numerical_schemas().items():
         expected = (
             json.dumps(document, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
         )
         assert CONTRACTS.joinpath("numerical", name).read_bytes() == expected.encode()
+    packaged = json.loads(
+        CONTRACTS.joinpath("numerical", "fixtures-1.0.json").read_text(encoding="utf-8")
+    )
+    _assert_same_fixture(packaged, json.loads(json.dumps(numerical_fixtures())))
 
 
 @pytest.mark.parametrize("case", NUMERICAL["accepted"], ids=lambda case: case["name"])
