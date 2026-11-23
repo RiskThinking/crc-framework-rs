@@ -53,9 +53,10 @@ both on and off GitHub using [All Contributors](https://allcontributors.org/).
 
 ### Python
 
+Until 1.0.0 is final, a plain install resolves to the 0.x line, which does not
+have the interfaces shown here. Install the 1.0 prerelease:
+
 ```sh
-python -m pip install crc-framework
-# To opt into prereleases:
 python -m pip install --upgrade --pre crc-framework
 ```
 
@@ -66,11 +67,11 @@ suitable for Python extensions.
 ### JavaScript / WebAssembly
 
 ```sh
-npm install @climateriskcommons/crc-framework
+npm install @climateriskcommons/crc-framework@alpha
 ```
 
-Stable releases use npm's `latest` channel. Add `@alpha` to opt into
-alpha prereleases. The package is ESM, requires WebAssembly, and includes TypeScript
+Stable releases use npm's `latest` channel; the 1.0 prerelease is published
+under `alpha`. The package is ESM, requires WebAssembly, and includes TypeScript
 declarations. See the [JavaScript guide](docs/javascript.md) for browser, bundler, Node,
 and SSR setup, canonical input rules, and prepared collection APIs.
 
