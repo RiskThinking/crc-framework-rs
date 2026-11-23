@@ -292,7 +292,16 @@ class Distribution:
     def empirical(cls, samples: ArrayLike) -> Distribution:
         observed = _vector(samples, "samples")
         values, counts = numpy.unique(observed, return_counts=True)
-        return cls.discrete(values, counts.astype(numpy.float64) / observed.size)
+        # Integer counts keep every ECDF rank exact: each cumulative probability
+        # is the correctly rounded K / N rather than a sum of rounded masses.
+        return cls._create(
+            {
+                "kind": "discrete",
+                "values": values.tolist(),
+                "probabilities": (counts / observed.size).tolist(),
+                "counts": counts.tolist(),
+            }
+        )
 
     @classmethod
     def discrete(cls, values: ArrayLike, probabilities: ArrayLike) -> Distribution:
@@ -655,6 +664,7 @@ class Distribution:
             return _core.NativeImpactSource.discrete(
                 cast(list[float], data["values"]),
                 cast(list[float], data["probabilities"]),
+                cast(list[int] | None, data.get("counts")),
             )
         if self.kind is DistributionKind.HISTOGRAM:
             return _core.NativeImpactSource.histogram(

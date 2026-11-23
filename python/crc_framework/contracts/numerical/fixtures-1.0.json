@@ -497,6 +497,11 @@
     {
       "name": "empirical",
       "document": {
+        "counts": [
+          2,
+          1,
+          1
+        ],
         "kind": "discrete",
         "object": "distribution",
         "probabilities": [
@@ -541,6 +546,20 @@
     {
       "name": "empirical-median-at-gap",
       "document": {
+        "counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
         "kind": "discrete",
         "object": "distribution",
         "probabilities": [
@@ -611,6 +630,18 @@
     {
       "name": "empirical-p90-at-gap",
       "document": {
+        "counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
         "kind": "discrete",
         "object": "distribution",
         "probabilities": [

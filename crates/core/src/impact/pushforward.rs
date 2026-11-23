@@ -7,9 +7,9 @@
 
 use crate::Interpolation;
 use crate::numerical::{
-    CompensatedSum, IntegralMoment, NumericalLaw, ProbabilitySegment, affine_fitted_mean_deviation,
-    affine_segment_mean_deviation, compensated, interval_fraction, linear_interpolate,
-    local_interval, segment_integral,
+    CompensatedSum, CountRanks, IntegralMoment, NumericalLaw, ProbabilitySegment,
+    affine_fitted_mean_deviation, affine_segment_mean_deviation, compensated, interval_fraction,
+    linear_interpolate, local_interval, segment_integral,
 };
 
 use super::definition::{
@@ -54,6 +54,8 @@ pub struct ImpactDistribution {
     clamp: Clamp,
     source: ImpactSource,
     atoms: Vec<ImpactAtom>,
+    /// Exact ranks of a discrete image of a counted source.
+    ranks: Option<CountRanks>,
     law: Law,
 }
 
@@ -168,7 +170,10 @@ impl ImpactDistribution {
             ));
         }
         match &self.law {
-            Law::Discrete => Ok(discrete_quantile(&self.atoms, probability)),
+            Law::Discrete => Ok(match &self.ranks {
+                Some(ranks) => self.atoms[ranks.quantile_index(probability)].value,
+                None => discrete_quantile(&self.atoms, probability),
+            }),
             Law::Continuous { decreasing } => {
                 if probability == 0.0 {
                     return self.essential(true);
@@ -446,6 +451,9 @@ impl ImpactDistribution {
                 return Ok(floor);
             }
         }
+        if let (Law::Discrete, Some(ranks)) = (&self.law, &self.ranks) {
+            return Ok(self.atoms[ranks.survival_index(survival)].value);
+        }
         if matches!(self.law, Law::Discrete) {
             let mut suffix = CompensatedSum::default();
             for atom in self.atoms.iter().rev() {
@@ -509,6 +517,14 @@ impl ImpactDistribution {
             (false, true) => response <= value,
             (false, false) => response < value,
         };
+        if let (true, Some(ranks)) = (self.is_discrete(), &self.ranks) {
+            let mass = if exceedance {
+                ranks.from(self.atoms.partition_point(|atom| !matches(atom.value)))
+            } else {
+                ranks.below(self.atoms.partition_point(|atom| matches(atom.value)))
+            };
+            return Ok(coordinate(mass));
+        }
         if self.is_discrete() {
             return Ok(coordinate(neumaier(
                 self.atoms
@@ -916,6 +932,37 @@ pub(crate) fn transform(
     // Any finite atomic source has an exact image, including under a
     // non-monotone response. Preserve every positive atom rather than sampling
     // the quantile law or discarding small probabilities.
+    if let ImpactSource::Discrete(discrete) = source
+        && let Some(ranks) = discrete.ranks()
+    {
+        // Counts move with their atoms, so the image of an empirical law is
+        // again an empirical law with exact ranks.
+        let mut counted = Vec::new();
+        for (location, count) in discrete.support().zip(ranks.counts()) {
+            counted.push((kernel::evaluate(model, clamp, location)?, count));
+        }
+        counted.sort_by(|left, right| left.0.total_cmp(&right.0));
+        let (values, counts): (Vec<f64>, Vec<u64>) = counted
+            .chunk_by(|left, right| left.0 == right.0)
+            .map(|group| (group[0].0, group.iter().map(|pair| pair.1).sum::<u64>()))
+            .unzip();
+        let ranks = CountRanks::new(&counts)
+            .map_err(|error| fail("invalid_value", "/counts", error.to_string()))?;
+        let atoms = values
+            .into_iter()
+            .zip(ranks.probabilities())
+            .map(|(value, probability)| ImpactAtom { value, probability })
+            .collect();
+        return Ok(ImpactDistribution {
+            definition_hash: definition_hash.to_string(),
+            model: model.clone(),
+            clamp: clamp.clone(),
+            source: source.clone(),
+            atoms,
+            ranks: Some(ranks),
+            law: Law::Discrete,
+        });
+    }
     if source.has_piecewise_constant_quantile() {
         let mut atoms = Vec::new();
         for (location, probability) in source.point_atoms() {
@@ -932,6 +979,7 @@ pub(crate) fn transform(
             clamp: clamp.clone(),
             source: source.clone(),
             atoms: merge_atoms(atoms),
+            ranks: None,
             law: Law::Discrete,
         });
     }
@@ -1042,6 +1090,7 @@ pub(crate) fn transform(
         clamp: clamp.clone(),
         source: source.clone(),
         atoms,
+        ranks: None,
         law,
     })
 }

@@ -119,9 +119,27 @@ impl PyImpactSource {
     }
 
     #[staticmethod]
-    fn discrete(py: Python<'_>, support: Vec<f64>, probabilities: Vec<f64>) -> PyResult<Self> {
-        let discrete = crc_framework_core::DiscreteDistribution::new(support, probabilities)
-            .map_err(|error| impact_error(py, error))?;
+    #[pyo3(signature = (support, probabilities, counts=None))]
+    fn discrete(
+        py: Python<'_>,
+        support: Vec<f64>,
+        probabilities: Vec<f64>,
+        counts: Option<Vec<u64>>,
+    ) -> PyResult<Self> {
+        let discrete = match counts {
+            Some(counts) => {
+                let ranks = crc_framework_core::numerical::CountRanks::new(&counts)
+                    .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
+                if ranks.probabilities() != probabilities {
+                    return Err(pyo3::exceptions::PyValueError::new_err(
+                        "discrete probabilities must equal their counts divided by the total",
+                    ));
+                }
+                crc_framework_core::DiscreteDistribution::from_counts(support, &ranks)
+            }
+            None => crc_framework_core::DiscreteDistribution::new(support, probabilities),
+        }
+        .map_err(|error| impact_error(py, error))?;
         Ok(Self {
             inner: ImpactSource::Discrete(discrete),
         })
