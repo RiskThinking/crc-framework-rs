@@ -67,7 +67,7 @@ supplied; it has no CDF, sampling, or statistics until you complete it.
 | `PointMassDistribution(value)` | `Distribution.point_mass(value)` |
 | `DiscreteDistribution`, `HistogramExposure` | `Distribution.discrete(values, probabilities)`, `Distribution.histogram(edges, probabilities)` |
 | `dist.ppf(q)`, `dist.quantiles(qs)` | `dist.quantile(q)` (scalar or array) |
-| `dist.pdf(x)` | Removed |
+| `dist.pdf(x)` | `dist.mass(x)` for atoms, `dist.cdf(b) - dist.cdf(a)` for intervals; no density (see below) |
 | `distribution_statistics(...)`, `interval_statistics(...)` | `dist.statistics(metrics=[...], level=..., tail=...)` |
 | `as_ecdf()`, `as_interpolated()` | `Distribution.empirical(...)`, `QuantileCurve.from_samples(...)` |
 | Family strings such as `"genextreme"` | `DistributionFamily.GENERALIZED_EXTREME_VALUE` |
@@ -103,6 +103,45 @@ print(law.quantile([0.5, 0.99]))
 ```
 
 For a lower-tail hazard such as drought, use `q = 1 / T` instead of `1 - 1 / T`.
+
+`Distribution` answers probability questions only, so there is no `pdf`. Use
+`mass(x)` for the probability of exactly `x`, which is nonzero only at atoms of
+discrete, empirical, point-mass and hurdle laws, and CDF differences for the
+probability of an interval. `mass` is not a density: it is `0.0` everywhere on a
+continuous law.
+
+```python
+from crc_framework import Distribution, DistributionFamily
+
+gumbel = Distribution.parametric(
+    DistributionFamily.GUMBEL_RIGHT, location=1.0, scale=2.0
+)
+assert gumbel.mass(1.0) == 0.0
+interval = gumbel.cdf(3.0) - gumbel.cdf(1.0)  # P(1 < X <= 3)
+assert 0.0 < interval < 1.0
+
+hurdle = Distribution.hurdle(gumbel, atom_probability=0.3, atom_location=0.0)
+assert hurdle.mass(0.0) == 0.3
+assert list(Distribution.discrete([0, 2], [0.9, 0.1]).mass([0, 1, 2])) == [0.9, 0.0, 0.1]
+```
+
+If you need a density, for example to plot a fitted law, evaluate it outside
+the framework. Parametric family names and parameters follow SciPy, including
+the GEV shape sign (`c = -xi`), so the serialized law maps directly onto
+`scipy.stats`:
+
+```py
+import json
+from scipy import stats
+
+law = json.loads(gumbel.to_json())
+family = getattr(stats, law["family"])
+shape = (law["shape"],) if "shape" in law else ()
+density = family.pdf(x, *shape, loc=law["location"], scale=law["scale"])
+```
+
+Empirical laws have no density; a smoothed estimate such as a kernel density is
+a modelling choice you make outside the framework.
 
 ### Statistics, tails, and new queries
 
