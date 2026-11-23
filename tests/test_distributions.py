@@ -915,3 +915,37 @@ def test_finite_endpoint_after_scale_shape_quotient_overflows(
 
     half = Impact.linear(slope=0.5, input=Ratio(), output=Ratio()).pushforward(law)
     assert half.support[q] == half.quantile(q) == endpoint / 2
+
+
+def test_empirical_quantiles_hit_exact_rank_boundaries() -> None:
+    # Rounded masses 21/30, 2/30, ... sum to 0.8999999999999999 at 13.
+    law = Distribution.empirical([0.0] * 21 + [1, 1, 2, 4, 4, 13, 20, 27, 28])
+    assert law.cdf(13) == 0.9
+    assert law.exceedance(13) == 0.1
+    assert law.quantile(0.9) == 13
+    assert law.quantile(math.nextafter(0.9, 1.0)) == 20
+    assert Distribution.from_json(law.to_json()).quantile(0.9) == 13
+    for n in range(2, 120):
+        levels = [k / n for k in range(1, n)]
+        assert list(Distribution.empirical(range(n)).quantile(levels)) == list(
+            range(n - 1)
+        )
+
+
+def test_empirical_impact_images_keep_exact_ranks() -> None:
+    law = Distribution.empirical([0.0] * 21 + [1, 1, 2, 4, 4, 13, 20, 27, 28])
+    ratio = Ratio()
+    image = Impact.linear(slope=-1.0, intercept=30.0, input=ratio, output=ratio)
+    reflected = image.pushforward(law)
+    # 30 - 28, 30 - 27 and 30 - 20 hold exactly 3/30 of the mass.
+    assert reflected.quantile(0.1) == 10
+    assert reflected.quantile(math.nextafter(0.1, 1.0)) == 17
+    assert reflected.cdf(10) == 0.1
+    assert reflected.exceedance(10) == 0.9
+
+
+def test_counted_documents_must_agree_with_their_probabilities() -> None:
+    document = json.loads(Distribution.empirical([0, 0, 1]).to_json())
+    document["counts"] = [1, 2]
+    with pytest.raises(ValueError):
+        Distribution.from_json(json.dumps(document))

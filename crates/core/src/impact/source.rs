@@ -6,8 +6,8 @@
 use std::borrow::Cow;
 
 use crate::numerical::{
-    CompensatedSum, ProbabilitySegment, affine_fitted_mean_deviation, interval_fraction,
-    linear_interpolate, segment_probability,
+    CompensatedSum, CountRanks, ProbabilitySegment, affine_fitted_mean_deviation,
+    interval_fraction, linear_interpolate, segment_probability,
 };
 use crate::{
     Distribution, EmpiricalDistribution, FittedDistribution, HurdleDistribution,
@@ -215,6 +215,8 @@ pub struct DiscreteDistribution {
     pairs: Vec<(f64, f64)>,
     /// Compensated prefixes of the masses, including zero.
     cumulative: Vec<f64>,
+    /// Exact ranks when the law was declared from observation counts.
+    ranks: Option<CountRanks>,
 }
 
 impl DiscreteDistribution {
@@ -276,6 +278,33 @@ impl DiscreteDistribution {
         Ok(Self {
             pairs: merged,
             cumulative,
+            ranks: None,
+        })
+    }
+
+    /// Exact observation ranks, when the law was declared from counts.
+    pub fn ranks(&self) -> Option<&CountRanks> {
+        self.ranks.as_ref()
+    }
+
+    /// An empirical law with exact integer counts at strictly increasing
+    /// support points. Cumulative probabilities are the rounded ranks `K / N`.
+    pub fn from_counts(support: Vec<f64>, ranks: &CountRanks) -> ContractResult<Self> {
+        let probabilities = ranks.probabilities();
+        if support.len() != probabilities.len()
+            || support.iter().any(|value| !value.is_finite())
+            || support.windows(2).any(|pair| pair[0] >= pair[1])
+        {
+            return Err(fail(
+                "invalid_value",
+                "/support",
+                "counted support values must be finite, increasing, and match the counts",
+            ));
+        }
+        Ok(Self {
+            pairs: support.into_iter().zip(probabilities).collect(),
+            cumulative: ranks.cumulative(),
+            ranks: Some(ranks.clone()),
         })
     }
 

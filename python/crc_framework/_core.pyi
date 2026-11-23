@@ -167,7 +167,9 @@ class NativeImpactSource:
     ) -> NativeImpactSource: ...
     @staticmethod
     def discrete(
-        support: Sequence[float], probabilities: Sequence[float]
+        support: Sequence[float],
+        probabilities: Sequence[float],
+        counts: Sequence[int] | None = None,
     ) -> NativeImpactSource: ...
     @staticmethod
     def curve(

@@ -24,6 +24,8 @@ enum Specification {
     Discrete {
         values: Vec<f64>,
         probabilities: Vec<f64>,
+        #[serde(default)]
+        counts: Option<Vec<u64>>,
     },
     Histogram {
         edges: Vec<f64>,
@@ -50,6 +52,8 @@ pub enum NumericalLaw {
         values: Vec<f64>,
         probabilities: Vec<f64>,
         cumulative: Vec<f64>,
+        /// Integer observation counts of an empirical law, when declared.
+        counts: Option<CountRanks>,
     },
     Histogram {
         edges: Vec<f64>,
@@ -96,6 +100,104 @@ pub(crate) fn interval_fraction(lo: f64, hi: f64, a: f64, b: f64) -> f64 {
         (b - a) / width
     } else {
         (b * 0.5 - a * 0.5) / (hi * 0.5 - lo * 0.5)
+    }
+}
+
+/// Exact ranks of a law built from integer observation counts.
+///
+/// Each cumulative probability is the single correctly rounded quotient
+/// `K / N`, so every rank boundary of the empirical CDF is the binary64 value
+/// nearest its exact fraction, independent of how many atoms precede it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CountRanks {
+    /// Prefix counts `K_0 = 0, K_1, ..., K_n = N`.
+    prefix: Vec<u64>,
+    /// `K_i / N`, each correctly rounded.
+    cumulative: Vec<f64>,
+}
+
+/// Largest total for which every count and prefix converts to binary64 exactly.
+const MAX_EXACT_COUNT: u64 = 1 << 53;
+
+impl CountRanks {
+    pub fn new(counts: &[u64]) -> Result<Self> {
+        if counts.is_empty() || counts.contains(&0) {
+            return Err(invalid("observation counts must be positive integers"));
+        }
+        let mut prefix = Vec::with_capacity(counts.len() + 1);
+        prefix.push(0_u64);
+        let mut total = 0_u64;
+        for &count in counts {
+            total = total
+                .checked_add(count)
+                .filter(|total| *total <= MAX_EXACT_COUNT)
+                .ok_or_else(|| invalid("observation counts must total at most 2^53"))?;
+            prefix.push(total);
+        }
+        let ratio = |count: u64| count as f64 / total as f64;
+        let cumulative = prefix.iter().map(|&count| ratio(count)).collect();
+        Ok(Self { prefix, cumulative })
+    }
+
+    /// Counts per support point.
+    pub fn counts(&self) -> Vec<u64> {
+        self.prefix.windows(2).map(|w| w[1] - w[0]).collect()
+    }
+
+    fn total(&self) -> u64 {
+        *self.prefix.last().expect("prefix includes zero")
+    }
+
+    fn ratio(&self, count: u64) -> f64 {
+        // Both integers are exact in binary64, so one division rounds once.
+        count as f64 / self.total() as f64
+    }
+
+    /// Masses `c_i / N`, each correctly rounded.
+    pub fn probabilities(&self) -> Vec<f64> {
+        self.prefix
+            .windows(2)
+            .map(|w| self.ratio(w[1] - w[0]))
+            .collect()
+    }
+
+    /// Cumulative probabilities `K_i / N`, each correctly rounded.
+    pub fn cumulative(&self) -> Vec<f64> {
+        self.cumulative.clone()
+    }
+
+    /// Index of the lowest support point whose rounded rank reaches `q`.
+    pub(crate) fn quantile_index(&self, q: f64) -> usize {
+        self.cumulative[1..]
+            .partition_point(|rank| *rank < q)
+            .min(self.prefix.len() - 2)
+    }
+
+    /// Index of the highest support point whose rounded upper rank exceeds
+    /// `survival`, the inverse of [`CountRanks::from`].
+    pub(crate) fn survival_index(&self, survival: f64) -> usize {
+        // `from(j)` decreases in `j` and `from(0) = 1`; find the last `j` with
+        // `from(j) > survival` among the support points.
+        let (mut lo, mut hi) = (0, self.prefix.len() - 1);
+        while hi - lo > 1 {
+            let mid = lo + (hi - lo) / 2;
+            if self.from(mid) > survival {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        lo
+    }
+
+    /// `P(X in the first `atoms` support points)`.
+    pub(crate) fn below(&self, atoms: usize) -> f64 {
+        self.ratio(self.prefix[atoms])
+    }
+
+    /// `P(X in the support points from `atoms` onward)`.
+    pub(crate) fn from(&self, atoms: usize) -> f64 {
+        self.ratio(self.total() - self.prefix[atoms])
     }
 }
 
@@ -611,6 +713,7 @@ impl NumericalLaw {
             Specification::Discrete {
                 values,
                 mut probabilities,
+                counts,
             } => {
                 if values.len() != probabilities.len()
                     || values.iter().any(|x| !x.is_finite())
@@ -621,11 +724,29 @@ impl NumericalLaw {
                         "discrete values must increase and have positive probability masses",
                     ));
                 }
+                if let Some(counts) = counts {
+                    if counts.len() != values.len() {
+                        return Err(invalid("discrete counts must match the values one to one"));
+                    }
+                    let ranks = CountRanks::new(&counts)?;
+                    if ranks.probabilities() != probabilities {
+                        return Err(invalid(
+                            "discrete probabilities must equal their counts divided by the total",
+                        ));
+                    }
+                    return Ok(Self::Discrete {
+                        values,
+                        probabilities,
+                        cumulative: ranks.cumulative(),
+                        counts: Some(ranks),
+                    });
+                }
                 let cumulative = cumulative(&mut probabilities)?;
                 Self::Discrete {
                     values,
                     probabilities,
                     cumulative,
+                    counts: None,
                 }
             }
             Specification::Histogram {
@@ -1157,6 +1278,11 @@ impl NumericalLaw {
             Self::PointMass(v) => f64::from(if inclusive { *v <= x } else { *v < x }),
             Self::Discrete {
                 values,
+                counts: Some(ranks),
+                ..
+            } => ranks.below(values.partition_point(|v| if inclusive { *v <= x } else { *v < x })),
+            Self::Discrete {
+                values,
                 probabilities,
                 ..
             } => compensated(
@@ -1289,6 +1415,11 @@ impl NumericalLaw {
                     d.sf(x)
                 }
             }
+            Self::Discrete {
+                values,
+                counts: Some(ranks),
+                ..
+            } => ranks.from(values.partition_point(|v| if inclusive { *v < x } else { *v <= x })),
             Self::Discrete {
                 values,
                 probabilities,
@@ -1704,6 +1835,37 @@ mod tests {
         assert!((curve.mass(2.0) - 0.6).abs() < 1e-15);
         assert_eq!(curve.cdf(2.0, false), 0.2);
         assert_eq!(curve.cdf(2.0, true), 0.8);
+    }
+    #[test]
+    fn counted_ranks_are_correctly_rounded_fractions() {
+        // Summing the rounded masses 21/30, 2/30, ... gives 0.8999999999999999
+        // at the fifth atom; the counted rank is the nearest binary64 to 27/30.
+        let law = NumericalLaw::from_json(
+            r#"{"kind":"discrete","values":[0,1,2,4,13,20,27,28],
+                "probabilities":[0.7,0.06666666666666667,0.03333333333333333,0.06666666666666667,0.03333333333333333,0.03333333333333333,0.03333333333333333,0.03333333333333333],
+                "counts":[21,2,1,2,1,1,1,1]}"#,
+        )
+        .unwrap();
+        assert_eq!(law.cdf(13.0, true), 0.9);
+        assert_eq!(law.exceedance(13.0, false), 0.1);
+        assert_eq!(law.quantile(0.9).unwrap(), 13.0);
+        assert_eq!(
+            law.quantile(f64::from_bits(0.9_f64.to_bits() + 1)).unwrap(),
+            20.0
+        );
+        let ranks = CountRanks::new(&[21, 2, 1, 2, 1, 1, 1, 1]).unwrap();
+        for survival in [0.0, 0.05, 0.1, 0.2, 0.3, 0.99] {
+            let index = ranks.survival_index(survival);
+            assert!(ranks.from(index) > survival);
+            assert!(index + 1 == 8 || ranks.from(index + 1) <= survival);
+        }
+        for bad in [
+            r#"{"kind":"discrete","values":[0,1],"probabilities":[0.5,0.5],"counts":[1,2]}"#,
+            r#"{"kind":"discrete","values":[0,1],"probabilities":[0.5,0.5],"counts":[1]}"#,
+            r#"{"kind":"discrete","values":[0,1],"probabilities":[0.5,0.5],"counts":[0,1]}"#,
+        ] {
+            assert!(NumericalLaw::from_json(bad).is_err(), "{bad}");
+        }
     }
     #[test]
     fn sub_epsilon_atoms_and_histogram_bins_survive_integration() {

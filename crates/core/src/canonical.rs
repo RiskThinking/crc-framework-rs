@@ -1122,6 +1122,13 @@ fn law_source(law: &NumericalLaw) -> Result<ImpactSource> {
         NumericalLaw::PointMass(x) => PointMassDistribution::new(*x).map(ImpactSource::PointMass),
         NumericalLaw::Discrete {
             values,
+            counts: Some(ranks),
+            ..
+        } => DiscreteDistribution::from_counts(values.clone(), ranks)
+            .map(ImpactSource::Discrete)
+            .map_err(invalid),
+        NumericalLaw::Discrete {
+            values,
             probabilities,
             ..
         } => DiscreteDistribution::new(values.clone(), probabilities.clone())

@@ -38,7 +38,11 @@ assert law.sample((2, 3), seed=42).shape == (2, 3)
 ```
 
 The empirical constructor always uses the ECDF: ties are atoms and the mean is
-the observed sample mean. Histogram probabilities are masses of bins, rather
+the observed sample mean. It records the integer count of each distinct value,
+so every cumulative probability is the correctly rounded fraction `K / N`
+rather than a sum of rounded masses. Levels such as `0.9` with 30 samples then
+select the same order statistic as the exact ECDF, and impact images of an
+empirical law keep those exact ranks. Histogram probabilities are masses of bins, rather
 than heights. A hurdle places its declared atom at the threshold and conditions
 the base strictly above that threshold before allocating the remaining mass.
 

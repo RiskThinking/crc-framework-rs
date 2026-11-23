@@ -101,6 +101,15 @@
                 "maximum": 1
               },
               "minItems": 1
+            },
+            "counts": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740992
+              },
+              "minItems": 1
             }
           },
           "required": [
@@ -469,6 +478,15 @@
                 "type": "number",
                 "minimum": 0,
                 "maximum": 1
+              },
+              "minItems": 1
+            },
+            "counts": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740992
               },
               "minItems": 1
             }

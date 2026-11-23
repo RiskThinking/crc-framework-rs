@@ -261,7 +261,12 @@ def numerical_schema():
                 "kind": {"const": "discrete"},
                 "values": numbers,
                 "probabilities": array(PROBABILITY, minItems=1),
-            }
+                "counts": array(
+                    {"type": "integer", "minimum": 1, "maximum": 2**53},
+                    minItems=1,
+                ),
+            },
+            ["kind", "values", "probabilities"],
         ),
         obj(
             {
