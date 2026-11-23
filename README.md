@@ -8,11 +8,13 @@ portfolio-level VaR/CVaR risk metrics.
 | Interface | Package | Scope |
 | --- | --- | --- |
 | Python | `crc-framework` on PyPI; import `crc_framework` | Distributions, quantile evidence, fitting, impacts, risk aggregation, and geography |
-| JavaScript / WASM | `@climateriskcommons/crc-framework` on npm | Canonical CRC curve consumption: quantile evaluation, batches, prepared handles, and TypeScript declarations |
+| JavaScript / WASM | `@climateriskcommons/crc-framework` on npm | Numerical document queries (quantiles, batches, prepared handles), shared schema validation, and TypeScript declarations |
 | Rust | `crates/core` | Shared algorithms and reference data used by both bindings |
 
-The JavaScript binding consumes canonical curves, including PMTiles/MVT
-properties. Python also supports fitting, impacts, and portfolio risk.
+The JavaScript binding reads the numerical documents that Python writes and
+validates the shared data contracts. It does not read the flat `curve_*`
+properties of 0.x PMTiles/MVT features. Python also supports fitting, impacts,
+and portfolio risk.
 Application-specific workflows belong in packages built on this framework.
 
 [Installation](#installation) · [Quick start](#quick-start) · [Guides](#guides-and-next-steps)
