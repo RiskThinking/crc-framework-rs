@@ -15,8 +15,6 @@ against 1.0 and are checked by `tools/check_examples.py`.
 1. Pin `crc-framework>=1,<2` (Python 3.11+) or
    `@climateriskcommons/crc-framework@^1` (npm). If you also use crc-sdk,
    upgrade both packages together; crc-sdk 1.0 requires crc-framework 1.x.
-   Until 1.0.0 is final, these ranges do not match the prerelease: use
-   `crc-framework>=1.0.0a1,<2` and `@climateriskcommons/crc-framework@alpha`.
    Building from source now needs Rust 1.87 or later (0.6 needed 1.85).
 2. Import everything from `crc_framework`. The submodules
    `crc_framework.distributions`, `.transforms`, `.metrics`, `.impacts`,

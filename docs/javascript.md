@@ -6,7 +6,7 @@ and the current JSON Schemas. Dataset workflows and data acquisition belong to
 CRC-SDK.
 
 ```sh
-npm install @climateriskcommons/crc-framework@alpha
+npm install @climateriskcommons/crc-framework
 ```
 
 Create numerical evidence in Python without authoring a serialization envelope:

@@ -22,7 +22,7 @@ and the [JavaScript guide](javascript.md) for runnable workflows. To upgrade exi
 The package and artifact versions are declared in
 [`release.json`](../python/crc_framework/contracts/api/release.json). The
 framework Python package, Rust workspace, WASM package, and generated JavaScript
-package use `1.0.0-alpha.2` (Python `1.0.0a2`), a prerelease of 1.0.0. Each
+package use `1.0.0`. Each
 artifact format has its own version in that ledger.
 Changing a package version does not automatically increment every format.
 
@@ -64,10 +64,10 @@ contracts, and WebAssembly package.
 ## Publishing
 
 1. Set the one release number in the ledger and `Cargo.toml`. Refresh
-   `Cargo.lock` with Cargo and review generated package versions. While 1.0
-   is a prerelease, the install commands in `README.md`, `js/README.md`, and
-   `docs/javascript.md` use `--pre` and `@alpha`; restore the plain commands
-   for the final release.
+   `Cargo.lock` with Cargo and review generated package versions. For a
+   prerelease, the install commands in `README.md`, `js/README.md`, and
+   `docs/javascript.md` use `--pre` and the npm prerelease channel; a final
+   release uses the plain commands.
 2. Build and verify the Python wheel and JavaScript package for that exact
    version, including their public runtime contracts.
 3. Create the GitHub release from the tested commit using the exact Cargo tag,
@@ -78,9 +78,9 @@ contracts, and WebAssembly package.
 
 | Destination | Version | Release behavior |
 | --- | --- | --- |
-| Rust workspace | `1.0.0-alpha.2` | Versioned source; no crates.io publishing workflow is configured |
-| PyPI `crc-framework` | `1.0.0a2` | `release.yaml` builds wheels and an sdist, attaches assets, and publishes to PyPI |
-| npm `@climateriskcommons/crc-framework` | `1.0.0-alpha.2` (`alpha` dist-tag) | `npm.yaml` publishes the tested generated package |
+| Rust workspace | `1.0.0` | Versioned source; no crates.io publishing workflow is configured |
+| PyPI `crc-framework` | `1.0.0` | `release.yaml` builds wheels and an sdist, attaches assets, and publishes to PyPI |
+| npm `@climateriskcommons/crc-framework` | `1.0.0` (`latest` dist-tag) | `npm.yaml` publishes the tested generated package |
 
 Use `v` plus the exact Cargo version for the tag. Cargo `1.0.0-alpha.1` maps to
 Python `1.0.0a1`; the Python spelling is an output conversion, not another version
