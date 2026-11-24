@@ -1,0 +1,269 @@
+{
+  "source": {
+    "ecofusion_revision": "94eb13e10d1e989b8d37b3d1012f3a603185c7ce",
+    "ecofusion_py_version": "0.8.13",
+    "ecofusion_py_revision": "f783f770fcf03ab10837245f10f71a6efdbbd018",
+    "export_functions": [
+      "compute_spanning_set",
+      "compute_climate_risk"
+    ]
+  },
+  "cases": [
+    {
+      "name": "upstream-flattening",
+      "inputs": "src/risk/climate/crs.rs::test_spanning_set_flattening",
+      "factors": [
+        {
+          "id": "dlyfrzthw",
+          "lower_rank_mass": 0.9,
+          "lower_impact": 0.0,
+          "upper_rank_mass": 0.1,
+          "upper_impact": 0.1
+        },
+        {
+          "id": "frost_days",
+          "lower_rank_mass": 0.8,
+          "lower_impact": 0.0,
+          "upper_rank_mass": 0.2,
+          "upper_impact": 0.05
+        }
+      ],
+      "branches": [
+        {
+          "branch_index": 3,
+          "joint_probability": 0.7199999690055847,
+          "total_impact": 0.0,
+          "indices": [
+            {
+              "index": "dlyfrzthw",
+              "is_downside": false,
+              "probability": 0.8999999761581421,
+              "impact": 0.0
+            },
+            {
+              "index": "frost_days",
+              "is_downside": false,
+              "probability": 0.800000011920929,
+              "impact": 0.0
+            }
+          ]
+        },
+        {
+          "branch_index": 1,
+          "joint_probability": 0.17999999225139618,
+          "total_impact": 0.05000000074505806,
+          "indices": [
+            {
+              "index": "dlyfrzthw",
+              "is_downside": false,
+              "probability": 0.8999999761581421,
+              "impact": 0.0
+            },
+            {
+              "index": "frost_days",
+              "is_downside": true,
+              "probability": 0.20000000298023224,
+              "impact": 0.05000000074505806
+            }
+          ]
+        },
+        {
+          "branch_index": 2,
+          "joint_probability": 0.08000000566244125,
+          "total_impact": 0.10000000149011612,
+          "indices": [
+            {
+              "index": "dlyfrzthw",
+              "is_downside": true,
+              "probability": 0.10000000149011612,
+              "impact": 0.10000000149011612
+            },
+            {
+              "index": "frost_days",
+              "is_downside": false,
+              "probability": 0.800000011920929,
+              "impact": 0.0
+            }
+          ]
+        },
+        {
+          "branch_index": 0,
+          "joint_probability": 0.020000001415610313,
+          "total_impact": 0.15000000596046448,
+          "indices": [
+            {
+              "index": "dlyfrzthw",
+              "is_downside": true,
+              "probability": 0.10000000149011612,
+              "impact": 0.10000000149011612
+            },
+            {
+              "index": "frost_days",
+              "is_downside": true,
+              "probability": 0.20000000298023224,
+              "impact": 0.05000000074505806
+            }
+          ]
+        }
+      ],
+      "expected_impact": 0.019999999552965164,
+      "historical_levels": [
+        {
+          "level": 0.5,
+          "var": 0.0,
+          "cvar": 0.019999999552965164,
+          "tail_contributions": {
+            "dlyfrzthw": 0.010000000707805157,
+            "frost_days": 0.009999999776482582
+          }
+        },
+        {
+          "level": 0.95,
+          "var": 0.10000000149011612,
+          "cvar": 0.11000000685453415,
+          "tail_contributions": {
+            "dlyfrzthw": 0.10000000894069672,
+            "frost_days": 0.010000000707805157
+          }
+        },
+        {
+          "level": 0.99,
+          "var": 0.15000000596046448,
+          "cvar": 0.15000000596046448,
+          "tail_contributions": {
+            "dlyfrzthw": 0.10000000149011612,
+            "frost_days": 0.05000000074505806
+          }
+        }
+      ]
+    },
+    {
+      "name": "equal-branch-losses",
+      "inputs": "Synthetic factors with identical downside impacts and unequal rank masses",
+      "factors": [
+        {
+          "id": "rx1day",
+          "lower_rank_mass": 0.75,
+          "lower_impact": 0.0,
+          "upper_rank_mass": 0.25,
+          "upper_impact": 2.0
+        },
+        {
+          "id": "frost_days",
+          "lower_rank_mass": 0.5,
+          "lower_impact": 0.0,
+          "upper_rank_mass": 0.5,
+          "upper_impact": 2.0
+        }
+      ],
+      "branches": [
+        {
+          "branch_index": 3,
+          "joint_probability": 0.375,
+          "total_impact": 0.0,
+          "indices": [
+            {
+              "index": "rx1day",
+              "is_downside": false,
+              "probability": 0.75,
+              "impact": 0.0
+            },
+            {
+              "index": "frost_days",
+              "is_downside": false,
+              "probability": 0.5,
+              "impact": 0.0
+            }
+          ]
+        },
+        {
+          "branch_index": 1,
+          "joint_probability": 0.375,
+          "total_impact": 2.0,
+          "indices": [
+            {
+              "index": "rx1day",
+              "is_downside": false,
+              "probability": 0.75,
+              "impact": 0.0
+            },
+            {
+              "index": "frost_days",
+              "is_downside": true,
+              "probability": 0.5,
+              "impact": 2.0
+            }
+          ]
+        },
+        {
+          "branch_index": 2,
+          "joint_probability": 0.125,
+          "total_impact": 2.0,
+          "indices": [
+            {
+              "index": "rx1day",
+              "is_downside": true,
+              "probability": 0.25,
+              "impact": 2.0
+            },
+            {
+              "index": "frost_days",
+              "is_downside": false,
+              "probability": 0.5,
+              "impact": 0.0
+            }
+          ]
+        },
+        {
+          "branch_index": 0,
+          "joint_probability": 0.125,
+          "total_impact": 4.0,
+          "indices": [
+            {
+              "index": "rx1day",
+              "is_downside": true,
+              "probability": 0.25,
+              "impact": 2.0
+            },
+            {
+              "index": "frost_days",
+              "is_downside": true,
+              "probability": 0.5,
+              "impact": 2.0
+            }
+          ]
+        }
+      ],
+      "expected_impact": 1.5,
+      "historical_levels": [
+        {
+          "level": 0.5,
+          "var": 2.0,
+          "cvar": 2.4000000953674316,
+          "tail_contributions": {
+            "rx1day": 0.800000011920929,
+            "frost_days": 1.600000023841858
+          }
+        },
+        {
+          "level": 0.95,
+          "var": 4.0,
+          "cvar": 4.0,
+          "tail_contributions": {
+            "rx1day": 2.0,
+            "frost_days": 2.0
+          }
+        },
+        {
+          "level": 0.99,
+          "var": 4.0,
+          "cvar": 4.0,
+          "tail_contributions": {
+            "rx1day": 2.0,
+            "frost_days": 2.0
+          }
+        }
+      ]
+    }
+  ]
+}

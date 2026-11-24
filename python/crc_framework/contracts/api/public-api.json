@@ -7,6 +7,7 @@
     "Values": "float | ArrayLike",
     "ValueResult": "float | FloatArray",
     "FloatArray": "numpy.typing.NDArray[numpy.float64]",
+    "MatrixLike": "Sequence[Sequence[float]] | FloatArray",
     "Unit": "LengthUnit | TimeUnit | RatioUnit | TemperatureUnit | SpeedUnit | PrecipitationRateUnit | DegreeDayUnit",
     "ScientificValue": "None | bool | int | float | str | Sequence[ScientificValue] | Mapping[str, ScientificValue]",
     "ConvergedFitDiagnostic": "SampleFitDiagnostic | QuantileFitDiagnostic | CensoredQuantileFitDiagnostic | HurdleQuantileFitDiagnostic"
@@ -20,6 +21,137 @@
         "MEAN": "mean",
         "SUM": "sum",
         "COUNT": "count"
+      }
+    },
+    "AnnualLossExceedance": {
+      "kind": "class",
+      "properties": {
+        "return_period": "float",
+        "loss": "float",
+        "nominal_exceedance_probability": "float",
+        "exceedance_probability": "float",
+        "nominal_tail_years": "float"
+      }
+    },
+    "AnnualLossLevel": {
+      "kind": "class",
+      "properties": {
+        "level": "float",
+        "value_at_risk": "float",
+        "conditional_value_at_risk": "float",
+        "diversification_benefit": "float | None",
+        "contributions": "Mapping[str, float] | None",
+        "nominal_tail_years": "float",
+        "boundary_years": "int",
+        "boundary_weight": "float"
+      }
+    },
+    "AnnualLossSimulation": {
+      "kind": "class",
+      "properties": {
+        "totals": "FloatArray",
+        "components": "Mapping[str, FloatArray] | None",
+        "total_insured_value": "float",
+        "spec": "AnnualLossSpec",
+        "secondary_stream": "int",
+        "rng_algorithm": "str",
+        "correlation_repair": "CorrelationRepair | None",
+        "perils": "tuple[str, ...]",
+        "dependence": "PerilDependence | None",
+        "trial_ids": "range"
+      }
+    },
+    "AnnualLossSpec": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "trials",
+            "kind": "keyword_only",
+            "annotation": "int",
+            "default": 20000
+          },
+          {
+            "name": "seed",
+            "kind": "keyword_only",
+            "annotation": "int",
+            "default": 20261027
+          },
+          {
+            "name": "peak_correlation",
+            "kind": "keyword_only",
+            "annotation": "float",
+            "default": 0.4
+          },
+          {
+            "name": "decay_length_km",
+            "kind": "keyword_only",
+            "annotation": "float",
+            "default": 150.0
+          },
+          {
+            "name": "damage_cv",
+            "kind": "keyword_only",
+            "annotation": "float",
+            "default": 0.3
+          },
+          {
+            "name": "repair_tolerance",
+            "kind": "keyword_only",
+            "annotation": "float | None",
+            "default": null
+          },
+          {
+            "name": "calibration_source",
+            "kind": "keyword_only",
+            "annotation": "str | None",
+            "default": null
+          }
+        ],
+        "returns": "AnnualLossSpec"
+      },
+      "methods": {
+        "reference": {
+          "parameters": [],
+          "returns": "AnnualLossSpec",
+          "binding": "class"
+        }
+      },
+      "properties": {
+        "trials": "int",
+        "seed": "int",
+        "peak_correlation": "float",
+        "decay_length_km": "float",
+        "damage_cv": "float",
+        "repair_tolerance": "float | None",
+        "calibration_source": "str | None"
+      }
+    },
+    "AnnualLossSummary": {
+      "kind": "class",
+      "methods": {
+        "at": {
+          "parameters": [
+            {
+              "name": "level",
+              "kind": "positional_or_keyword",
+              "annotation": "float"
+            }
+          ],
+          "returns": "AnnualLossLevel",
+          "binding": "instance"
+        }
+      },
+      "properties": {
+        "trial_count": "int",
+        "total_insured_value": "float",
+        "average_annual_loss": "float",
+        "standard_deviation": "float",
+        "coefficient_of_variation": "float",
+        "loss_cost": "float | None",
+        "levels": "tuple[AnnualLossLevel, ...]",
+        "aep": "tuple[AnnualLossExceedance, ...]",
+        "diagnostics": "tuple[Diagnostic, ...]"
       }
     },
     "AssetType": {
@@ -327,6 +459,13 @@
           "returns": "ImpactContext",
           "binding": "class"
         }
+      }
+    },
+    "CorrelationRepair": {
+      "kind": "class",
+      "properties": {
+        "minimum_eigenvalue": "float",
+        "maximum_change": "float"
       }
     },
     "CountryContext": {
@@ -1439,6 +1578,53 @@
         }
       }
     },
+    "InsuredInterest": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "id",
+            "kind": "positional_or_keyword",
+            "annotation": "str"
+          },
+          {
+            "name": "longitude",
+            "kind": "keyword_only",
+            "annotation": "float"
+          },
+          {
+            "name": "latitude",
+            "kind": "keyword_only",
+            "annotation": "float"
+          },
+          {
+            "name": "total_insured_value",
+            "kind": "keyword_only",
+            "annotation": "float"
+          },
+          {
+            "name": "damage_curve",
+            "kind": "keyword_only",
+            "annotation": "QuantileCurve | Distribution"
+          },
+          {
+            "name": "terms",
+            "kind": "keyword_only",
+            "annotation": "PolicyTerms | None",
+            "default": null
+          }
+        ],
+        "returns": "InsuredInterest"
+      },
+      "properties": {
+        "id": "str",
+        "longitude": "float",
+        "latitude": "float",
+        "total_insured_value": "float",
+        "damage_curve": "QuantileCurve | Distribution",
+        "terms": "PolicyTerms"
+      }
+    },
     "InundationContext": {
       "kind": "class",
       "constructor": {
@@ -1587,6 +1773,130 @@
         "kind": "FitKind",
         "candidates": "tuple[FitSpec, ...]",
         "criterion": "SelectionCriterion"
+      }
+    },
+    "PerilDependence": {
+      "kind": "class",
+      "methods": {
+        "independent": {
+          "parameters": [],
+          "returns": "PerilDependence",
+          "binding": "class"
+        },
+        "from_correlation": {
+          "parameters": [
+            {
+              "name": "perils",
+              "kind": "positional_or_keyword",
+              "annotation": "Sequence[str]"
+            },
+            {
+              "name": "correlation",
+              "kind": "positional_or_keyword",
+              "annotation": "MatrixLike"
+            },
+            {
+              "name": "calibration_source",
+              "kind": "keyword_only",
+              "annotation": "str"
+            }
+          ],
+          "returns": "PerilDependence",
+          "binding": "class"
+        },
+        "calibrate": {
+          "parameters": [
+            {
+              "name": "perils",
+              "kind": "positional_or_keyword",
+              "annotation": "Sequence[str]"
+            },
+            {
+              "name": "annual_ranks",
+              "kind": "positional_or_keyword",
+              "annotation": "MatrixLike"
+            },
+            {
+              "name": "calibration_source",
+              "kind": "keyword_only",
+              "annotation": "str"
+            }
+          ],
+          "returns": "PerilDependence",
+          "binding": "class"
+        },
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "PerilDependence",
+          "binding": "class"
+        }
+      },
+      "properties": {
+        "perils": "tuple[str, ...]",
+        "correlation": "tuple[tuple[float, ...], ...] | None",
+        "calibration_source": "str | None",
+        "observation_count": "int | None",
+        "observations_sha256": "str | None"
+      }
+    },
+    "PolicyTerms": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "deductible",
+            "kind": "keyword_only",
+            "annotation": "float",
+            "default": 0.0
+          },
+          {
+            "name": "limit",
+            "kind": "keyword_only",
+            "annotation": "float | None",
+            "default": null
+          },
+          {
+            "name": "share",
+            "kind": "keyword_only",
+            "annotation": "float",
+            "default": 1.0
+          }
+        ],
+        "returns": "PolicyTerms"
+      },
+      "methods": {
+        "insured_loss": {
+          "parameters": [
+            {
+              "name": "total_insured_value",
+              "kind": "positional_or_keyword",
+              "annotation": "float"
+            },
+            {
+              "name": "damage_ratio",
+              "kind": "positional_or_keyword",
+              "annotation": "Values"
+            }
+          ],
+          "returns": "ValueResult",
+          "binding": "instance"
+        }
+      },
+      "properties": {
+        "deductible": "float",
+        "limit": "float | None",
+        "share": "float"
       }
     },
     "PrecipitationAmount": {
@@ -2499,6 +2809,143 @@
         }
       ],
       "returns": "tuple[RankScenario, ...]"
+    },
+    "simulate_annual_losses": {
+      "kind": "function",
+      "parameters": [
+        {
+          "name": "interests",
+          "kind": "positional_or_keyword",
+          "annotation": "Sequence[InsuredInterest]"
+        },
+        {
+          "name": "spec",
+          "kind": "keyword_only",
+          "annotation": "AnnualLossSpec | None",
+          "default": null
+        },
+        {
+          "name": "include_components",
+          "kind": "keyword_only",
+          "annotation": "bool",
+          "default": false
+        },
+        {
+          "name": "secondary_stream",
+          "kind": "keyword_only",
+          "annotation": "int",
+          "default": 0
+        },
+        {
+          "name": "block_size",
+          "kind": "keyword_only",
+          "annotation": "int",
+          "default": 256
+        },
+        {
+          "name": "memory_limit",
+          "kind": "keyword_only",
+          "annotation": "int",
+          "default": 536870912
+        },
+        {
+          "name": "work_limit",
+          "kind": "keyword_only",
+          "annotation": "int",
+          "default": 10000000000
+        }
+      ],
+      "returns": "AnnualLossSimulation"
+    },
+    "simulate_separate_peril_losses": {
+      "kind": "function",
+      "parameters": [
+        {
+          "name": "perils",
+          "kind": "positional_or_keyword",
+          "annotation": "Mapping[str, Sequence[InsuredInterest]]"
+        },
+        {
+          "name": "dependence",
+          "kind": "keyword_only",
+          "annotation": "PerilDependence"
+        },
+        {
+          "name": "spec",
+          "kind": "keyword_only",
+          "annotation": "AnnualLossSpec | None",
+          "default": null
+        },
+        {
+          "name": "include_components",
+          "kind": "keyword_only",
+          "annotation": "bool",
+          "default": false
+        },
+        {
+          "name": "secondary_stream",
+          "kind": "keyword_only",
+          "annotation": "int",
+          "default": 0
+        },
+        {
+          "name": "block_size",
+          "kind": "keyword_only",
+          "annotation": "int",
+          "default": 256
+        },
+        {
+          "name": "memory_limit",
+          "kind": "keyword_only",
+          "annotation": "int",
+          "default": 536870912
+        },
+        {
+          "name": "work_limit",
+          "kind": "keyword_only",
+          "annotation": "int",
+          "default": 10000000000
+        }
+      ],
+      "returns": "AnnualLossSimulation"
+    },
+    "summarize_annual_losses": {
+      "kind": "function",
+      "parameters": [
+        {
+          "name": "totals",
+          "kind": "positional_or_keyword",
+          "annotation": "ArrayLike"
+        },
+        {
+          "name": "total_insured_value",
+          "kind": "keyword_only",
+          "annotation": "float"
+        },
+        {
+          "name": "levels",
+          "kind": "keyword_only",
+          "annotation": "Sequence[float]",
+          "default": {
+            "tuple": [0.95, 0.99, 0.995]
+          }
+        },
+        {
+          "name": "return_periods",
+          "kind": "keyword_only",
+          "annotation": "Sequence[float]",
+          "default": {
+            "tuple": [10, 25, 50, 100, 200, 250]
+          }
+        },
+        {
+          "name": "components",
+          "kind": "keyword_only",
+          "annotation": "Mapping[str, ArrayLike] | None",
+          "default": null
+        }
+      ],
+      "returns": "AnnualLossSummary"
     }
   },
   "semantics": {
@@ -2514,6 +2961,8 @@
     "protocols": "Unresolved context references and resolved point functions have distinct call contracts.",
     "enum_inputs": "Closed Python choices require the declared enum; schema loaders hydrate canonical serialized values without aliases.",
     "risk_aggregation": "Independent binary outcomes contribute additive impacts in their supplied units; there is no implicit weighting or averaging. Tied VaR states use probability-weighted attribution.",
+    "annual_loss": "Annual losses and optional components are aligned by year in a common currency. Empirical upper-tail mass is shared uniformly across years tied at the cutoff.",
+    "separate_peril_loss": "Multi-peril annual loss requires explicit cross-peril dependence, identical insured interests across perils, and terms applied separately to each peril. Portfolio total insured value counts each interest once.",
     "hurdle": "The base is conditioned strictly above atom_location before mixing the declared atom. For atom_probability < 1 a positive base survival mass is required; the truncation is explicit in the representation.",
     "selection_criterion": "Kolmogorov-Smirnov selection applies only to observed samples. Quantile model selection explicitly requests normalized RMSE; probability-labelled evidence is not treated as an empirical sample.",
     "model_requirements": "Typed named measurement and context records share authoritative schemas. Model-owned unestablished calibration facts prevent binding, never trigger invented defaults. Numerical resolution remains separate from scientific data binding."

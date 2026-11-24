@@ -33,6 +33,7 @@ _BUILTIN_TYPES = {
     "tuple",
     "list",
     "dict",
+    "range",
     "type",
     "Sequence",
     "Mapping",
@@ -154,14 +155,20 @@ def _default(
             )
             return
         if set(value) == {"tuple"}:
+            items = value["tuple"]
             _require(
-                isinstance(value["tuple"], list) and not value["tuple"],
-                f"{path}: only an empty tuple default is supported",
+                isinstance(items, list),
+                f"{path}: tuple default must contain a list",
             )
+            if annotation.startswith("tuple[") and not items:
+                return
             _require(
-                annotation.startswith("tuple["),
+                annotation.startswith("Sequence[") and annotation.endswith("]"),
                 f"{path}: tuple default contradicts annotation",
             )
+            item_type = annotation[len("Sequence[") : -1]
+            for index, item in enumerate(items):
+                _default(item, item_type, exports, f"{path}/{index}")
             return
         raise ContractError(f"{path}: unsupported default record")
     _require(
@@ -470,6 +477,7 @@ def validate_release(release: Mapping[str, Any]) -> None:
         "numerical",
         "impact",
         "evidence",
+        "annual-loss",
     }
     _keys(release["packages"], packages, packages, "/release/packages")
     _keys(release["formats"], formats, formats, "/release/formats")
@@ -557,7 +565,7 @@ def _runtime_default(value: Any) -> Any:
     if isinstance(value, Enum):
         return {"enum": f"{type(value).__name__}.{value.name}"}
     if isinstance(value, tuple):
-        return {"tuple": list(value)}
+        return {"tuple": [_runtime_default(item) for item in value]}
     return value
 
 

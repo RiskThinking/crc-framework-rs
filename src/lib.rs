@@ -1,4 +1,5 @@
 mod impact;
+mod insurance;
 mod numerical;
 mod rank;
 
@@ -401,6 +402,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(lookup_continent, m)?)?;
     m.add_function(wrap_pyfunction!(lookup_geography, m)?)?;
     impact::register(m)?;
+    insurance::register(m)?;
     numerical::register(m)?;
     rank::register(m)?;
     Ok(())

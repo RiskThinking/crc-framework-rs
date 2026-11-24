@@ -43,6 +43,29 @@ from ._geography import (
     lookup_geography,
     lookup_ipcc_region,
 )
+from ._impacts import (
+    BuiltinImpact,
+    ContextField,
+    ExpectationMethod,
+    Impact,
+    ImpactError,
+    ImpactReference,
+    ImpactRequirements,
+)
+from ._insurance import (
+    AnnualLossExceedance,
+    AnnualLossLevel,
+    AnnualLossSimulation,
+    AnnualLossSpec,
+    AnnualLossSummary,
+    CorrelationRepair,
+    InsuredInterest,
+    PerilDependence,
+    PolicyTerms,
+    simulate_annual_losses,
+    simulate_separate_peril_losses,
+    summarize_annual_losses,
+)
 from ._measurement import (
     Aggregation,
     AssetType,
@@ -90,18 +113,14 @@ from ._risk import (
     compute_risk,
     rank_scenarios,
 )
-from ._impacts import (
-    BuiltinImpact,
-    ContextField,
-    ExpectationMethod,
-    Impact,
-    ImpactError,
-    ImpactReference,
-    ImpactRequirements,
-)
 
 __all__ = [
     "Aggregation",
+    "AnnualLossExceedance",
+    "AnnualLossLevel",
+    "AnnualLossSimulation",
+    "AnnualLossSpec",
+    "AnnualLossSummary",
     "AssetType",
     "BinaryOutcome",
     "BuiltinImpact",
@@ -113,6 +132,7 @@ __all__ = [
     "ContextField",
     "ContextValue",
     "CoolingCostContext",
+    "CorrelationRepair",
     "CountryContext",
     "CropContext",
     "DegreeDayUnit",
@@ -146,10 +166,13 @@ __all__ = [
     "ImpactError",
     "ImpactReference",
     "ImpactRequirements",
+    "InsuredInterest",
     "InundationContext",
     "LengthUnit",
     "Measurement",
     "ModelSelection",
+    "PerilDependence",
+    "PolicyTerms",
     "PrecipitationAmount",
     "PrecipitationRate",
     "PrecipitationRateUnit",
@@ -189,4 +212,7 @@ __all__ = [
     "lookup_geography",
     "lookup_ipcc_region",
     "rank_scenarios",
+    "simulate_annual_losses",
+    "simulate_separate_peril_losses",
+    "summarize_annual_losses",
 ]

@@ -237,6 +237,179 @@ the CVaR cutoff includes only part of a tied value's mass, each tied state
 contributes the same fraction of its mass. Branch limits are enforced before
 allocation. Outcome identities must be unique.
 
+## Summarize insured annual losses
+
+`PolicyTerms` applies a monetary deductible and limit, then multiplies by the
+insurer's share. The default terms pass through ground-up loss. If the
+deductible is a fraction of total insured value, multiply by that value first.
+Use a common currency and valuation basis for every interest.
+
+```python
+from crc_framework import PolicyTerms, summarize_annual_losses
+
+terms = PolicyTerms(deductible=5_000, limit=15_000, share=0.8)
+assert terms.insured_loss(100_000, 0.26) == 12_000
+
+# Each entry represents the same year in the portfolio and component samples.
+warehouse = [0, 0, 0, 10, 0, 20, 0, 20]
+office = [0, 0, 0, 0, 10, 10, 30, 30]
+totals = [left + right for left, right in zip(warehouse, office, strict=True)]
+summary = summarize_annual_losses(
+    totals,
+    total_insured_value=200_000,
+    levels=[0.8125],
+    return_periods=[100, 250],
+    components={"warehouse": warehouse, "office": office},
+)
+
+assert summary.average_annual_loss == 16.25
+tail = summary.at(0.8125)
+assert tail.value_at_risk == 30
+assert tail.contributions is not None
+assert abs(sum(tail.contributions.values()) - tail.conditional_value_at_risk) < 1e-12
+```
+
+The summary retains zero-loss years and selects VaR and aggregate exceedance
+probability (AEP) return levels from cumulative annual counts. At a rank of
+`5 / 6`, it selects the fifth ordered loss from six years. Each AEP point
+reports the nominal probability `1 / T` and the observed probability of a
+loss strictly greater than its threshold. CVaR averages the requested upper
+rank mass. `boundary_years` counts the years tied at VaR, and `boundary_weight`
+is the fraction of each such year included in CVaR. `nominal_tail_years` scales
+the requested tail probability by the trial count. Aligned components also
+give the signed difference between the sum of standalone VaRs and portfolio
+VaR. When total insured value is zero, `loss_cost` is `None` and `diagnostics`
+records the reason.
+
+## Simulate annual losses for one peril
+
+Use `InsuredInterest` when you have a mean damage curve and resolved policy
+terms for each interest. Express the curve in non-exceedance ranks with damage
+ratios in `[0, 1]`, including both rank endpoints. Evaluate vulnerability at the
+hazard knots before constructing the damage curve. The simulator interpolates
+between those damage ratios. Supply explicit `TailCompletion` endpoints when
+completing partial evidence is appropriate for the book.
+
+```python
+from crc_framework import (
+    AnnualLossSpec,
+    InsuredInterest,
+    PolicyTerms,
+    QuantileCurve,
+    simulate_annual_losses,
+    summarize_annual_losses,
+)
+
+book = [
+    InsuredInterest(
+        "warehouse",
+        longitude=-75.0,
+        latitude=45.0,
+        total_insured_value=100_000,
+        damage_curve=QuantileCurve([0, 0.9, 1], [0, 0.2, 0.7]),
+        terms=PolicyTerms(deductible=5_000, limit=30_000, share=0.8),
+    ),
+]
+spec = AnnualLossSpec.reference()
+run = simulate_annual_losses(book, spec=spec, include_components=True)
+summary = summarize_annual_losses(
+    run.totals,
+    total_insured_value=run.total_insured_value,
+    components=run.components,
+)
+assert len(run.trial_ids) == summary.trial_count == 20_000
+```
+
+Use one currency and valuation basis for the book. Each simulated year draws
+one severity per location, applies primary policy terms, and sums the insured
+losses. This gives an annual aggregate loss proxy gross of reinsurance.
+
+The reference configuration uses 20,000 trials, seed `20261027`, peak latent
+correlation 0.4, decay length 150 km, and damage coefficient of variation 0.3.
+Dependence decays with great-circle distance. Set `repair_tolerance` to allow
+an eigenvalue floor of `1e-8` with the specified maximum change to any matrix
+entry. A repaired run reports its original minimum eigenvalue and maximum
+entry change. Set `damage_cv=0` to use the mean damage ratio directly. Supply
+`calibration_source` to record the label of a peril-specific calibration.
+
+For paired runs, reuse the same interest IDs, coordinates, and spec. The
+simulator sorts interests by ID and uses a versioned ChaCha12 primary stream.
+Select a different `secondary_stream` for independent damage uncertainty in
+the paired run. Trial IDs are zero-based. Replay has been verified across
+block sizes and input ordering on the same build.
+
+The dense simulator checks estimated numerical memory and work before
+factorization. `memory_limit` is in bytes. Keep `include_components` off
+when you need only the portfolio totals. With components enabled, all
+component arrays share the same trial IDs. NumPy reference comparisons use
+independent RNG streams and sampling tolerances. CVaR uses the exact
+requested tail mass, including fractional mass at a tied cutoff.
+
+## Combine annual losses with separate peril terms
+
+Use `simulate_separate_peril_losses` for a book whose coverages apply their
+deductible, limit, and share separately to each peril. Every peril must have
+the same interests, coordinates, and insured values in a common currency
+and valuation basis. Each peril supplies its own damage curves and terms.
+The portfolio counts each interest's insured value once. The insured losses
+from separately responsive coverages can sum to more than that value.
+
+Choose cross-peril dependence explicitly. Use `PerilDependence.independent()`
+when the model assumes independent perils. For a calibrated model, supply a
+positive definite latent Gaussian matrix with `from_correlation`, or estimate
+one with `calibrate` from aligned annual non-exceedance ranks observed at the
+same scale. Each row represents the same observation year across perils.
+Ranks must be strictly inside `(0, 1)`. The observed sequence must vary for
+every peril and have more years than perils. `calibrate` correlates the
+standard-normal scores and records the calibration label, observation count,
+and rank checksum. Perfect or linearly dependent ranks require a separately
+justified positive definite calibration before simulation.
+
+```python
+from crc_framework import PerilDependence, simulate_separate_peril_losses
+
+flood = "river-flood"
+wind = "windstorm"
+wind_book = [
+    InsuredInterest(
+        "warehouse",
+        longitude=-75.0,
+        latitude=45.0,
+        total_insured_value=100_000,
+        damage_curve=QuantileCurve([0, 0.9, 1], [0, 0.1, 0.5]),
+        terms=PolicyTerms(deductible=10_000, limit=25_000),
+    ),
+]
+dependence = PerilDependence.calibrate(
+    [flood, wind],
+    [[0.1, 0.2], [0.25, 0.5], [0.5, 0.3], [0.7, 0.65], [0.9, 0.85]],
+    calibration_source="illustrative aligned annual ranks",
+)
+combined = simulate_separate_peril_losses(
+    {flood: book, wind: wind_book},
+    dependence=dependence,
+    spec=spec,
+    include_components=True,
+)
+assert combined.total_insured_value == 100_000
+assert combined.components is not None and set(combined.components) == {flood, wind}
+```
+
+One `AnnualLossSpec` supplies the common spatial correlation law and damage
+variability. The joint model multiplies the latent correlation between
+perils by the spatial correlation between locations. Secondary draws use
+distinct streams for each peril. Keep the book, peril identities, dependence,
+and simulation specification fixed for paired runs, and choose a distinct
+secondary stream for each run. Optional components carry each peril's
+insured annual totals. Passing them to `summarize_annual_losses` attributes
+the portfolio tail to perils.
+
+For a dense book, the spatial factorization is shared across perils. Drawing
+annual ranks still requires a dense spatial transform per peril and trial.
+The work and memory checks account for the full combined run. The
+[synthetic benchmark](../tools/benchmark_annual_loss.py) exercises the same
+simulator and reports runtime, sample size, and rejections at the default limits.
+
 ## Serialization and reference geography
 
 `Distribution`, `QuantileCurve`, fitting specifications, and impacts have typed

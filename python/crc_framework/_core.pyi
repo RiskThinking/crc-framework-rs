@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from typing import TypeAlias
 
 __version__: str
 
@@ -49,6 +50,75 @@ def rank_risk(
     levels: Sequence[float],
     max_branches: int | None = ...,
 ) -> tuple[int, list[tuple[float, float, float, list[tuple[str, float, float]]]]]: ...
+
+class NativePolicyTerms:
+    def __init__(
+        self, deductible: float, limit: float | None, share: float
+    ) -> None: ...
+    def insured_losses(
+        self, total_insured_value: float, damage_ratios: Sequence[float]
+    ) -> list[float]: ...
+
+class NativeAnnualLossSpec:
+    def __init__(
+        self,
+        trials: int,
+        seed: int,
+        peak_correlation: float,
+        decay_length_km: float,
+        damage_cv: float,
+        repair_tolerance: float | None,
+    ) -> None: ...
+
+class NativeInsuredInterest:
+    def __init__(
+        self,
+        id: str,
+        coordinates: tuple[float, float],
+        total_insured_value: float,
+        knots: tuple[Sequence[float], Sequence[float]],
+        terms: NativePolicyTerms,
+    ) -> None: ...
+
+_NativeAnnualLossSimulation: TypeAlias = tuple[
+    bytes, list[tuple[str, bytes]] | None, float, str, tuple[float, float] | None
+]
+
+def simulate_annual_losses(
+    interests: Sequence[NativeInsuredInterest],
+    spec: NativeAnnualLossSpec,
+    execution: tuple[bool, int, int, int, int],
+) -> _NativeAnnualLossSimulation: ...
+def simulate_separate_peril_losses(
+    perils: Sequence[tuple[str, Sequence[NativeInsuredInterest]]],
+    cross_peril_correlation: Sequence[Sequence[float]] | None,
+    spec: NativeAnnualLossSpec,
+    execution: tuple[bool, int, int, int, int],
+) -> _NativeAnnualLossSimulation: ...
+def validate_peril_correlation(correlation: Sequence[Sequence[float]]) -> None: ...
+
+_NativeAnnualLossLevel: TypeAlias = tuple[
+    float, float, float, float | None, list[tuple[str, float]] | None, float, int, float
+]
+_NativeAnnualLossExceedance: TypeAlias = tuple[float, float, float, float, float]
+_NativeAnnualLossSummary: TypeAlias = tuple[
+    int,
+    float,
+    float,
+    float,
+    float,
+    float | None,
+    list[_NativeAnnualLossLevel],
+    list[_NativeAnnualLossExceedance],
+]
+
+def summarize_annual_losses(
+    totals: Sequence[float],
+    total_insured_value: float,
+    levels: Sequence[float],
+    return_periods: Sequence[float],
+    components: Sequence[tuple[str, Sequence[float]]] | None = ...,
+) -> _NativeAnnualLossSummary: ...
 
 class NativeFitParameters:
     family: str
