@@ -53,6 +53,8 @@ from ._measurement import (
     Ratio,
     RatioUnit,
     SpeedUnit,
+    TemperatureUnit,
+    Threshold,
     TimeUnit,
     Unit,
     WaterCostContext,
@@ -790,7 +792,18 @@ class _ModelScience:
     unestablished: tuple[str, ...] = ()
 
 
+_FREEZING = Threshold(0, unit=TemperatureUnit.CELSIUS)
+_YEAR = Duration(1, unit=TimeUnit.YEAR)
+
+
 def _model_science(model: BuiltinImpact) -> _ModelScience:
+    """Each model's input states the facts its calibration assumed.
+
+    Binding is exact equality, so data must declare the same event threshold,
+    counting or accumulation duration and wind averaging. Per-cell thresholds
+    for frost days, freeze-thaw cycles and rx1day are return levels of the
+    1985–2024 historic baseline; they are model data, not input facts.
+    """
     if model in (
         BuiltinImpact.INUNDATION,
         BuiltinImpact.COASTAL_FLOOD,
@@ -799,21 +812,28 @@ def _model_science(model: BuiltinImpact) -> _ModelScience:
         return _ModelScience(
             DepthAboveGround(unit=LengthUnit.METRE), DepthAboveGround, InundationContext
         )
-    if model in (
-        BuiltinImpact.FREEZE_THAW_CYCLES,
-        BuiltinImpact.FROST_DAYS,
-        BuiltinImpact.HOT_DAYS,
-    ):
-        event = {
-            BuiltinImpact.FREEZE_THAW_CYCLES: Event.FREEZE_THAW_CYCLE,
-            BuiltinImpact.FROST_DAYS: Event.FROST_DAY,
-            BuiltinImpact.HOT_DAYS: Event.HOT_DAY,
-        }[model]
+    if model is BuiltinImpact.HOT_DAYS:
         return _ModelScience(
-            EventCount(event=event, aggregation=Aggregation.COUNT),
+            EventCount(event=Event.HOT_DAY, aggregation=Aggregation.COUNT),
             EventCount,
-            EmptyContext if model is BuiltinImpact.HOT_DAYS else CellContext,
+            EmptyContext,
             ("event threshold", "counting duration", "calibration reference period"),
+        )
+    if model in (BuiltinImpact.FREEZE_THAW_CYCLES, BuiltinImpact.FROST_DAYS):
+        event = (
+            Event.FREEZE_THAW_CYCLE
+            if model is BuiltinImpact.FREEZE_THAW_CYCLES
+            else Event.FROST_DAY
+        )
+        return _ModelScience(
+            EventCount(
+                event=event,
+                aggregation=Aggregation.COUNT,
+                threshold=_FREEZING,
+                duration=_YEAR,
+            ),
+            EventCount,
+            CellContext,
         )
     if model is BuiltinImpact.MAXIMUM_DAILY_PRECIPITATION:
         return _ModelScience(
@@ -823,16 +843,27 @@ def _model_science(model: BuiltinImpact) -> _ModelScience:
             ),
             PrecipitationAmount,
             CellContext,
-            ("calibration reference period",),
         )
-    if model in (BuiltinImpact.CYCLONE, BuiltinImpact.MAXIMUM_DAILY_WIND_SPEED):
+    if model is BuiltinImpact.CYCLONE:
+        # STORM synthetic tracks give 10-minute sustained winds, used without
+        # conversion. Cyclone hazard is independent of period and pathway.
+        return _ModelScience(
+            WindSpeed(
+                unit=SpeedUnit.METRES_PER_SECOND,
+                averaging_duration=Duration(600, unit=TimeUnit.SECOND),
+                aggregation=Aggregation.MAXIMUM,
+            ),
+            WindSpeed,
+            CountryContext,
+        )
+    if model is BuiltinImpact.MAXIMUM_DAILY_WIND_SPEED:
+        # Daily-maximum model wind is used as delivered, with no averaging.
         return _ModelScience(
             WindSpeed(
                 unit=SpeedUnit.METRES_PER_SECOND, aggregation=Aggregation.MAXIMUM
             ),
             WindSpeed,
             CountryContext,
-            ("wind averaging duration", "calibration reference period"),
         )
     if model is BuiltinImpact.FIRE_WEATHER_INDEX:
         return _ModelScience(
@@ -841,24 +872,31 @@ def _model_science(model: BuiltinImpact) -> _ModelScience:
             EmptyContext,
         )
     if model is BuiltinImpact.STANDARDIZED_PRECIPITATION_EVAPOTRANSPIRATION_INDEX:
+        # Monthly SPEI standardized over the same series: no fixed reference.
         return _ModelScience(
             ClimateIndex(
-                index=ClimateIndexKind.STANDARDIZED_PRECIPITATION_EVAPOTRANSPIRATION_INDEX
+                index=ClimateIndexKind.STANDARDIZED_PRECIPITATION_EVAPOTRANSPIRATION_INDEX,
+                accumulation_duration=Duration(1, unit=TimeUnit.MONTH),
             ),
             ClimateIndex,
             WaterCostContext,
-            ("index accumulation duration", "index reference period"),
         )
-    if model in (
-        BuiltinImpact.COOLING_DEGREE_DAYS,
-        BuiltinImpact.COOLING_DEGREE_DAYS_CROP_YIELD,
-    ):
+    if model is BuiltinImpact.COOLING_DEGREE_DAYS:
+        # The caller's historic mean context sets the cooling-cost baseline.
+        return _ModelScience(
+            DegreeDays(
+                unit=DegreeDayUnit.KELVIN_DAYS,
+                threshold=Threshold(18, unit=TemperatureUnit.CELSIUS),
+                duration=_YEAR,
+            ),
+            DegreeDays,
+            CoolingCostContext,
+        )
+    if model is BuiltinImpact.COOLING_DEGREE_DAYS_CROP_YIELD:
         return _ModelScience(
             Measurement(quantity="degree_days", unit=DegreeDayUnit.KELVIN_DAYS),
             DegreeDays,
-            CoolingCostContext
-            if model is BuiltinImpact.COOLING_DEGREE_DAYS
-            else CropContext,
+            CropContext,
             (
                 "temperature threshold",
                 "accumulation duration",

@@ -83,11 +83,15 @@ def test_maximum_daily_precipitation_model_requires_a_one_day_amount() -> None:
             )
         )
     assert wrong_type.value.code == "measurement_type_mismatch"
-    # Source tables do not establish their calibration period. Correct units
-    # and quantity do not manufacture that missing model-owned fact.
-    with pytest.raises(ImpactError) as missing_calibration:
-        requirements.bind(amount)
-    assert missing_calibration.value.code == "calibration_unestablished"
+    requirements.bind(amount)
+    with pytest.raises(ImpactError) as two_days:
+        requirements.bind(
+            PrecipitationAmount(
+                unit=LengthUnit.MILLIMETRE,
+                accumulation_duration=Duration(2, unit=TimeUnit.DAY),
+            )
+        )
+    assert two_days.value.code == "measurement_mismatch"
     resolved = reference.resolve(CellContext(cell=594475159402840063))
     assert resolved.input == amount
     assert 0 <= resolved.evaluate(100.0) <= 1

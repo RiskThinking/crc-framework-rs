@@ -301,16 +301,79 @@ def test_column_bindings_round_trip_but_are_not_resolved_by_numerical_models() -
 
 
 def test_unknown_calibration_facts_are_not_invented_from_data() -> None:
-    requirement = Impact.builtin(BuiltinImpact.FROST_DAYS).requirements
+    requirement = Impact.builtin(BuiltinImpact.CONSECUTIVE_DRY_DAYS).requirements
     assert requirement.unestablished_facts
     supplied = EventCount(
-        event=Event.FROST_DAY,
-        aggregation=Aggregation.COUNT,
-        threshold=Threshold(0, unit=TemperatureUnit.CELSIUS),
+        event=Event.DRY_DAY,
+        aggregation=Aggregation.MAXIMUM,
+        threshold=Threshold(1, unit=PrecipitationRateUnit.MILLIMETRES_PER_DAY),
         duration=Duration(1, unit=TimeUnit.YEAR),
     )
     with pytest.raises(ImpactError, match="calibration_unestablished"):
         requirement.bind(supplied)
+
+
+def test_established_models_bind_exactly_the_calibrated_definitions() -> None:
+    year = Duration(1, unit=TimeUnit.YEAR)
+    freezing = Threshold(0, unit=TemperatureUnit.CELSIUS)
+    calibrated = {
+        BuiltinImpact.FROST_DAYS: EventCount(
+            event=Event.FROST_DAY,
+            aggregation=Aggregation.COUNT,
+            threshold=freezing,
+            duration=year,
+        ),
+        BuiltinImpact.FREEZE_THAW_CYCLES: EventCount(
+            event=Event.FREEZE_THAW_CYCLE,
+            aggregation=Aggregation.COUNT,
+            threshold=freezing,
+            duration=year,
+        ),
+        BuiltinImpact.CYCLONE: WindSpeed(
+            unit=SpeedUnit.METRES_PER_SECOND,
+            averaging_duration=Duration(600, unit=TimeUnit.SECOND),
+            aggregation=Aggregation.MAXIMUM,
+        ),
+        BuiltinImpact.MAXIMUM_DAILY_WIND_SPEED: WindSpeed(
+            unit=SpeedUnit.METRES_PER_SECOND, aggregation=Aggregation.MAXIMUM
+        ),
+        BuiltinImpact.STANDARDIZED_PRECIPITATION_EVAPOTRANSPIRATION_INDEX: ClimateIndex(
+            index=ClimateIndexKind.STANDARDIZED_PRECIPITATION_EVAPOTRANSPIRATION_INDEX,
+            accumulation_duration=Duration(1, unit=TimeUnit.MONTH),
+        ),
+        BuiltinImpact.COOLING_DEGREE_DAYS: DegreeDays(
+            unit=DegreeDayUnit.KELVIN_DAYS,
+            threshold=Threshold(18, unit=TemperatureUnit.CELSIUS),
+            duration=year,
+        ),
+    }
+    for model, measurement in calibrated.items():
+        requirements = Impact.builtin(model).requirements
+        assert requirements.unestablished_facts == ()
+        requirements.bind(measurement)
+    # Another threshold, counting period or averaging is another measurement.
+    mismatched = {
+        BuiltinImpact.FROST_DAYS: EventCount(
+            event=Event.FROST_DAY,
+            aggregation=Aggregation.COUNT,
+            threshold=Threshold(-2, unit=TemperatureUnit.CELSIUS),
+            duration=year,
+        ),
+        BuiltinImpact.COOLING_DEGREE_DAYS: DegreeDays(
+            unit=DegreeDayUnit.KELVIN_DAYS,
+            threshold=Threshold(18, unit=TemperatureUnit.CELSIUS),
+            duration=Duration(1, unit=TimeUnit.MONTH),
+        ),
+        BuiltinImpact.CYCLONE: WindSpeed(
+            unit=SpeedUnit.METRES_PER_SECOND,
+            averaging_duration=Duration(60, unit=TimeUnit.SECOND),
+            aggregation=Aggregation.MAXIMUM,
+        ),
+    }
+    for model, measurement in mismatched.items():
+        with pytest.raises(ImpactError) as error:
+            Impact.builtin(model).requirements.bind(measurement)
+        assert error.value.code == "measurement_mismatch"
 
 
 def test_retired_hot_days_warns_and_never_binds() -> None:
