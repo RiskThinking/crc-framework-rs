@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import warnings
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
@@ -248,6 +249,10 @@ class Impact:
     def builtin(cls, model: BuiltinImpact) -> ImpactReference:
         if not isinstance(model, BuiltinImpact):
             raise TypeError("model must be BuiltinImpact")
+        if model in _RETIRED:
+            warnings.warn(
+                f"{model.name}: {_RETIRED[model]}", DeprecationWarning, stacklevel=2
+            )
         return ImpactReference._create(model)
 
     @classmethod
@@ -633,6 +638,12 @@ class Impact:
 
 
 class BuiltinImpact(Enum):
+    """Published RiskThinking models.
+
+    ``HOT_DAYS`` is retired from the RiskThinking methodology: selecting it warns
+    with ``DeprecationWarning``, it never binds data, and 2.0 removes it.
+    """
+
     FREEZE_THAW_CYCLES = "crc:freeze_thaw_cycles"
     FROST_DAYS = "crc:frost_days"
     MAXIMUM_DAILY_PRECIPITATION = "crc:maximum_daily_precipitation"
@@ -650,6 +661,15 @@ class BuiltinImpact(Enum):
     COOLING_DEGREE_DAYS_CROP_YIELD = "crc:cooling_degree_days_crop_yield"
     CONSECUTIVE_DRY_DAYS = "crc:consecutive_dry_days"
 
+
+# Models removed from the RiskThinking methodology. They stay readable so saved
+# documents remain valid, never bind to data, and are removed in 2.0.
+_RETIRED = {
+    BuiltinImpact.HOT_DAYS: (
+        "the hot-days productivity-loss model is retired from the RiskThinking "
+        "methodology and will be removed in crc-framework 2.0"
+    ),
+}
 
 _FACTORS = {
     BuiltinImpact.FREEZE_THAW_CYCLES: "daily_freezethaw_cycles",
@@ -727,8 +747,11 @@ class ImpactRequirements:
     context_fields: tuple[ContextField, ...]
     unestablished_facts: tuple[str, ...]
     output: Measurement
+    _retired: str | None = dataclass_field(default=None, repr=False, compare=False)
 
     def bind(self, measurement: Measurement) -> None:
+        if self._retired is not None:
+            raise ImpactError("model_retired", "/model", self._retired)
         if not isinstance(measurement, self.measurement_type):
             raise ImpactError(
                 "measurement_type_mismatch",
@@ -1020,6 +1043,7 @@ class ImpactReference:
             _context_fields(self._model, science.context_type),
             science.unestablished,
             self._output(cast(dict[str, str], calibration)),
+            _RETIRED.get(self._model),
         )
 
     def _input(self) -> Measurement:

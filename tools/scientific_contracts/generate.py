@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import warnings
 import json
 from pathlib import Path
 
@@ -109,7 +110,7 @@ def build():
     _, version, _, digest = _core.impact_registry_identity()
     models = []
     for model in impacts.BuiltinImpact:
-        ref = impacts.Impact.builtin(model)
+        ref = _builtin(model)
         r = ref.requirements
         models.append(
             {
@@ -358,7 +359,7 @@ def build():
     )
 
     for selected in impacts.BuiltinImpact:
-        ref = impacts.Impact.builtin(selected)
+        ref = _builtin(selected)
         fixtures.append(
             {
                 "name": "reference-" + selected.name,
@@ -592,16 +593,23 @@ def reference():
         "",
         "Some source calibrations do not establish a threshold, averaging interval, accumulation timescale or reference period. `unestablished_facts` exposes these gaps. Scientific data binding rejects them instead of guessing; supplying a plausible value on the data does not establish the published model calibration. Pure numerical `resolve` remains available for explicitly numerical work.",
         "",
+        "`BuiltinImpact.HOT_DAYS` is retired from the RiskThinking methodology. `Impact.builtin(BuiltinImpact.HOT_DAYS)` warns with `DeprecationWarning`, and binding it to data fails with `model_retired`. Saved documents that name it still read. crc-framework 2.0 removes it.",
+        "",
         "Maximum daily precipitation uses ETCCDI Rx1day: the maximum daily precipitation amount in millimetres accumulated over one day ([Climdex definition](https://www.climdex.org/learn/indices/)). Its numerical response consumes that amount directly; it does not integrate a precipitation rate. The reduction is recorded in data provenance.",
         "",
         "| Model | Measurement | Context | Unestablished calibration facts |",
         "| --- | --- | --- | --- |",
     ]
+    retired = {
+        _builtin(model).id
+        for model in impacts.BuiltinImpact
+        if _builtin(model).requirements._retired is not None
+    }
     for model in models:
         lines.append(
             "| `"
             + model["id"]
-            + "` | `"
+            + ("` (retired) | `" if model["id"] in retired else "` | `")
             + model["measurement_type"]
             + "` | `"
             + model["context_type"]
@@ -619,6 +627,13 @@ def reference():
         "",
     ]
     return "\n".join(lines).replace("by64", "by 64").encode()
+
+
+def _builtin(model):
+    """A reference for generated resources, which list retired models too."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        return impacts.Impact.builtin(model)
 
 
 def main():
