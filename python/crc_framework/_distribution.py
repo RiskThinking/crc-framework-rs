@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import bisect
 import json
 import math
 from collections.abc import Mapping, Sequence
@@ -106,6 +107,8 @@ class TailCompletion:
 
 
 def _finite(value: float, label: str) -> float:
+    if type(value) is float and math.isfinite(value):
+        return value
     if isinstance(value, bool) or not isinstance(
         value, (int, float, numpy.floating, numpy.integer)
     ):
@@ -117,6 +120,8 @@ def _finite(value: float, label: str) -> float:
 
 
 def _real_array(values: Values, label: str) -> FloatArray:
+    if type(values) is list and all(type(item) is float for item in values):
+        return numpy.array(values, dtype=numpy.float64)
     if isinstance(values, numpy.ndarray):
         valid = values.dtype.kind in "iuf"
     else:
@@ -145,11 +150,15 @@ def _snapshot(array: FloatArray) -> FloatArray:
 
 def _input(values: Values, *, probabilities: bool = False) -> tuple[FloatArray, bool]:
     array = _real_array(values, "queries")
-    if numpy.isnan(array).any():
-        raise ValueError("queries must not contain NaN")
-    if probabilities and (
-        not numpy.isfinite(array).all() or ((array < 0) | (array > 1)).any()
+    # One range test admits valid probabilities; NaN fails it too, and the
+    # specific error is found only for rejected queries.
+    if (
+        not ((array >= 0) & (array <= 1)).all()
+        if probabilities
+        else numpy.isnan(array).any()
     ):
+        if numpy.isnan(array).any():
+            raise ValueError("queries must not contain NaN")
         raise ValueError("probabilities must be finite and in [0, 1]")
     return array, array.ndim == 0
 
@@ -159,6 +168,21 @@ def _output(
 ) -> ValueResult:
     result = numpy.asarray(values, dtype=numpy.float64).reshape(shape)
     return float(result) if scalar else _snapshot(result)
+
+
+_NUMERICAL = "https://climateriskcommons.org/schemas/numerical/1.0"
+
+
+def _bytes(query: FloatArray) -> bytes:
+    return numpy.ascontiguousarray(query, dtype=numpy.float64).tobytes()
+
+
+def _native_output(
+    result: bytes, shape: tuple[int, ...], scalar: bool
+) -> ValueResult:
+    # Bytes-backed like `_snapshot`: the array can never be made writeable.
+    array = numpy.frombuffer(result, dtype=numpy.float64).reshape(shape)
+    return float(array) if scalar else array
 
 
 def _dump(value: object) -> str:
@@ -183,6 +207,30 @@ def _parse(text: str) -> dict[str, object]:
     return cast(dict[str, object], value)
 
 
+def _structured(text: str, kind: str) -> dict[str, object]:
+    """Parse a numerical document of one object kind.
+
+    Structural validation rejects duplicate fields and non-finite numbers, so
+    a valid text needs no checking parser. An invalid one is parsed by the
+    checking parser first, keeping its errors and the object check ahead of
+    schema errors.
+    """
+    try:
+        _core.validate_structure(_NUMERICAL, text)
+        data = cast(dict[str, object], json.loads(text))
+    except ValueError:
+        data = _parse(text)
+        _object(data, kind)
+        raise
+    _object(data, kind)
+    return data
+
+
+def _object(data: Mapping[str, object], kind: str) -> None:
+    if data.get("schema_version") != "1.0" or data.get("object") != kind:
+        raise ValueError(f"expected numerical {kind} schema 1.0")
+
+
 def _fields(
     data: Mapping[str, object],
     required: set[str],
@@ -192,6 +240,37 @@ def _fields(
         raise ValueError(
             f"invalid numerical fields; required={sorted(required)}, found={sorted(data)}"
         )
+
+
+def _native_law(data: dict[str, object]) -> _core.NativeNumericalLaw:
+    """Build the native law of a non-hurdle representation.
+
+    Scalar kinds use typed constructors; the native validation is the one the
+    JSON representation receives, without a serialize-and-parse round trip.
+    """
+    # Every caller passes an exact representation: one built by a constructor
+    # or one whose fields structural validation has already checked.
+    kind = data.get("kind")
+    if kind == "parametric":
+        return _core.NativeNumericalLaw.parametric(
+            cast(str, data["family"]),
+            cast(float, data["location"]),
+            cast(float, data["scale"]),
+            cast(float | None, data.get("shape")),
+        )
+    if kind == "point_mass":
+        return _core.NativeNumericalLaw.point_mass(cast(float, data["value"]))
+    if kind == "quantile":
+        return _core.NativeNumericalLaw.quantile_law(
+            cast(list[float], data["probabilities"]), cast(list[float], data["values"])
+        )
+    if kind == "histogram":
+        return _core.NativeNumericalLaw.histogram(
+            cast(list[float], data["edges"]), cast(list[float], data["probabilities"])
+        )
+    # Discrete counts keep the JSON route: it rejects non-integral counts as
+    # invalid values rather than as a Python type error.
+    return _core.NativeNumericalLaw(_dump(data))
 
 
 @dataclass(frozen=True, init=False)
@@ -207,43 +286,59 @@ class Distribution:
 
     @classmethod
     def _create(
-        cls, data: dict[str, object], record: dict[str, object] | None = None
+        cls,
+        data: dict[str, object],
+        record: dict[str, object] | None = None,
+        *,
+        base: Distribution | None = None,
     ) -> Distribution:
         result = object.__new__(cls)
-        compound = False
-        native_data = dict(data)
+        native: _core.NativeNumericalLaw | None
         if data.get("kind") == "hurdle":
-            _fields(data, {"kind", "base", "atom_probability", "atom_location"})
-            base_data = cast(dict[str, object], data["base"])
-            hydrated = cls.from_json(
-                _dump({"schema_version": "1.0", "object": "distribution", **base_data})
+            if base is None:
+                _fields(data, {"kind", "base", "atom_probability", "atom_location"})
+                base_data = cast(dict[str, object], data["base"])
+                # The base was validated with its enclosing document; only a
+                # base whose admission does more than build its law is read
+                # through from_json again.
+                base = (
+                    cls._create(dict(base_data))
+                    if base_data.get("kind") in ("parametric", "point_mass", "hurdle")
+                    else cls.from_json(
+                        _dump(
+                            {
+                                "schema_version": "1.0",
+                                "object": "distribution",
+                                **base_data,
+                            }
+                        )
+                    )
+                )
+            # A base without a native law (a transformed one) makes the
+            # hurdle a compound document evaluated through its JSON form.
+            native = (
+                None
+                if base._native is None
+                else _core.NativeNumericalLaw.hurdle(
+                    base._native,
+                    cast(float, data["atom_probability"]),
+                    cast(float, data["atom_location"]),
+                )
             )
-            compound = hydrated._native is None
-            if not compound:
-                native_data["base"] = hydrated._native_data()
-        object.__setattr__(
-            result,
-            "_native",
-            None if compound else _core.NativeNumericalLaw(_dump(native_data)),
+        else:
+            native = _native_law(data)
+        result.__dict__.update(
+            _native=native,
+            _data=data,
+            _transformed=None,
+            _record=record,
+            _compound=None,
         )
-        object.__setattr__(result, "_data", data)
-        object.__setattr__(result, "_transformed", None)
-        object.__setattr__(result, "_record", record)
-        object.__setattr__(
-            result,
-            "_compound",
-            _core.NativeNumericalDocument(result.to_json()) if compound else None,
-        )
+        if native is None:
+            result.__dict__["_compound"] = _core.NativeNumericalDocument(
+                result.to_json()
+            )
         return result
-
-    def _native_data(self) -> dict[str, object]:
-        data = dict(self._data)
-        if self.kind is DistributionKind.HURDLE:
-            base_data = cast(dict[str, object], data["base"])
-            data["base"] = Distribution.from_json(
-                _dump({"schema_version": "1.0", "object": "distribution", **base_data})
-            )._native_data()
-        return data
 
     def _serialized_data(self) -> dict[str, object]:
         return {
@@ -355,7 +450,8 @@ class Distribution:
                 "base": base._serialized_data(),
                 "atom_probability": _finite(atom_probability, "atom_probability"),
                 "atom_location": _finite(atom_location, "atom_location"),
-            }
+            },
+            base=base,
         )
 
     @property
@@ -372,10 +468,14 @@ class Distribution:
         return self._transformed.quantile(0.0), self._transformed.quantile(1.0)
 
     def quantile(self, probabilities: Values) -> ValueResult:
+        native = self._native
+        if native is not None and type(probabilities) is float:
+            if 0.0 <= probabilities <= 1.0:
+                return native.quantile_at(probabilities)
         query, scalar = _input(probabilities, probabilities=True)
-        if self._native is not None:
-            result = self._native.quantile(query.reshape(-1).tolist())
-        elif self._compound is not None:
+        if native is not None:
+            return _native_output(native.quantile(_bytes(query)), query.shape, scalar)
+        if self._compound is not None:
             result = self._compound.quantiles(query.reshape(-1).tolist())
         else:
             assert self._transformed is not None
@@ -385,10 +485,13 @@ class Distribution:
     def cdf(self, values: Values, *, inclusive: bool = True) -> ValueResult:
         if type(inclusive) is not bool:
             raise TypeError("inclusive must be bool")
+        native = self._native
+        if native is not None and type(values) is float and values == values:
+            return native.cdf_at(values, inclusive)
         query, scalar = _input(values)
-        if self._native is not None:
-            result = self._native.cdf(query.reshape(-1).tolist(), inclusive)
-        elif self._compound is not None:
+        if native is not None:
+            return _native_output(native.cdf(_bytes(query), inclusive), query.shape, scalar)
+        if self._compound is not None:
             result = self._compound.hurdle_cdf(query.reshape(-1).tolist(), inclusive)
         else:
             assert self._transformed is not None
@@ -398,12 +501,19 @@ class Distribution:
         return _output(result, query.shape, scalar)
 
     def exceedance(self, values: Values, *, inclusive: bool = False) -> ValueResult:
+        native = self._native
+        if native is not None and type(values) is float and values == values:
+            if type(inclusive) is not bool:
+                raise TypeError("inclusive must be bool")
+            return native.exceedance_at(values, inclusive)
         query, scalar = _input(values)
         if type(inclusive) is not bool:
             raise TypeError("inclusive must be bool")
-        if self._native is not None:
-            result = self._native.exceedance(query.reshape(-1).tolist(), inclusive)
-        elif self._compound is not None:
+        if native is not None:
+            return _native_output(
+                native.exceedance(_bytes(query), inclusive), query.shape, scalar
+            )
+        if self._compound is not None:
             result = self._compound.hurdle_exceedance(
                 query.reshape(-1).tolist(), inclusive
             )
@@ -415,10 +525,13 @@ class Distribution:
         return _output(result, query.shape, scalar)
 
     def mass(self, values: Values) -> ValueResult:
+        native = self._native
+        if native is not None and type(values) is float and values == values:
+            return native.mass_at(values)
         query, scalar = _input(values)
-        if self._native is not None:
-            result = self._native.mass(query.reshape(-1).tolist())
-        elif self._compound is not None:
+        if native is not None:
+            return _native_output(native.mass(_bytes(query)), query.shape, scalar)
+        if self._compound is not None:
             result = self._compound.hurdle_mass(query.reshape(-1).tolist())
         else:
             assert self._transformed is not None
@@ -726,15 +839,8 @@ class Distribution:
 
     @classmethod
     def from_json(cls, text: str) -> Distribution:
-        data = _parse(text)
-        if (
-            data.pop("schema_version", None) != "1.0"
-            or data.pop("object", None) != "distribution"
-        ):
-            raise ValueError("expected numerical distribution schema 1.0")
-        _core.validate_structure(
-            "https://climateriskcommons.org/schemas/numerical/1.0", text
-        )
+        data = _structured(text, "distribution")
+        del data["schema_version"], data["object"]
         has_evidence = "evidence" in data
         record = data.pop("evidence", None)
         if data.get("kind") == "transformed":
@@ -823,12 +929,13 @@ class QuantileCurve:
     def __init__(self, probabilities: ArrayLike, values: ArrayLike) -> None:
         q = _vector(probabilities, "probabilities")
         x = _vector(values, "values")
+        # Strictly increasing probabilities lie in [0, 1] when their ends do.
         if (
             len(q) < 2
             or len(q) != len(x)
-            or (numpy.diff(q) <= 0).any()
-            or (q < 0).any()
-            or (q > 1).any()
+            or not 0 <= q[0]
+            or not q[-1] <= 1
+            or not numpy.diff(q).min() > 0
             or (x[1:] < x[:-1]).any()
         ):
             raise ValueError(
@@ -850,6 +957,10 @@ class QuantileCurve:
         return float(self._probabilities[0]), float(self._probabilities[-1])
 
     def quantile(self, probabilities: Values) -> ValueResult:
+        if type(probabilities) is float:
+            lo, hi = self.probability_interval
+            if lo <= probabilities <= hi:
+                return self._interpolate(probabilities)
         query, scalar = _input(probabilities, probabilities=True)
         lo, hi = self.probability_interval
         if ((query < lo) | (query > hi)).any():
@@ -874,6 +985,24 @@ class QuantileCurve:
         result[weight == 0] = low[weight == 0]
         result[weight == 1] = high[weight == 1]
         return _output(result, query.shape, scalar)
+
+    def _interpolate(self, probability: float) -> float:
+        """`quantile` of one probability inside the interval, without arrays.
+
+        The same IEEE operations as the vectorized path, element for element.
+        """
+        q, x = self._probabilities, self._values
+        right = max(bisect.bisect_left(q, probability), 1)
+        q_low, q_high = float(q[right - 1]), float(q[right])
+        low, high = float(x[right - 1]), float(x[right])
+        weight = (probability - q_low) / (q_high - q_low)
+        if weight == 0:
+            return low
+        if weight == 1:
+            return high
+        if low < 0 and high > 0:
+            return low * (1 - weight) + high * weight
+        return low + (high - low) * weight
 
     def _inverse_survival(self, probability: float) -> float:
         lo, hi = self.probability_interval
