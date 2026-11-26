@@ -301,18 +301,36 @@ def test_column_bindings_round_trip_but_are_not_resolved_by_numerical_models() -
 
 
 def test_unknown_calibration_facts_are_not_invented_from_data() -> None:
-    requirement = Impact.builtin(BuiltinImpact.HOT_DAYS).requirements
+    requirement = Impact.builtin(BuiltinImpact.FROST_DAYS).requirements
     assert requirement.unestablished_facts
     supplied = EventCount(
-        event=Event.HOT_DAY,
+        event=Event.FROST_DAY,
         aggregation=Aggregation.COUNT,
-        threshold=Threshold(35, unit=TemperatureUnit.CELSIUS),
+        threshold=Threshold(0, unit=TemperatureUnit.CELSIUS),
         duration=Duration(1, unit=TimeUnit.YEAR),
     )
     with pytest.raises(ImpactError, match="calibration_unestablished"):
         requirement.bind(supplied)
-    # Numerical resolution is distinct from asserting a calibrated data match.
-    assert isinstance(Impact.builtin(BuiltinImpact.HOT_DAYS).resolve(), Impact)
+
+
+def test_retired_hot_days_warns_and_never_binds() -> None:
+    with pytest.warns(DeprecationWarning, match="HOT_DAYS.*retired.*2.0"):
+        reference = Impact.builtin(BuiltinImpact.HOT_DAYS)
+    supplied = EventCount(
+        event=Event.HOT_DAY,
+        aggregation=Aggregation.COUNT,
+        duration=Duration(1, unit=TimeUnit.YEAR),
+    )
+    with pytest.raises(ImpactError) as error:
+        reference.requirements.bind(supplied)
+    assert error.value.code == "model_retired"
+    # Saved documents keep resolving numerically.
+    assert isinstance(reference.resolve(), Impact)
+    assert not any(
+        model is not BuiltinImpact.HOT_DAYS
+        and Impact.builtin(model).requirements._retired is not None
+        for model in BuiltinImpact
+    )
 
 
 def test_pinned_provenance_rejects_a_different_numerical_definition() -> None:

@@ -54,6 +54,8 @@ Use `BuiltinImpact.COOLING_DEGREE_DAYS_CROP_YIELD` with `CropContext` for agricu
 
 Some source calibrations do not establish a threshold, averaging interval, accumulation timescale or reference period. `unestablished_facts` exposes these gaps. Scientific data binding rejects them instead of guessing; supplying a plausible value on the data does not establish the published model calibration. Pure numerical `resolve` remains available for explicitly numerical work.
 
+`BuiltinImpact.HOT_DAYS` is retired from the RiskThinking methodology. `Impact.builtin(BuiltinImpact.HOT_DAYS)` warns with `DeprecationWarning`, and binding it to data fails with `model_retired`. Saved documents that name it still read. crc-framework 2.0 removes it.
+
 Maximum daily precipitation uses ETCCDI Rx1day: the maximum daily precipitation amount in millimetres accumulated over one day ([Climdex definition](https://www.climdex.org/learn/indices/)). Its numerical response consumes that amount directly; it does not integrate a precipitation rate. The reduction is recorded in data provenance.
 
 | Model | Measurement | Context | Unestablished calibration facts |
@@ -64,7 +66,7 @@ Maximum daily precipitation uses ETCCDI Rx1day: the maximum daily precipitation 
 | `crc:cyclone` | `WindSpeed` | `CountryContext` | wind averaging duration, calibration reference period |
 | `crc:maximum_daily_wind_speed` | `WindSpeed` | `CountryContext` | wind averaging duration, calibration reference period |
 | `crc:fire_weather_index` | `ClimateIndex` | `EmptyContext` |  |
-| `crc:hot_days` | `EventCount` | `EmptyContext` | event threshold, counting duration, calibration reference period |
+| `crc:hot_days` (retired) | `EventCount` | `EmptyContext` | event threshold, counting duration, calibration reference period |
 | `crc:coastal_flood` | `DepthAboveGround` | `InundationContext` |  |
 | `crc:river_flood` | `DepthAboveGround` | `InundationContext` |  |
 | `crc:inundation` | `DepthAboveGround` | `InundationContext` |  |
