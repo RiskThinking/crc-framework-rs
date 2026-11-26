@@ -2,6 +2,35 @@
 
 [Documentation index](README.md) · [Project README](../README.md)
 
+## 1.1.0
+
+Built-in impact models now carry the calibration facts the RiskThinking
+science team confirmed, so more of them bind to data. Fire-weather damage
+applies only in the wildland-urban interface.
+
+- Seven models establish their input facts and bind to data that declares
+  them exactly: frost days and freeze-thaw cycles (0 °C, per year), maximum
+  daily precipitation (1-day accumulation), cyclone wind (10-minute sustained,
+  annual maximum), maximum daily wind (no averaging), SPEI (monthly) and
+  cooling degree days (18 °C base, per year). Their per-cell thresholds are
+  return levels of the 1985–2024 historic baseline. The
+  [measurements guide](measurements.md#published-models) lists each model's
+  input facts.
+- `BuiltinImpact.FIRE_WEATHER_INDEX` requires
+  `WildfireContext(wildland_urban_interface=...)` and refuses to resolve
+  without it. Outside the interface the response is zero damage. Bind the
+  field to an asset column to decide it per asset. A saved fire-weather
+  impact resolved without this context no longer re-resolves.
+- `BuiltinImpact.HOT_DAYS` is retired. `Impact.builtin` warns with
+  `DeprecationWarning`, binding it to data fails with `model_retired`, and
+  saved documents that name it still read. crc-framework 2.0 removes it.
+- The crop-yield models (`COOLING_DEGREE_DAYS_CROP_YIELD`,
+  `CONSECUTIVE_DRY_DAYS`) keep their unestablished facts until the fitting
+  definitions are published.
+
+The impact context format moves to `1.1`, which adds `wildfire_context`. Every
+1.0 context document is a valid 1.1 document. Other formats are unchanged.
+
 ## 1.0.1
 
 A performance release with no interface or format changes. Distributions are
@@ -32,7 +61,7 @@ and the [JavaScript guide](javascript.md) for runnable workflows. To upgrade exi
 The package and artifact versions are declared in
 [`release.json`](../python/crc_framework/contracts/api/release.json). The
 framework Python package, Rust workspace, WASM package, and generated JavaScript
-package use `1.0.1`. Each
+package use `1.1.0`. Each
 artifact format has its own version in that ledger.
 Changing a package version does not automatically increment every format.
 
@@ -88,9 +117,9 @@ contracts, and WebAssembly package.
 
 | Destination | Version | Release behavior |
 | --- | --- | --- |
-| Rust workspace | `1.0.1` | Versioned source; no crates.io publishing workflow is configured |
-| PyPI `crc-framework` | `1.0.1` | `release.yaml` builds wheels and an sdist, attaches assets, and publishes to PyPI |
-| npm `@climateriskcommons/crc-framework` | `1.0.1` (`latest` dist-tag) | `npm.yaml` publishes the tested generated package |
+| Rust workspace | `1.1.0` | Versioned source; no crates.io publishing workflow is configured |
+| PyPI `crc-framework` | `1.1.0` | `release.yaml` builds wheels and an sdist, attaches assets, and publishes to PyPI |
+| npm `@climateriskcommons/crc-framework` | `1.1.0` (`latest` dist-tag) | `npm.yaml` publishes the tested generated package |
 
 Use `v` plus the exact Cargo version for the tag. Cargo `1.0.0-alpha.1` maps to
 Python `1.0.0a1`; the Python spelling is an output conversion, not another version
