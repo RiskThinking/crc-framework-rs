@@ -42,9 +42,9 @@ const RESOURCES: &[(&str, &str)] = &[
         ),
     ),
     (
-        "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+        "https://climateriskcommons.org/schemas/impact-context-1.1.schema.json",
         include_str!(
-            "../../../python/crc_framework/contracts/scientific/impact-context-1.0.schema.json"
+            "../../../python/crc_framework/contracts/scientific/impact-context-1.1.schema.json"
         ),
     ),
     (
@@ -203,7 +203,7 @@ pub fn validate_structure(uri: &str, value: &Value) -> Result<()> {
     validator.validate(value).map_err(invalid)?;
     match uri {
         "https://climateriskcommons.org/schemas/measurement-1.0.schema.json"
-        | "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json" => {
+        | "https://climateriskcommons.org/schemas/impact-context-1.1.schema.json" => {
             validate_custom_science(value)
         }
         "https://climateriskcommons.org/schemas/impact-2.0.schema.json" => {
@@ -217,7 +217,7 @@ pub fn validate_structure(uri: &str, value: &Value) -> Result<()> {
             )?;
             if let Some(proof) = value.get("provenance") {
                 validate_structure(
-                    "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+                    "https://climateriskcommons.org/schemas/impact-context-1.1.schema.json",
                     &proof["context"],
                 )?;
             }

@@ -58,6 +58,7 @@ from ._measurement import (
     TimeUnit,
     Unit,
     WaterCostContext,
+    WildfireContext,
     WindSpeed,
     _canonical_value,
     _context_schema,
@@ -866,10 +867,11 @@ def _model_science(model: BuiltinImpact) -> _ModelScience:
             CountryContext,
         )
     if model is BuiltinImpact.FIRE_WEATHER_INDEX:
+        # Fire weather damages only assets in the wildland-urban interface.
         return _ModelScience(
             ClimateIndex(index=ClimateIndexKind.FIRE_WEATHER_INDEX),
             ClimateIndex,
-            EmptyContext,
+            WildfireContext,
         )
     if model is BuiltinImpact.STANDARDIZED_PRECIPITATION_EVAPOTRANSPIRATION_INDEX:
         # Monthly SPEI standardized over the same series: no fixed reference.
@@ -932,6 +934,8 @@ def _context_fields(
             if name == "region"
             else "AssetType"
             if name == "asset_type"
+            else "bool"
+            if name == "wildland_urban_interface"
             else "str"
         )
         choices = tuple(
@@ -1144,6 +1148,10 @@ class ImpactReference:
                     "/context/" + field.name,
                     "accepted values: " + ", ".join(field.choices),
                 )
+        provenance = {
+            "model": _load(self.to_json()),
+            "context": _load(context.to_json()),
+        }
         private: dict[str, object] = {}
         if "cell" in values:
             private["cell"] = format(int(values["cell"]), "x")
@@ -1164,6 +1172,14 @@ class ImpactReference:
                 "",
                 "the pinned built-in version is not installed",
             )
+        if values.get("wildland_urban_interface") is False:
+            # Outside the interface the calibrated response is zero damage.
+            return Impact._create(
+                {"kind": "linear", "slope": 0.0, "intercept": 0.0},
+                self._input(),
+                required.output,
+                provenance=provenance,
+            )
         internal = {
             "schema_version": "1.0",
             "registry_id": registry,
@@ -1183,10 +1199,6 @@ class ImpactReference:
             )
         except Exception as error:
             raise _error(error) from error
-        provenance = {
-            "model": _load(self.to_json()),
-            "context": _load(context.to_json()),
-        }
         return Impact._from_native(
             native, self._input(), required.output, provenance=provenance
         )

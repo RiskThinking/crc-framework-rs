@@ -1298,20 +1298,49 @@
       "accepted_units": [
         "1"
       ],
-      "context_fields": [],
+      "context_fields": [
+        {
+          "annotation": "ContextValue | bool",
+          "choices": [],
+          "name": "wildland_urban_interface",
+          "required": true
+        }
+      ],
       "context_schema": {
         "additionalProperties": false,
         "properties": {
           "kind": {
-            "const": "empty_context"
+            "const": "wildfire_context"
+          },
+          "wildland_urban_interface": {
+            "oneOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "column": {
+                    "minLength": 1,
+                    "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "column"
+                ],
+                "type": "object"
+              }
+            ]
           }
         },
         "required": [
-          "kind"
+          "kind",
+          "wildland_urban_interface"
         ],
         "type": "object"
       },
-      "context_type": "EmptyContext",
+      "context_type": "WildfireContext",
       "id": "crc:fire_weather_index",
       "input": {
         "index": "fire_weather_index",

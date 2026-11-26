@@ -167,7 +167,7 @@
         "kind": "empty_context"
       },
       "name": "EmptyContext",
-      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.1.schema.json",
       "valid": true
     },
     {
@@ -176,7 +176,7 @@
         "kind": "cell_context"
       },
       "name": "CellContext",
-      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.1.schema.json",
       "valid": true
     },
     {
@@ -185,7 +185,7 @@
         "kind": "country_context"
       },
       "name": "CountryContext",
-      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.1.schema.json",
       "valid": true
     },
     {
@@ -195,7 +195,7 @@
         "region": "europe"
       },
       "name": "InundationContext",
-      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.1.schema.json",
       "valid": true
     },
     {
@@ -205,7 +205,7 @@
         "kind": "water_cost_context"
       },
       "name": "WaterCostContext",
-      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.1.schema.json",
       "valid": true
     },
     {
@@ -216,7 +216,7 @@
         "kind": "cooling_cost_context"
       },
       "name": "CoolingCostContext",
-      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.1.schema.json",
       "valid": true
     },
     {
@@ -226,7 +226,16 @@
         "kind": "crop_context"
       },
       "name": "CropContext",
-      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.1.schema.json",
+      "valid": true
+    },
+    {
+      "document": {
+        "kind": "wildfire_context",
+        "wildland_urban_interface": true
+      },
+      "name": "WildfireContext",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.1.schema.json",
       "valid": true
     },
     {
@@ -328,7 +337,7 @@
         "kind": "cell_context"
       },
       "name": "invalid-context-0",
-      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.1.schema.json",
       "valid": false
     },
     {
@@ -338,7 +347,7 @@
         "kind": "inundation_context"
       },
       "name": "invalid-context-1",
-      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.1.schema.json",
       "valid": false
     },
     {
@@ -348,7 +357,7 @@
         "region": "EUROPE"
       },
       "name": "invalid-context-2",
-      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.1.schema.json",
       "valid": false
     },
     {
@@ -359,7 +368,7 @@
         "kind": "crop_context"
       },
       "name": "invalid-context-3",
-      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.1.schema.json",
       "valid": false
     },
     {
@@ -370,7 +379,24 @@
         "kind": "cooling_cost_context"
       },
       "name": "invalid-context-4",
-      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.1.schema.json",
+      "valid": false
+    },
+    {
+      "document": {
+        "kind": "wildfire_context",
+        "wildland_urban_interface": 1
+      },
+      "name": "invalid-context-5",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.1.schema.json",
+      "valid": false
+    },
+    {
+      "document": {
+        "kind": "wildfire_context"
+      },
+      "name": "invalid-context-6",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.1.schema.json",
       "valid": false
     },
     {
@@ -438,7 +464,7 @@
         "kind": "cell_context"
       },
       "name": "invalid-h3-context",
-      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.1.schema.json",
       "schema_valid": true,
       "valid": false
     },
@@ -1051,7 +1077,7 @@
         }
       },
       "name": "bound-context-columns",
-      "schema": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+      "schema": "https://climateriskcommons.org/schemas/impact-context-1.1.schema.json",
       "valid": true
     },
     {

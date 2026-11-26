@@ -11,7 +11,7 @@ export const DocumentSchema = Object.freeze({
   DATASET: 'https://climateriskcommons.org/schemas/dataset/2.0',
   CATALOG: 'https://climateriskcommons.org/schemas/taxonomy/1.0',
   MEASUREMENT: 'https://climateriskcommons.org/schemas/measurement-1.0.schema.json',
-  IMPACT_CONTEXT: 'https://climateriskcommons.org/schemas/impact-context-1.0.schema.json',
+  IMPACT_CONTEXT: 'https://climateriskcommons.org/schemas/impact-context-1.1.schema.json',
   IMPACT: 'https://climateriskcommons.org/schemas/impact-2.0.schema.json',
   IMPACT_REFERENCE: 'https://climateriskcommons.org/schemas/impact-reference-2.0.schema.json',
 });

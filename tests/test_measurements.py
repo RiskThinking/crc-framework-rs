@@ -61,7 +61,7 @@ def test_scientific_fixtures_agree_with_schema_and_python(case) -> None:
     )
     decoder = {
         "measurement-1.0.schema.json": Measurement.from_json,
-        "impact-context-1.0.schema.json": ImpactContext.from_json,
+        "impact-context-1.1.schema.json": ImpactContext.from_json,
         "impact-reference-2.0.schema.json": ImpactReference.from_json,
         "impact-2.0.schema.json": Impact.from_json,
     }[name]

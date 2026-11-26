@@ -529,7 +529,7 @@ def _scientific_validator(name: str) -> Draft202012Validator:
     schema = None
     for filename in (
         "measurement-1.0.schema.json",
-        "impact-context-1.0.schema.json",
+        "impact-context-1.1.schema.json",
         "impact-reference-2.0.schema.json",
         "impact-2.0.schema.json",
     ):
@@ -1218,6 +1218,9 @@ def _binding_or(value: object, expected: type[object], name: str) -> None:
         _finite(cast(float, value), name)
     elif expected is str:
         _identifier(cast(str, value), name)
+    elif expected is bool:
+        if type(value) is not bool:
+            raise TypeError(f"{name} must be a bool or a context binding")
     elif not isinstance(value, expected):
         raise TypeError(f"{name} must be {expected.__name__} or a context binding")
 
@@ -1263,6 +1266,7 @@ _CONTEXT_DEFINITIONS: dict[str, dict[str, object]] = {
         "historic_mean": _NUMBER,
     },
     "crop_context": {"country": _IDENTIFIER_SCHEMA, "historic_mean": _NUMBER},
+    "wildfire_context": {"wildland_urban_interface": {"type": "boolean"}},
 }
 
 
@@ -1278,7 +1282,7 @@ def _context_schema(kind: str) -> dict[str, object]:
 def _context_union_schema() -> dict[str, object]:
     return {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "$id": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+        "$id": "https://climateriskcommons.org/schemas/impact-context-1.1.schema.json",
         "title": "ImpactContext",
         "oneOf": [_context_schema(k) for k in _CONTEXT_DEFINITIONS],
     }
@@ -1396,6 +1400,23 @@ class CropContext(_ContextRecord):
         self._validate()
 
 
+@dataclass(frozen=True, kw_only=True)
+class WildfireContext(_ContextRecord):
+    """Whether the asset lies in the wildland-urban interface.
+
+    The interface is the area within 500 m of a fuel patch of at least
+    2 km by 2 km with at least 50% fuel cover. Fire-weather damage applies
+    only there; outside it the response is zero.
+    """
+
+    wildland_urban_interface: bool | ContextValue
+    _kind = "wildfire_context"
+
+    def __post_init__(self) -> None:
+        _binding_or(self.wildland_urban_interface, bool, "wildland_urban_interface")
+        self._validate()
+
+
 _CONTEXT_TYPES: dict[str, type[ImpactContext]] = {
     "empty_context": EmptyContext,
     "cell_context": CellContext,
@@ -1404,6 +1425,7 @@ _CONTEXT_TYPES: dict[str, type[ImpactContext]] = {
     "water_cost_context": WaterCostContext,
     "cooling_cost_context": CoolingCostContext,
     "crop_context": CropContext,
+    "wildfire_context": WildfireContext,
 }
 
 

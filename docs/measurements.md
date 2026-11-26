@@ -56,6 +56,8 @@ A model binds data only when the data declares exactly the model's input, includ
 
 The per-cell thresholds of frost days, freeze-thaw cycles and maximum daily precipitation are return levels of the 1985–2024 historic baseline: the 50-year level for frost days and freeze-thaw cycles, the 100-year level for precipitation. Cyclone winds are 10-minute sustained winds from STORM synthetic tracks, used without conversion; cyclone hazard does not depend on period or pathway. Daily maximum wind is used as delivered, with no averaging. SPEI is monthly and standardized over the same series, so it declares no reference period. The cooling degree-day cost compares against the historic mean the caller supplies in `CoolingCostContext`.
 
+Fire weather damages only assets in the wildland-urban interface: within 500 m of a fuel patch of at least 2 km by 2 km with at least 50% fuel cover. `BuiltinImpact.FIRE_WEATHER_INDEX` requires `WildfireContext(wildland_urban_interface=...)`; resolving it without one fails with `invalid_context` or `missing_context`. With `wildland_urban_interface=False` the response is zero damage. Bind the field to an asset column to decide it per asset. Impact contexts use format 1.1, which adds `wildfire_context` to 1.0; every 1.0 context document is a valid 1.1 document.
+
 Where a source calibration does not establish a fact, `unestablished_facts` lists it. Scientific data binding rejects those models instead of guessing; supplying a plausible value on the data does not establish the published model calibration. Pure numerical `resolve` remains available for explicitly numerical work.
 
 `BuiltinImpact.HOT_DAYS` is retired from the RiskThinking methodology. `Impact.builtin(BuiltinImpact.HOT_DAYS)` warns with `DeprecationWarning`, and binding it to data fails with `model_retired`. Saved documents that name it still read. crc-framework 2.0 removes it.
@@ -69,7 +71,7 @@ Maximum daily precipitation uses ETCCDI Rx1day: the maximum daily precipitation 
 | `crc:maximum_daily_precipitation` | `PrecipitationAmount` | unit `mm`, accumulation duration 1 d | `CellContext` |  |
 | `crc:cyclone` | `WindSpeed` | unit `m/s`, aggregation `maximum`, averaging duration 600 s | `CountryContext` |  |
 | `crc:maximum_daily_wind_speed` | `WindSpeed` | unit `m/s`, aggregation `maximum` | `CountryContext` |  |
-| `crc:fire_weather_index` | `ClimateIndex` | index `fire_weather_index` | `EmptyContext` |  |
+| `crc:fire_weather_index` | `ClimateIndex` | index `fire_weather_index` | `WildfireContext` |  |
 | `crc:hot_days` (retired) | `EventCount` | event `hot_day`, aggregation `count` | `EmptyContext` | event threshold, counting duration, calibration reference period |
 | `crc:coastal_flood` | `DepthAboveGround` | unit `m` | `InundationContext` |  |
 | `crc:river_flood` | `DepthAboveGround` | unit `m` | `InundationContext` |  |

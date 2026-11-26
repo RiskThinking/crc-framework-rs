@@ -78,6 +78,7 @@ from ._measurement import (
     TimeDuration,
     TimeUnit,
     WaterCostContext,
+    WildfireContext,
     WaterSurfaceElevation,
     WindSpeed,
 )
@@ -180,6 +181,7 @@ __all__ = [
     "TimeDuration",
     "TimeUnit",
     "WaterCostContext",
+    "WildfireContext",
     "WaterSurfaceElevation",
     "WindSpeed",
     "compute_risk",
