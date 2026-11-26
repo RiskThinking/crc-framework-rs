@@ -15,6 +15,7 @@ from crc_framework import (
     Distribution,
     DistributionFamily,
     DistributionKind,
+    EmptyContext,
     ExpectationMethod,
     FloodRegion,
     Impact,
@@ -32,6 +33,7 @@ from crc_framework import (
     TailCompletion,
     Temperature,
     TemperatureUnit,
+    WildfireContext,
     _core,
 )
 
@@ -346,7 +348,12 @@ def test_expectation_uses_numerical_integration_when_exact_is_unavailable() -> N
     [
         linear(1, minimum=0, maximum=1),
         Impact.builtin(BuiltinImpact.HOT_DAYS).resolve(),
-        Impact.builtin(BuiltinImpact.FIRE_WEATHER_INDEX).resolve(),
+        Impact.builtin(BuiltinImpact.FIRE_WEATHER_INDEX).resolve(
+            WildfireContext(wildland_urban_interface=True)
+        ),
+        Impact.builtin(BuiltinImpact.FIRE_WEATHER_INDEX).resolve(
+            WildfireContext(wildland_urban_interface=False)
+        ),
     ],
 )
 def test_clamped_and_builtin_expectations_on_hurdle_laws(response: Impact) -> None:
@@ -438,6 +445,7 @@ def test_every_builtin_identity_resolves_with_its_discovered_context(
         "region": FloodRegion.EUROPE,
         "asset_type": AssetType.RESIDENTIAL,
         "historic_mean": 20.0,
+        "wildland_urban_interface": True,
     }
     values = {field.name: data[field.name] for field in requirements.context_fields}
     context = requirements.context_type(**values)
@@ -445,6 +453,30 @@ def test_every_builtin_identity_resolves_with_its_discovered_context(
     assert isinstance(response, Impact)
     assert math.isfinite(cast(float, response.evaluate(3.0)))
     assert Impact.from_json(response.to_json()).evaluate(3.0) == response.evaluate(3.0)
+
+
+def test_fire_weather_requires_the_interface_and_is_zero_outside_it() -> None:
+    reference = Impact.builtin(BuiltinImpact.FIRE_WEATHER_INDEX)
+    assert reference.requirements.context_type is WildfireContext
+    with pytest.raises(ImpactError) as missing:
+        reference.resolve()
+    assert missing.value.code == "missing_context"
+    with pytest.raises(ImpactError) as empty:
+        reference.resolve(EmptyContext())
+    assert empty.value.code == "invalid_context"
+    inside = reference.resolve(WildfireContext(wildland_urban_interface=True))
+    outside = reference.resolve(WildfireContext(wildland_urban_interface=False))
+    values = [0.0, 20.0, 60.0]
+    assert np.all(np.asarray(inside.evaluate(values))[1:] > 0)
+    assert np.asarray(outside.evaluate(values)).tolist() == [0.0, 0.0, 0.0]
+    law = Distribution.parametric(DistributionFamily.GUMBEL_RIGHT, location=30, scale=5)
+    assert outside.expectation(law) == 0.0
+    assert outside.pushforward(law).quantile([0.5, 0.99]).tolist() == [0.0, 0.0]
+    assert outside.input == inside.input and outside.output == inside.output
+    loaded = Impact.from_json(outside.to_json())
+    assert loaded.to_json() == outside.to_json()
+    with pytest.raises(TypeError, match="bool"):
+        WildfireContext(wildland_urban_interface=1)  # type: ignore[arg-type]
 
 
 def test_continuous_affine_composition_remains_exact_and_serializable() -> None:

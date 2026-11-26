@@ -2499,6 +2499,41 @@
         }
       ],
       "returns": "tuple[RankScenario, ...]"
+    },
+    "WildfireContext": {
+      "kind": "class",
+      "constructor": {
+        "parameters": [
+          {
+            "name": "wildland_urban_interface",
+            "kind": "keyword_only",
+            "annotation": "bool | ContextValue"
+          }
+        ],
+        "returns": "WildfireContext"
+      },
+      "properties": {
+        "schema": "Mapping[str, ScientificValue]",
+        "wildland_urban_interface": "bool | ContextValue"
+      },
+      "methods": {
+        "to_json": {
+          "parameters": [],
+          "returns": "str",
+          "binding": "instance"
+        },
+        "from_json": {
+          "parameters": [
+            {
+              "name": "text",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "ImpactContext",
+          "binding": "class"
+        }
+      }
     }
   },
   "semantics": {

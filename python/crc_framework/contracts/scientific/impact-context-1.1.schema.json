@@ -1,5 +1,5 @@
 {
-  "$id": "https://climateriskcommons.org/schemas/impact-context-1.0.schema.json",
+  "$id": "https://climateriskcommons.org/schemas/impact-context-1.1.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "oneOf": [
     {
@@ -359,6 +359,40 @@
         "kind",
         "country",
         "historic_mean"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "wildfire_context"
+        },
+        "wildland_urban_interface": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "column": {
+                  "minLength": 1,
+                  "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "column"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "wildland_urban_interface"
       ],
       "type": "object"
     }
