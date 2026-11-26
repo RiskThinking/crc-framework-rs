@@ -210,14 +210,12 @@ impl PyImpactDistribution {
     }
 
     fn quantile(&self, py: Python<'_>, probability: f64) -> PyResult<f64> {
-        self.inner
-            .quantile(probability)
+        py.detach(|| self.inner.quantile(probability))
             .map_err(|error| impact_error(py, error))
     }
 
     fn quantiles(&self, py: Python<'_>, probabilities: Vec<f64>) -> PyResult<Vec<f64>> {
-        self.inner
-            .quantiles(&probabilities)
+        py.detach(|| self.inner.quantiles(&probabilities))
             .map_err(|error| impact_error(py, error))
     }
 
@@ -257,8 +255,7 @@ impl PyImpactDistribution {
     }
 
     fn inverse_survival(&self, py: Python<'_>, survival: f64) -> PyResult<f64> {
-        self.inner
-            .inverse_survival(survival)
+        py.detach(|| self.inner.inverse_survival(survival))
             .map_err(|error| impact_error(py, error))
     }
 }

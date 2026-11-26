@@ -684,90 +684,23 @@ impl NumericalLaw {
     }
 
     fn from_specification(specification: Specification) -> Result<Self> {
-        Ok(match specification {
+        match specification {
             Specification::Parametric {
                 family,
                 location,
                 scale,
                 shape,
-            } => {
-                let family = DistributionFamily::from_name(&family)
-                    .ok_or_else(|| invalid("unknown distribution family"))?;
-                if matches!(
-                    family,
-                    DistributionFamily::GumbelLeft | DistributionFamily::GumbelRight
-                ) && shape.is_some()
-                {
-                    return Err(invalid("Gumbel distributions have no shape parameter"));
-                }
-                Self::Parametric(FittedDistribution::from_parameters(
-                    family, shape, location, scale,
-                )?)
-            }
-            Specification::PointMass { value } => {
-                if !value.is_finite() {
-                    return Err(invalid("point mass must be finite"));
-                }
-                Self::PointMass(value)
-            }
+            } => Self::parametric(&family, location, scale, shape),
+            Specification::PointMass { value } => Self::point_mass(value),
             Specification::Discrete {
                 values,
-                mut probabilities,
+                probabilities,
                 counts,
-            } => {
-                if values.len() != probabilities.len()
-                    || values.iter().any(|x| !x.is_finite())
-                    || values.windows(2).any(|p| p[0] >= p[1])
-                    || probabilities.iter().any(|p| *p <= 0.0)
-                {
-                    return Err(invalid(
-                        "discrete values must increase and have positive probability masses",
-                    ));
-                }
-                if let Some(counts) = counts {
-                    if counts.len() != values.len() {
-                        return Err(invalid("discrete counts must match the values one to one"));
-                    }
-                    let ranks = CountRanks::new(&counts)?;
-                    if ranks.probabilities() != probabilities {
-                        return Err(invalid(
-                            "discrete probabilities must equal their counts divided by the total",
-                        ));
-                    }
-                    return Ok(Self::Discrete {
-                        values,
-                        probabilities,
-                        cumulative: ranks.cumulative(),
-                        counts: Some(ranks),
-                    });
-                }
-                let cumulative = cumulative(&mut probabilities)?;
-                Self::Discrete {
-                    values,
-                    probabilities,
-                    cumulative,
-                    counts: None,
-                }
-            }
+            } => Self::discrete(values, probabilities, counts),
             Specification::Histogram {
                 edges,
-                mut probabilities,
-            } => {
-                if edges.len() != probabilities.len() + 1
-                    || edges.iter().any(|x| !x.is_finite())
-                    || edges.windows(2).any(|p| p[0] >= p[1])
-                {
-                    return Err(invalid(
-                        "histogram requires increasing edges, one more than its masses",
-                    ));
-                }
-                let cumulative = cumulative(&mut probabilities)?;
-                Self::Histogram {
-                    edges,
-                    probabilities,
-                    cumulative,
-                }
-            }
+                probabilities,
+            } => Self::histogram(edges, probabilities),
             Specification::Hurdle {
                 base,
                 atom_probability,
@@ -776,35 +709,118 @@ impl NumericalLaw {
                 Self::from_specification(*base)?,
                 atom_probability,
                 atom_location,
-            )?,
+            ),
             Specification::Quantile {
                 probabilities,
                 values,
-            } => {
-                if values.len() < 2
-                    || values.len() != probabilities.len()
-                    || probabilities[0] != 0.0
-                    || *probabilities.last().unwrap() != 1.0
-                    || probabilities
-                        .iter()
-                        .any(|q| !q.is_finite() || !(0.0..=1.0).contains(q))
-                    || probabilities.windows(2).any(|p| p[0] >= p[1])
-                    || values.iter().any(|x| !x.is_finite())
-                    || values.windows(2).any(|p| p[0] > p[1])
-                {
-                    return Err(invalid(
-                        "a complete quantile law requires ordered finite knots spanning [0, 1]",
-                    ));
-                }
-                Self::Quantile {
-                    probabilities,
-                    values,
-                }
+            } => Self::quantile_law(probabilities, values),
+        }
+    }
+
+    /// A parametric law; the typed counterpart of its JSON representation.
+    pub fn parametric(family: &str, location: f64, scale: f64, shape: Option<f64>) -> Result<Self> {
+        let family = DistributionFamily::from_name(family)
+            .ok_or_else(|| invalid("unknown distribution family"))?;
+        if matches!(
+            family,
+            DistributionFamily::GumbelLeft | DistributionFamily::GumbelRight
+        ) && shape.is_some()
+        {
+            return Err(invalid("Gumbel distributions have no shape parameter"));
+        }
+        Ok(Self::Parametric(FittedDistribution::from_parameters(
+            family, shape, location, scale,
+        )?))
+    }
+
+    pub fn point_mass(value: f64) -> Result<Self> {
+        if !value.is_finite() {
+            return Err(invalid("point mass must be finite"));
+        }
+        Ok(Self::PointMass(value))
+    }
+
+    pub fn discrete(
+        values: Vec<f64>,
+        mut probabilities: Vec<f64>,
+        counts: Option<Vec<u64>>,
+    ) -> Result<Self> {
+        if values.len() != probabilities.len()
+            || values.iter().any(|x| !x.is_finite())
+            || values.windows(2).any(|p| p[0] >= p[1])
+            || probabilities.iter().any(|p| *p <= 0.0)
+        {
+            return Err(invalid(
+                "discrete values must increase and have positive probability masses",
+            ));
+        }
+        if let Some(counts) = counts {
+            if counts.len() != values.len() {
+                return Err(invalid("discrete counts must match the values one to one"));
             }
+            let ranks = CountRanks::new(&counts)?;
+            if ranks.probabilities() != probabilities {
+                return Err(invalid(
+                    "discrete probabilities must equal their counts divided by the total",
+                ));
+            }
+            return Ok(Self::Discrete {
+                values,
+                probabilities,
+                cumulative: ranks.cumulative(),
+                counts: Some(ranks),
+            });
+        }
+        let cumulative = cumulative(&mut probabilities)?;
+        Ok(Self::Discrete {
+            values,
+            probabilities,
+            cumulative,
+            counts: None,
         })
     }
 
-    pub(crate) fn hurdle(base: Self, atom_probability: f64, atom_location: f64) -> Result<Self> {
+    pub fn histogram(edges: Vec<f64>, mut probabilities: Vec<f64>) -> Result<Self> {
+        if edges.len() != probabilities.len() + 1
+            || edges.iter().any(|x| !x.is_finite())
+            || edges.windows(2).any(|p| p[0] >= p[1])
+        {
+            return Err(invalid(
+                "histogram requires increasing edges, one more than its masses",
+            ));
+        }
+        let cumulative = cumulative(&mut probabilities)?;
+        Ok(Self::Histogram {
+            edges,
+            probabilities,
+            cumulative,
+        })
+    }
+
+    /// A complete quantile law: probability-linear between knots spanning [0, 1].
+    pub fn quantile_law(probabilities: Vec<f64>, values: Vec<f64>) -> Result<Self> {
+        if values.len() < 2
+            || values.len() != probabilities.len()
+            || probabilities[0] != 0.0
+            || *probabilities.last().unwrap() != 1.0
+            || probabilities
+                .iter()
+                .any(|q| !q.is_finite() || !(0.0..=1.0).contains(q))
+            || probabilities.windows(2).any(|p| p[0] >= p[1])
+            || values.iter().any(|x| !x.is_finite())
+            || values.windows(2).any(|p| p[0] > p[1])
+        {
+            return Err(invalid(
+                "a complete quantile law requires ordered finite knots spanning [0, 1]",
+            ));
+        }
+        Ok(Self::Quantile {
+            probabilities,
+            values,
+        })
+    }
+
+    pub fn hurdle(base: Self, atom_probability: f64, atom_location: f64) -> Result<Self> {
         if !atom_location.is_finite() || !(0.0..=1.0).contains(&atom_probability) {
             return Err(invalid(
                 "hurdle atom must be finite and its probability in [0, 1]",

@@ -21,8 +21,10 @@ you know about the data:
 
 All complete laws share `quantile`, `cdf`, `exceedance`, `mass`, `sample`, and
 `statistics`. Scalar evaluations return floats; array evaluations preserve shape,
-including empty and noncontiguous NumPy arrays. Probabilities are non-exceedance
-ranks in `[0, 1]`.
+including empty and noncontiguous NumPy arrays, and return read-only arrays.
+Probabilities are non-exceedance ranks in `[0, 1]`. Evaluations run natively
+without holding the GIL, and long arrays are split across CPU threads with
+results identical to a single-threaded evaluation.
 
 ```python
 from crc_framework import Distribution
