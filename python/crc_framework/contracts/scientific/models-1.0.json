@@ -52,8 +52,16 @@
       "id": "crc:freeze_thaw_cycles",
       "input": {
         "aggregation": "count",
+        "duration": {
+          "unit": "yr",
+          "value": 1
+        },
         "event": "freeze_thaw_cycle",
-        "kind": "event_count"
+        "kind": "event_count",
+        "threshold": {
+          "unit": "degC",
+          "value": 0
+        }
       },
       "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
       "measurement_schema": {
@@ -176,11 +184,7 @@
         "kind": "ratio",
         "unit": "1"
       },
-      "unestablished_facts": [
-        "event threshold",
-        "counting duration",
-        "calibration reference period"
-      ],
+      "unestablished_facts": [],
       "version": "2026.10.1"
     },
     {
@@ -235,8 +239,16 @@
       "id": "crc:frost_days",
       "input": {
         "aggregation": "count",
+        "duration": {
+          "unit": "yr",
+          "value": 1
+        },
         "event": "frost_day",
-        "kind": "event_count"
+        "kind": "event_count",
+        "threshold": {
+          "unit": "degC",
+          "value": 0
+        }
       },
       "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
       "measurement_schema": {
@@ -359,11 +371,7 @@
         "kind": "ratio",
         "unit": "1"
       },
-      "unestablished_facts": [
-        "event threshold",
-        "counting duration",
-        "calibration reference period"
-      ],
+      "unestablished_facts": [],
       "version": "2026.10.1"
     },
     {
@@ -483,9 +491,7 @@
         "kind": "ratio",
         "unit": "1"
       },
-      "unestablished_facts": [
-        "calibration reference period"
-      ],
+      "unestablished_facts": [],
       "version": "2026.10.1"
     },
     {
@@ -814,6 +820,10 @@
       "id": "crc:cyclone",
       "input": {
         "aggregation": "maximum",
+        "averaging_duration": {
+          "unit": "s",
+          "value": 600
+        },
         "kind": "wind_speed",
         "unit": "m/s"
       },
@@ -883,10 +893,7 @@
         "kind": "ratio",
         "unit": "1"
       },
-      "unestablished_facts": [
-        "wind averaging duration",
-        "calibration reference period"
-      ],
+      "unestablished_facts": [],
       "version": "2026.10.1"
     },
     {
@@ -1284,10 +1291,7 @@
         "kind": "ratio",
         "unit": "1"
       },
-      "unestablished_facts": [
-        "wind averaging duration",
-        "calibration reference period"
-      ],
+      "unestablished_facts": [],
       "version": "2026.10.1"
     },
     {
@@ -2099,6 +2103,10 @@
       "context_type": "WaterCostContext",
       "id": "crc:standardized_precipitation_evapotranspiration_index",
       "input": {
+        "accumulation_duration": {
+          "unit": "month",
+          "value": 1
+        },
         "index": "standardized_precipitation_evapotranspiration_index",
         "kind": "climate_index"
       },
@@ -2175,10 +2183,7 @@
         "quantity": "normalized_water_cost",
         "unit": "1"
       },
-      "unestablished_facts": [
-        "index accumulation duration",
-        "index reference period"
-      ],
+      "unestablished_facts": [],
       "version": "2026.10.1"
     },
     {
@@ -3239,8 +3244,15 @@
       "context_type": "CoolingCostContext",
       "id": "crc:cooling_degree_days",
       "input": {
-        "kind": "measurement",
-        "quantity": "degree_days",
+        "duration": {
+          "unit": "yr",
+          "value": 1
+        },
+        "kind": "degree_days",
+        "threshold": {
+          "unit": "degC",
+          "value": 18
+        },
         "unit": "K.d"
       },
       "manifest_sha256": "sha256:aee900a83e9316e98922996abfae5b9b2752d763c9161c59edfadf1a9cfbbcc6",
@@ -3320,11 +3332,7 @@
         "quantity": "normalized_cooling_cost",
         "unit": "1"
       },
-      "unestablished_facts": [
-        "temperature threshold",
-        "accumulation duration",
-        "calibration reference period"
-      ],
+      "unestablished_facts": [],
       "version": "2026.10.1"
     },
     {

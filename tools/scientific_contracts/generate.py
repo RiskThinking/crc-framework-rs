@@ -591,14 +591,18 @@ def reference():
         "",
         "Use `BuiltinImpact.COOLING_DEGREE_DAYS_CROP_YIELD` with `CropContext` for agricultural buildings. `BuiltinImpact.COOLING_DEGREE_DAYS` uses `CoolingCostContext` for residential, commercial, and industrial cooling costs.",
         "",
-        "Some source calibrations do not establish a threshold, averaging interval, accumulation timescale or reference period. `unestablished_facts` exposes these gaps. Scientific data binding rejects them instead of guessing; supplying a plausible value on the data does not establish the published model calibration. Pure numerical `resolve` remains available for explicitly numerical work.",
+        "A model binds data only when the data declares exactly the model's input, including its event threshold, counting or accumulation duration and wind averaging. The input facts below are the definitions the RiskThinking calibration assumed. Events are counted per calendar year: a frost day has a daily minimum temperature below the threshold; a freeze-thaw cycle has a daily minimum at or below the threshold and a daily maximum above it; a dry day has precipitation below the threshold.",
+        "",
+        "The per-cell thresholds of frost days, freeze-thaw cycles and maximum daily precipitation are return levels of the 1985–2024 historic baseline: the 50-year level for frost days and freeze-thaw cycles, the 100-year level for precipitation. Cyclone winds are 10-minute sustained winds from STORM synthetic tracks, used without conversion; cyclone hazard does not depend on period or pathway. Daily maximum wind is used as delivered, with no averaging. SPEI is monthly and standardized over the same series, so it declares no reference period. The cooling degree-day cost compares against the historic mean the caller supplies in `CoolingCostContext`.",
+        "",
+        "Where a source calibration does not establish a fact, `unestablished_facts` lists it. Scientific data binding rejects those models instead of guessing; supplying a plausible value on the data does not establish the published model calibration. Pure numerical `resolve` remains available for explicitly numerical work.",
         "",
         "`BuiltinImpact.HOT_DAYS` is retired from the RiskThinking methodology. `Impact.builtin(BuiltinImpact.HOT_DAYS)` warns with `DeprecationWarning`, and binding it to data fails with `model_retired`. Saved documents that name it still read. crc-framework 2.0 removes it.",
         "",
         "Maximum daily precipitation uses ETCCDI Rx1day: the maximum daily precipitation amount in millimetres accumulated over one day ([Climdex definition](https://www.climdex.org/learn/indices/)). Its numerical response consumes that amount directly; it does not integrate a precipitation rate. The reduction is recorded in data provenance.",
         "",
-        "| Model | Measurement | Context | Unestablished calibration facts |",
-        "| --- | --- | --- | --- |",
+        "| Model | Measurement | Input facts | Context | Unestablished calibration facts |",
+        "| --- | --- | --- | --- | --- |",
     ]
     retired = {
         _builtin(model).id
@@ -611,7 +615,9 @@ def reference():
             + model["id"]
             + ("` (retired) | `" if model["id"] in retired else "` | `")
             + model["measurement_type"]
-            + "` | `"
+            + "` | "
+            + _input_facts(model["input"])
+            + " | `"
             + model["context_type"]
             + "` | "
             + ", ".join(model["unestablished_facts"])
@@ -627,6 +633,26 @@ def reference():
         "",
     ]
     return "\n".join(lines).replace("by64", "by 64").encode()
+
+
+def _input_facts(measurement):
+    """The qualifiers a model's input fixes, in the order a reader checks them."""
+
+    def amount(value):
+        number = value["value"]
+        return f"{number:g} {value['unit']}"
+
+    facts = [f"unit `{measurement['unit']}`"] if "unit" in measurement else []
+    for name in ("event", "index", "aggregation"):
+        if name in measurement:
+            facts.append(f"{name} `{measurement[name]}`")
+    for name in ("threshold", "duration", "accumulation_duration", "averaging_duration"):
+        if name in measurement:
+            facts.append(name.replace("_", " ") + " " + amount(measurement[name]))
+    if "reference_period" in measurement:
+        period = measurement["reference_period"]
+        facts.append(f"reference {period['start']}–{period['end']}")
+    return ", ".join(facts)
 
 
 def _builtin(model):
