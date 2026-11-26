@@ -2,6 +2,16 @@
 
 [Documentation index](README.md) · [Project README](../README.md)
 
+## 1.0.1
+
+A performance release with no interface or format changes. Distributions are
+built from typed values instead of a JSON round trip, and a hurdle reuses its
+base law. `Distribution.from_json` validates its text once. Scalar queries
+call native code directly, and array queries pass contiguous bytes instead of
+Python lists. Long arrays are evaluated across CPU threads without the GIL,
+with results identical to single-threaded evaluation. Transformed laws release
+the GIL during quantile and inverse-survival inversion.
+
 ## 1.0.0
 
 This major release replaces the public Python and JavaScript interfaces. Python
@@ -22,7 +32,7 @@ and the [JavaScript guide](javascript.md) for runnable workflows. To upgrade exi
 The package and artifact versions are declared in
 [`release.json`](../python/crc_framework/contracts/api/release.json). The
 framework Python package, Rust workspace, WASM package, and generated JavaScript
-package use `1.0.0`. Each
+package use `1.0.1`. Each
 artifact format has its own version in that ledger.
 Changing a package version does not automatically increment every format.
 
@@ -78,9 +88,9 @@ contracts, and WebAssembly package.
 
 | Destination | Version | Release behavior |
 | --- | --- | --- |
-| Rust workspace | `1.0.0` | Versioned source; no crates.io publishing workflow is configured |
-| PyPI `crc-framework` | `1.0.0` | `release.yaml` builds wheels and an sdist, attaches assets, and publishes to PyPI |
-| npm `@climateriskcommons/crc-framework` | `1.0.0` (`latest` dist-tag) | `npm.yaml` publishes the tested generated package |
+| Rust workspace | `1.0.1` | Versioned source; no crates.io publishing workflow is configured |
+| PyPI `crc-framework` | `1.0.1` | `release.yaml` builds wheels and an sdist, attaches assets, and publishes to PyPI |
+| npm `@climateriskcommons/crc-framework` | `1.0.1` (`latest` dist-tag) | `npm.yaml` publishes the tested generated package |
 
 Use `v` plus the exact Cargo version for the tag. Cargo `1.0.0-alpha.1` maps to
 Python `1.0.0a1`; the Python spelling is an output conversion, not another version
