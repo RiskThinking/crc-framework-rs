@@ -85,10 +85,12 @@ def specification():
         (
             "hurdle_quantiles",
             {
+                # Null infers the atom from the knots at atom_location.
                 "atom_probability": {
-                    **PROBABILITY,
-                    "exclusiveMinimum": 0,
-                    "exclusiveMaximum": 1,
+                    "anyOf": [
+                        {**PROBABILITY, "exclusiveMinimum": 0, "exclusiveMaximum": 1},
+                        {"type": "null"},
+                    ]
                 },
                 "atom_location": NUMBER,
                 "minimum_knots": {"type": "integer", "minimum": 4},
@@ -193,7 +195,7 @@ def fitting_schema():
     )
     return {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "$id": "https://climateriskcommons.org/schemas/fitting/1.0",
+        "$id": "https://climateriskcommons.org/schemas/fitting/1.1",
         "$defs": specs,
         **record,
     }
@@ -332,7 +334,7 @@ def numerical_schema():
 def build():
     return {
         "numerical-1.0.schema.json": numerical_schema(),
-        "fitting-1.0.schema.json": fitting_schema(),
+        "fitting-1.1.schema.json": fitting_schema(),
     }
 
 

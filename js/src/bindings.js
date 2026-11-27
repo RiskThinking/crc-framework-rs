@@ -6,8 +6,8 @@ import initWasm, {
 
 export const DocumentSchema = Object.freeze({
   NUMERICAL: 'https://climateriskcommons.org/schemas/numerical/1.0',
-  FITTING_RECORD: 'https://climateriskcommons.org/schemas/fitting/1.0',
-  FITTING_SPECIFICATION: 'https://climateriskcommons.org/schemas/fitting/1.0#/$defs/specification',
+  FITTING_RECORD: 'https://climateriskcommons.org/schemas/fitting/1.1',
+  FITTING_SPECIFICATION: 'https://climateriskcommons.org/schemas/fitting/1.1#/$defs/specification',
   DATASET: 'https://climateriskcommons.org/schemas/dataset/2.0',
   CATALOG: 'https://climateriskcommons.org/schemas/taxonomy/1.0',
   MEASUREMENT: 'https://climateriskcommons.org/schemas/measurement-1.0.schema.json',

@@ -87,7 +87,7 @@ pip 25.1 or later installs the same tools with `pip install --group dev`.
 
 ## Current interchange contracts
 
-The current packaged contracts define numerical/fitting format `1.0`, scientific
+The current packaged contracts define numerical format `1.0`, fitting format `1.1`, scientific
 declarations `1.0`, Impact `2.0`, dataset `2.0`, and taxonomy `1.0`. Their schemas and fixtures are packaged with
 the wheel and embedded in Rust/WASM; consumers apply scientific invariants in
 addition to JSON Schema structural validation. A tagged numerical object carries

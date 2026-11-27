@@ -33,7 +33,7 @@ from referencing import Registry, Resource
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = json.loads(
     (
-        ROOT / "python/crc_framework/contracts/numerical/fitting-1.0.schema.json"
+        ROOT / "python/crc_framework/contracts/numerical/fitting-1.1.schema.json"
     ).read_text()
 )
 REGISTRY = Registry().with_resource(SCHEMA["$id"], Resource.from_contents(SCHEMA))

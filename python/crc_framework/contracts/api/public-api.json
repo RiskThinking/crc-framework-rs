@@ -1076,7 +1076,8 @@
           {
             "name": "atom_probability",
             "kind": "keyword_only",
-            "annotation": "float"
+            "annotation": "float | None",
+            "default": null
           },
           {
             "name": "atom_location",
@@ -1120,7 +1121,7 @@
       "properties": {
         "kind": "FitKind",
         "family": "DistributionFamily",
-        "atom_probability": "float",
+        "atom_probability": "float | None",
         "atom_location": "float",
         "minimum_knots": "int",
         "constraints": "FitConstraints | None"

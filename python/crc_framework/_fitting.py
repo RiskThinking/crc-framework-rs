@@ -247,8 +247,15 @@ class CensoredQuantileFit(FitSpec):
 
 @dataclass(frozen=True, kw_only=True)
 class HurdleQuantileFit(FitSpec):
+    """A point mass at atom_location plus a parametric tail above it.
+
+    When atom_probability is None, it is read from the evidence: the largest
+    probability of the knots at atom_location, which needs at least two such
+    knots. Evidence without them fails this fit.
+    """
+
     family: DistributionFamily
-    atom_probability: float
+    atom_probability: float | None = None
     atom_location: float = 0.0
     minimum_knots: int = 4
     constraints: FitConstraints | None = None
@@ -256,9 +263,12 @@ class HurdleQuantileFit(FitSpec):
     def __post_init__(self) -> None:
         _enum(self.family, DistributionFamily, "family")
         _finite(self.atom_location, "atom_location")
-        _finite(self.atom_probability, "atom_probability")
-        if not 0 < self.atom_probability < 1:
-            raise ValueError("atom_probability must be strictly between zero and one")
+        if self.atom_probability is not None:
+            _finite(self.atom_probability, "atom_probability")
+            if not 0 < self.atom_probability < 1:
+                raise ValueError(
+                    "atom_probability must be strictly between zero and one"
+                )
         _minimum(self.minimum_knots, "minimum_knots", 4)
         _constraints(self.constraints)
 
@@ -440,7 +450,7 @@ class FitRecord:
     def from_json(cls, text: str) -> FitRecord:
         """Validate the shared fitting contract and restore its typed record."""
         _core.validate_document(
-            "https://climateriskcommons.org/schemas/fitting/1.0", text
+            "https://climateriskcommons.org/schemas/fitting/1.1", text
         )
         return _decode_record(json.loads(text))
 
@@ -840,18 +850,26 @@ def fit_quantiles(
                 )
                 distribution = Distribution._from_native(native.distribution)
             elif isinstance(candidate, HurdleQuantileFit):
+                atom_probability = candidate.atom_probability
+                if atom_probability is None:
+                    at_atom = fit_probabilities[fit_values == candidate.atom_location]
+                    if at_atom.size < 2:
+                        raise ValueError(
+                            "inferring the atom requires at least two knots at atom_location"
+                        )
+                    atom_probability = float(at_atom[-1])
                 native = _core.fit_hurdle_quantiles(
                     fit_probabilities.tolist(),
                     fit_values.tolist(),
                     candidate.family.value,
-                    atom_probability=candidate.atom_probability,
+                    atom_probability=atom_probability,
                     atom_location=candidate.atom_location,
                     weights=fit_weights.tolist(),
                     **options,
                 )
                 distribution = Distribution.hurdle(
                     Distribution._from_native(native.base_distribution),
-                    atom_probability=candidate.atom_probability,
+                    atom_probability=atom_probability,
                     atom_location=candidate.atom_location,
                 )
             else:
@@ -1064,10 +1082,12 @@ def _decode_spec(value: object) -> FitSpec:
             residual_scale_floor_ratio=floor,
             constraints=constraints,
         )
-    probability = _optional_float(data.get("atom_probability"))
+    if "atom_probability" not in data:
+        raise ValueError("hurdle fits require atom_probability, which may be null")
+    probability = _optional_float(data["atom_probability"])
     location = _optional_float(data.get("atom_location", 0))
-    if probability is None or location is None:
-        raise ValueError("hurdle fits require atom_probability and atom_location")
+    if location is None:
+        raise ValueError("hurdle fits require a finite atom_location")
     return HurdleQuantileFit(
         family=family,
         atom_probability=probability,

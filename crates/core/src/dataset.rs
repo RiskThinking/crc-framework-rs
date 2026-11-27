@@ -443,7 +443,7 @@ fn replay_attempts(requested: &Value, attempts: &[Value], cursor: &mut usize) ->
 /// Validate the one shared scientific fitting specification family.
 pub fn validate_specification(value: &Value) -> Result<()> {
     validate_structure(
-        "https://climateriskcommons.org/schemas/fitting/1.0#/$defs/specification",
+        "https://climateriskcommons.org/schemas/fitting/1.1#/$defs/specification",
         value,
     )?;
     fit_specification(value).map(|_| ())
@@ -519,8 +519,11 @@ pub fn validate_fitted_curve(
         }
     }
     let base = if selected["kind"] == "hurdle_quantiles" {
+        // A null atom probability was inferred from the evidence, which the
+        // record does not retain, so only a supplied probability is compared.
         if fitted["kind"] != "hurdle"
-            || !scientific_equal(&fitted["atom_probability"], &selected["atom_probability"])
+            || (!selected["atom_probability"].is_null()
+                && !scientific_equal(&fitted["atom_probability"], &selected["atom_probability"]))
             || fitted["atom_location"].as_f64()
                 != Some(selected["atom_location"].as_f64().unwrap_or(0.0))
         {
@@ -655,7 +658,7 @@ fn fit_interval(value: &Value) -> Result<Option<(f64, f64)>> {
 }
 
 fn validate_record(record: &Value) -> Result<Option<&Value>> {
-    validate_structure("https://climateriskcommons.org/schemas/fitting/1.0", record)?;
+    validate_structure("https://climateriskcommons.org/schemas/fitting/1.1", record)?;
     let evidence_count = integer(&record["evidence_count"])?;
     let used_count = integer(&record["used_count"])?;
     let count = natural(&evidence_count)?;
