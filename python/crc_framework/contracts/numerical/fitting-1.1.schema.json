@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://climateriskcommons.org/schemas/fitting/1.0",
+  "$id": "https://climateriskcommons.org/schemas/fitting/1.1",
   "$defs": {
     "samples_fit_specification": {
       "type": "object",
@@ -356,11 +356,18 @@
           ]
         },
         "atom_probability": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1,
-          "exclusiveMinimum": 0,
-          "exclusiveMaximum": 1
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "exclusiveMinimum": 0,
+              "exclusiveMaximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "atom_location": {
           "type": "number",

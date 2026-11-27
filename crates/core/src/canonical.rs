@@ -32,8 +32,8 @@ const RESOURCES: &[(&str, &str)] = &[
         include_str!("../../../python/crc_framework/contracts/numerical/numerical-1.0.schema.json"),
     ),
     (
-        "https://climateriskcommons.org/schemas/fitting/1.0",
-        include_str!("../../../python/crc_framework/contracts/numerical/fitting-1.0.schema.json"),
+        "https://climateriskcommons.org/schemas/fitting/1.1",
+        include_str!("../../../python/crc_framework/contracts/numerical/fitting-1.1.schema.json"),
     ),
     (
         "https://climateriskcommons.org/schemas/measurement-1.0.schema.json",
@@ -89,7 +89,7 @@ static VALIDATORS: LazyLock<std::result::Result<Vec<(String, jsonschema::Validat
                 ))
             })
             .collect::<std::result::Result<_, String>>()?;
-        let uri = "https://climateriskcommons.org/schemas/fitting/1.0#/$defs/specification";
+        let uri = "https://climateriskcommons.org/schemas/fitting/1.1#/$defs/specification";
         validators.push((
             uri.to_string(),
             jsonschema::options()
@@ -239,10 +239,10 @@ pub fn validate_document(uri: &str, text: &str) -> Result<()> {
         "https://climateriskcommons.org/schemas/taxonomy/1.0" => {
             crate::dataset::validate_catalog(&value)
         }
-        "https://climateriskcommons.org/schemas/fitting/1.0" => {
+        "https://climateriskcommons.org/schemas/fitting/1.1" => {
             crate::dataset::validate_fit_record(&value)
         }
-        "https://climateriskcommons.org/schemas/fitting/1.0#/$defs/specification" => {
+        "https://climateriskcommons.org/schemas/fitting/1.1#/$defs/specification" => {
             crate::dataset::validate_specification(&value)
         }
         "https://climateriskcommons.org/schemas/impact-2.0.schema.json" => {

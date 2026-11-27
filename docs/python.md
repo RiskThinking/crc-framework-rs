@@ -149,8 +149,11 @@ fit = fit_quantiles(
 ```
 
 `CensoredQuantileFit` models knots recorded at or below a declared censoring
-location. `HurdleQuantileFit` uses a declared atom probability and a fitted tail;
-it does not infer an atom from repeated sparse knots. `ModelSelection` executes
+location. `HurdleQuantileFit` places a point mass at `atom_location` (default
+`0`) below a fitted tail. With `atom_probability=None` the mass is read from
+the evidence: the largest probability among the knots at `atom_location`. That
+needs at least two such knots, so a curve that only passes through the location
+fails the hurdle candidate. `ModelSelection` executes
 only its explicit candidate specifications. Sample selection uses
 `SelectionCriterion.KOLMOGOROV_SMIRNOV`; quantile selection explicitly uses
 `SelectionCriterion.NORMALIZED_ROOT_MEAN_SQUARE_ERROR`. Quantile evidence is

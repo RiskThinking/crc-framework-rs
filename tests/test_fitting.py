@@ -14,6 +14,7 @@ from crc_framework import (
     FitConstraints,
     FitError,
     FitFailureDiagnostic,
+    FitRecord,
     FitStatus,
     HurdleQuantileFit,
     ModelSelection,
@@ -266,6 +267,44 @@ def test_hurdle_quantile_fit_reports_atom_and_true_tail() -> None:
     assert result.distribution.mass(0.0) == pytest.approx(0.6)
     assert result.diagnostic.atom_count == 4
     assert result.diagnostic.tail_count == 5
+
+
+def test_hurdle_infers_its_atom_from_the_knots_at_its_location() -> None:
+    source = Distribution.hurdle(
+        Distribution.parametric(
+            DistributionFamily.GUMBEL_RIGHT, location=0.0, scale=1.0
+        ),
+        atom_probability=0.6,
+    )
+    probabilities = np.array([0.1, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99])
+    curve = QuantileCurve(
+        probabilities, np.asarray(source.quantile(probabilities), dtype=np.float64)
+    )
+    inferred = HurdleQuantileFit(family=DistributionFamily.GUMBEL_RIGHT)
+    result = fit_quantiles(curve, inferred)
+    assert result.distribution.mass(0.0) == pytest.approx(0.6)
+    assert result.diagnostic.atom_count == 4
+    assert result.record.specification == inferred
+    restored = FitRecord.from_json(result.record.to_json())
+    assert restored.specification == inferred
+    assert json.loads(inferred.to_json())["atom_probability"] is None
+    _core.validate_fitted_curve(
+        result.record.to_json(), result.distribution.to_json(), "v", "[]"
+    )
+
+
+def test_inferred_hurdle_needs_two_knots_at_its_location() -> None:
+    curve = QuantileCurve([0.1, 0.3, 0.5, 0.7, 0.9], [0.0, 1.0, 2.0, 3.0, 5.0])
+    inferred = HurdleQuantileFit(family=DistributionFamily.GUMBEL_RIGHT)
+    with pytest.raises(FitError, match="at least two knots at atom_location"):
+        fit_quantiles(curve, inferred)
+    plain = QuantileFit(family=DistributionFamily.GUMBEL_RIGHT)
+    selected = fit_quantiles(curve, ModelSelection(
+        candidates=(inferred, plain),
+        criterion=SelectionCriterion.NORMALIZED_ROOT_MEAN_SQUARE_ERROR,
+    ))
+    assert selected.record.selected_attempt == 1
+    assert selected.record.attempts[0].status is FitStatus.FAILED
 
 
 def test_scientific_inputs_and_choices_are_explicit() -> None:
