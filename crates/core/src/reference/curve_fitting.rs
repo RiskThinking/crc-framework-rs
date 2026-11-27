@@ -385,6 +385,27 @@ pub(crate) fn fit_quantile_points(
     accept: Option<&dyn Fn(&TailDistribution) -> bool>,
     project: Option<&dyn Fn(&mut [f64])>,
 ) -> Option<QuantileOptimization> {
+    if truncation_atom.is_none() {
+        if let Some(profiled) =
+            profile_quantile_points(kind, probabilities, values, weights, value_scale)
+        {
+            // The unconstrained least-squares optimum is also the constrained
+            // one whenever it satisfies the bounds. Otherwise the simplex
+            // searches the feasible region below.
+            let accepted = accept.is_none_or(|accept| {
+                TailDistribution::from_parameters(
+                    DistributionFamily::from_reference_kind(kind),
+                    profiled.shape,
+                    profiled.loc,
+                    profiled.scale,
+                )
+                .is_ok_and(|law| accept(&law))
+            });
+            if accepted {
+                return Some(profiled);
+            }
+        }
+    }
     let starts = quantile_starts(kind, probabilities, values, weights);
     let parameter_count = if matches!(kind, DistributionKind::GumbelR | DistributionKind::GumbelL) {
         2
@@ -671,6 +692,169 @@ fn quantile_starts(
         }
     }
     starts
+}
+
+/// Shape grid for the profiled search, in the coordinate the search moves in,
+/// and the map from that coordinate to the family's shape. The ranges match
+/// `constrain_quantile_parameters`.
+fn profile_grid(kind: DistributionKind) -> Option<(f64, f64, fn(f64) -> f64)> {
+    match kind {
+        DistributionKind::GenExtreme | DistributionKind::GenPareto => {
+            Some((-2.0, 2.0, |shape| shape))
+        }
+        DistributionKind::WeibullMin | DistributionKind::WeibullMax => {
+            Some((0.05_f64.ln(), 50.0_f64.ln(), f64::exp))
+        }
+        // The skew-normal quantile has no closed form, and Gumbel has no shape.
+        DistributionKind::SkewNorm | DistributionKind::GumbelR | DistributionKind::GumbelL => None,
+    }
+}
+
+/// Weighted least squares of quantile knots by variable projection.
+///
+/// Every supported family is `loc + scale * z(shape, q)`. For a fixed shape the
+/// least-squares location and scale are closed form, so only the shape is
+/// searched: on a grid over its whole admissible range, then by golden-section
+/// refinement around the best grid point. The search is deterministic and needs
+/// no starting values. Returns `None` when no shape gives a positive, finite
+/// scale within the optimizer's limits; the simplex then handles the fit.
+fn profile_quantile_points(
+    kind: DistributionKind,
+    probabilities: &[f64],
+    values: &[f64],
+    weights: &[f64],
+    value_scale: f64,
+) -> Option<QuantileOptimization> {
+    const GRID_POINTS: usize = 81;
+    const MAX_ITERATIONS: usize = 200;
+    let weight_sum = weights.iter().sum::<f64>();
+    let gumbel_basis: Vec<f64>;
+    // GEV quantiles reuse ln(-ln q), so a trial shape costs one `exp` per knot.
+    let gev_log_t: Vec<f64> = if kind == DistributionKind::GenExtreme {
+        probabilities.iter().map(|q| (-(q.ln())).ln()).collect()
+    } else {
+        Vec::new()
+    };
+    let mut standardized = vec![0.0; probabilities.len()];
+    let mut evaluations = 0usize;
+    let mut score = |shape: Option<f64>, basis: Option<&[f64]>| -> Option<(f64, f64, f64)> {
+        evaluations += 1;
+        let z: &[f64] = match (basis, shape) {
+            (Some(basis), _) => basis,
+            (None, Some(c)) if kind == DistributionKind::GenExtreme => {
+                for (out, &log_t) in standardized.iter_mut().zip(&gev_log_t) {
+                    *out = if c.abs() < 1e-12 {
+                        -log_t
+                    } else {
+                        -(c * log_t).exp_m1() / c
+                    };
+                }
+                &standardized
+            }
+            (None, shape) => {
+                let law = FittedDistribution::from_kind_and_params(kind, shape, 0.0, 1.0)?;
+                for (out, &q) in standardized.iter_mut().zip(probabilities) {
+                    *out = law.ppf(q);
+                }
+                &standardized
+            }
+        };
+        if z.iter().any(|value| !value.is_finite()) {
+            return None;
+        }
+        let (loc, scale) = weighted_location_scale(z, values, weights)?;
+        if !(1.0e-12..=MAXIMUM_QUANTILE_SCALE).contains(&scale) {
+            return None;
+        }
+        let loss = z
+            .iter()
+            .zip(values)
+            .zip(weights)
+            .map(|((&z, &value), &weight)| {
+                weight * ((loc + scale * z - value) / value_scale).powi(2)
+            })
+            .sum::<f64>()
+            / weight_sum;
+        loss.is_finite().then_some((loss, loc, scale))
+    };
+
+    let Some((low, high, shape_of)) = profile_grid(kind) else {
+        if kind == DistributionKind::SkewNorm {
+            return None;
+        }
+        gumbel_basis = probabilities
+            .iter()
+            .map(|&q| standardized_quantile(kind, 0.0, q))
+            .collect::<Option<_>>()?;
+        let (_, loc, scale) = score(None, Some(&gumbel_basis))?;
+        return Some(QuantileOptimization {
+            shape: None,
+            loc,
+            scale,
+            converged: true,
+            iterations: 0,
+            evaluations,
+        });
+    };
+
+    let step = (high - low) / (GRID_POINTS - 1) as f64;
+    let mut best: Option<(f64, f64, f64, f64)> = None; // (loss, coordinate, loc, scale)
+    let mut grid_best = 0usize;
+    for index in 0..GRID_POINTS {
+        let coordinate = low + step * index as f64;
+        if let Some((loss, loc, scale)) = score(Some(shape_of(coordinate)), None) {
+            if best.is_none_or(|(current, ..)| loss < current) {
+                best = Some((loss, coordinate, loc, scale));
+                grid_best = index;
+            }
+        }
+    }
+    best?;
+    let mut a = low + step * grid_best.saturating_sub(1) as f64;
+    let mut b = low + step * (grid_best + 1).min(GRID_POINTS - 1) as f64;
+    let ratio = (5.0_f64.sqrt() - 1.0) / 2.0;
+    let mut evaluate = |coordinate: f64, best: &mut Option<(f64, f64, f64, f64)>| -> f64 {
+        match score(Some(shape_of(coordinate)), None) {
+            Some((loss, loc, scale)) => {
+                if best.is_none_or(|(current, ..)| loss < current) {
+                    *best = Some((loss, coordinate, loc, scale));
+                }
+                loss
+            }
+            None => f64::INFINITY,
+        }
+    };
+    let mut x1 = b - ratio * (b - a);
+    let mut x2 = a + ratio * (b - a);
+    let mut f1 = evaluate(x1, &mut best);
+    let mut f2 = evaluate(x2, &mut best);
+    let mut iterations = 0usize;
+    let tolerance = 1.0e-10;
+    while b - a > tolerance * (1.0 + a.abs().max(b.abs())) && iterations < MAX_ITERATIONS {
+        iterations += 1;
+        if f1 <= f2 {
+            b = x2;
+            x2 = x1;
+            f2 = f1;
+            x1 = b - ratio * (b - a);
+            f1 = evaluate(x1, &mut best);
+        } else {
+            a = x1;
+            x1 = x2;
+            f1 = f2;
+            x2 = a + ratio * (b - a);
+            f2 = evaluate(x2, &mut best);
+        }
+    }
+    let (_, coordinate, loc, scale) = best?;
+    Some(QuantileOptimization {
+        shape: Some(shape_of(coordinate)),
+        loc,
+        scale,
+        converged: iterations < MAX_ITERATIONS,
+        iterations,
+        evaluations,
+    })
 }
 
 fn standardized_quantile(kind: DistributionKind, shape: f64, probability: f64) -> Option<f64> {
