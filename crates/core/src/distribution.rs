@@ -1702,6 +1702,10 @@ fn fit_quantile_points_internal(
         weights,
         conditioning_scale,
         truncation_atom,
+        // A maximum without a probability bounds the support's upper end.
+        bounds
+            .maximum_value
+            .filter(|_| bounds.probability.is_none()),
         Some(&|law| {
             if let Some(atom) = truncation_atom {
                 HurdleDistribution::new(

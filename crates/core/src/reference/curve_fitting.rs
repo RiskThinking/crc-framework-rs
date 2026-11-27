@@ -232,12 +232,12 @@ pub(crate) struct CensoredQuantileOptimization {
 }
 
 #[derive(Debug, Clone)]
-struct SimplexResult {
-    parameters: Vec<f64>,
-    objective: f64,
-    converged: bool,
-    iterations: usize,
-    evaluations: usize,
+pub(super) struct SimplexResult {
+    pub(super) parameters: Vec<f64>,
+    pub(super) objective: f64,
+    pub(super) converged: bool,
+    pub(super) iterations: usize,
+    pub(super) evaluations: usize,
 }
 
 /// Strict multi-start maximum likelihood for one requested family. Moment and
@@ -382,28 +382,56 @@ pub(crate) fn fit_quantile_points(
     weights: &[f64],
     value_scale: f64,
     truncation_atom: Option<f64>,
+    maximum: Option<f64>,
     accept: Option<&dyn Fn(&TailDistribution) -> bool>,
     project: Option<&dyn Fn(&mut [f64])>,
 ) -> Option<QuantileOptimization> {
-    if truncation_atom.is_none() {
-        if let Some(profiled) =
-            profile_quantile_points(kind, probabilities, values, weights, value_scale)
-        {
-            // The unconstrained least-squares optimum is also the constrained
-            // one whenever it satisfies the bounds. Otherwise the simplex
-            // searches the feasible region below.
-            let accepted = accept.is_none_or(|accept| {
-                TailDistribution::from_parameters(
-                    DistributionFamily::from_reference_kind(kind),
-                    profiled.shape,
-                    profiled.loc,
-                    profiled.scale,
-                )
-                .is_ok_and(|law| accept(&law))
-            });
-            if accepted {
-                return Some(profiled);
-            }
+    let profiled = match truncation_atom {
+        None => profile_quantile_points(kind, probabilities, values, weights, value_scale, maximum),
+        Some(atom) => super::hurdle_tail::profile_truncated_quantile_points(
+            kind,
+            probabilities,
+            values,
+            weights,
+            atom,
+            maximum,
+            accept,
+        ),
+    };
+    if let Some(profiled) = profiled {
+        // The unconstrained least-squares optimum is also the constrained one
+        // whenever it satisfies the bounds. Otherwise the simplex searches the
+        // feasible region below.
+        let accepted = accept.is_none_or(|accept| {
+            TailDistribution::from_parameters(
+                DistributionFamily::from_reference_kind(kind),
+                profiled.shape,
+                profiled.loc,
+                profiled.scale,
+            )
+            .is_ok_and(|law| accept(&law))
+        });
+        let parameters: Vec<f64> = profiled
+            .shape
+            .into_iter()
+            .chain([profiled.loc, profiled.scale])
+            .collect();
+        // The truncated search scores a proxy of the stored curve; the law it
+        // returns must also be admissible to the objective the simplex uses.
+        let admissible = truncation_atom.is_none()
+            || quantile_objective(
+                kind,
+                &parameters,
+                probabilities,
+                values,
+                weights,
+                weights.iter().sum::<f64>(),
+                value_scale,
+                truncation_atom,
+            )
+            .is_finite();
+        if accepted && admissible {
+            return Some(profiled);
         }
     }
     let starts = quantile_starts(kind, probabilities, values, weights);
@@ -716,16 +744,22 @@ fn profile_grid(kind: DistributionKind) -> Option<(f64, f64, fn(f64) -> f64)> {
 /// least-squares location and scale are closed form, so only the shape is
 /// searched: on a grid over its whole admissible range, then by golden-section
 /// refinement around the best grid point. The search is deterministic and needs
-/// no starting values. Returns `None` when no shape gives a positive, finite
-/// scale within the optimizer's limits; the simplex then handles the fit.
+/// no starting values. With `maximum`, the support must end at or below it;
+/// for a fixed shape that is one linear constraint on location and scale, met
+/// in closed form. Returns `None` when no shape gives a positive, finite scale
+/// within the optimizer's limits; the simplex then handles the fit.
 fn profile_quantile_points(
     kind: DistributionKind,
     probabilities: &[f64],
     values: &[f64],
     weights: &[f64],
     value_scale: f64,
+    maximum: Option<f64>,
 ) -> Option<QuantileOptimization> {
     const GRID_POINTS: usize = 81;
+    let family = DistributionFamily::from_reference_kind(kind);
+    // Aim just inside the bound so the stored endpoint survives rounding.
+    let maximum = maximum.map(|maximum| maximum - 1.0e-12 * maximum.abs().max(1.0));
     const MAX_ITERATIONS: usize = 200;
     let weight_sum = weights.iter().sum::<f64>();
     let gumbel_basis: Vec<f64>;
@@ -762,7 +796,35 @@ fn profile_quantile_points(
         if z.iter().any(|value| !value.is_finite()) {
             return None;
         }
-        let (loc, scale) = weighted_location_scale(z, values, weights)?;
+        let (mut loc, mut scale) = weighted_location_scale(z, values, weights)?;
+        if let Some(maximum) = maximum {
+            let top = TailDistribution::from_parameters(family, shape, 0.0, 1.0)
+                .ok()?
+                .ppf(1.0)
+                .unwrap_or(f64::INFINITY);
+            if !top.is_finite() {
+                return None;
+            }
+            if loc + scale * top > maximum {
+                // The loss is a convex quadratic in (loc, scale), so the
+                // constrained optimum puts the support's end on the bound:
+                // maximum - value = scale * (top - z).
+                let (cross, square) = z.iter().zip(values).zip(weights).fold(
+                    (0.0, 0.0),
+                    |(cross, square), ((&z, &value), &weight)| {
+                        (
+                            cross + weight * (top - z) * (maximum - value),
+                            square + weight * (top - z) * (top - z),
+                        )
+                    },
+                );
+                scale = cross / square;
+                loc = maximum - scale * top;
+                if !(scale.is_finite() && loc.is_finite()) {
+                    return None;
+                }
+            }
+        }
         if !(1.0e-12..=MAXIMUM_QUANTILE_SCALE).contains(&scale) {
             return None;
         }
@@ -1155,7 +1217,7 @@ fn quantile_objective(
     loss / weight_sum
 }
 
-fn quantile_nelder_mead<F, C>(
+pub(super) fn quantile_nelder_mead<F, C>(
     mut start: Vec<f64>,
     steps: Vec<f64>,
     objective: F,
