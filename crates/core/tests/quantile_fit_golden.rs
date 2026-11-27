@@ -11,7 +11,7 @@
 //! counts while preserving fit quality. Counters are recorded for investigation,
 //! but are not portable correctness assertions; use benchmarks for performance.
 //!
-//! The baseline was generated on macOS 15 / aarch64. For mechanical optimizer
+//! The baseline was generated on macOS 27 / aarch64. For mechanical optimizer
 //! refactors on that environment, CRC_GOLDEN_EXACT=1 restores bit-exact checks,
 //! including counters. For another environment, capture fingerprints before and
 //! after the change with CRC_GOLDEN_REGEN and diff them on the same toolchain.
