@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 import math
 from abc import ABC, abstractmethod
@@ -529,14 +530,12 @@ def _label(specification: FitSpec) -> str:
 
 def _normalized_weights(weights: npt.NDArray[np.float64]) -> tuple[float, ...]:
     scaled = weights / float(np.max(weights))
-    normalized = tuple(float(value) for value in scaled / float(np.sum(scaled)))
-    if any(
-        weight == 0 and original > 0 for weight, original in zip(normalized, weights)
-    ):
+    normalized = scaled / float(np.sum(scaled))
+    if np.any((normalized == 0) & (weights > 0)):
         raise ValueError(
             "relative weights are too small to represent; positive weights cannot be silently dropped"
         )
-    return normalized
+    return tuple(normalized.tolist())
 
 
 def _failure(
@@ -1128,12 +1127,28 @@ def _decode_attempt(value: object) -> FitAttempt:
     return FitAttempt(specification, status, diagnostic)
 
 
+@functools.lru_cache(maxsize=1024)
+def _cached_specification(specification: FitSpec) -> object:
+    return _serialize(specification)
+
+
+def _specification_document(specification: FitSpec) -> object:
+    """Serialize a specification once; records repeat the same candidates.
+
+    The cached documents are only read by `json.dumps`, never mutated.
+    """
+    try:
+        return _cached_specification(specification)
+    except TypeError:  # an unhashable field value
+        return _serialize(specification)
+
+
 def _record_document(record: FitRecord) -> dict[str, object]:
     return {
-        "specification": _serialize(record.specification),
+        "specification": _specification_document(record.specification),
         "attempts": [
             {
-                "specification": _serialize(a.specification),
+                "specification": _specification_document(a.specification),
                 "status": a.status.value,
                 "diagnostic": {
                     field.name: getattr(a.diagnostic, field.name)
