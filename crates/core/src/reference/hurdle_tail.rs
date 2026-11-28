@@ -52,6 +52,9 @@ const SHAPE_GRID_POINTS: usize = 9;
 const SHAPE_TOLERANCE: f64 = 1.0e-5;
 const LOGIT_TOLERANCE: f64 = 1.0e-5;
 const GUMBEL_LOGIT_POINTS: usize = 12;
+/// A one-parameter search is the whole fit, with no Levenberg-Marquardt step
+/// after it, so it resolves its coordinate as finely as the loss allows.
+const LINE_TOLERANCE: f64 = 1.0e-10;
 const STARTS: usize = 2;
 const LM_ITERATIONS: usize = 40;
 const LM_RELATIVE_TOLERANCE: f64 = 1.0e-10;
@@ -130,7 +133,7 @@ pub(crate) fn profile_truncated_quantile_points(
             logit_floor(),
             logit_ceiling(),
             GUMBEL_LOGIT_POINTS,
-            LOGIT_TOLERANCE,
+            LINE_TOLERANCE,
         );
     } else if family == DistributionFamily::GenPareto {
         // Threshold stability: the truncated tail of a generalized Pareto law
@@ -141,7 +144,7 @@ pub(crate) fn profile_truncated_quantile_points(
             -2.0,
             2.0,
             SHAPE_GRID_POINTS,
-            SHAPE_TOLERANCE,
+            LINE_TOLERANCE,
         );
     } else {
         tail.search_shape_and_logit();
@@ -868,6 +871,58 @@ mod tests {
             (fit.loc - 3.0).abs() < 1e-3 && (fit.scale - 2.0).abs() < 1e-3,
             "{fit:?}"
         );
+    }
+
+    fn truncated_tail(
+        family: DistributionFamily,
+        shape: Option<f64>,
+        atom: f64,
+    ) -> (Vec<f64>, Vec<f64>) {
+        let law = FittedDistribution::from_parameters(family, shape, 0.0, 1.0).unwrap();
+        let (cdf, sf) = (law.cdf(atom), law.sf(atom));
+        let probabilities: Vec<f64> = (1..20).map(|i| i as f64 / 20.0).collect();
+        let values = probabilities
+            .iter()
+            .map(|&u| truncated_ppf(&law, cdf, sf, u).unwrap())
+            .collect();
+        (probabilities, values)
+    }
+
+    #[test]
+    fn one_parameter_searches_recover_exact_tails_to_full_precision() {
+        // Gumbel searches only the truncation point and the generalized Pareto
+        // only its shape; nothing refines either search afterwards.
+        for (kind, family, shape, atom) in [
+            (
+                DistributionKind::GumbelR,
+                DistributionFamily::GumbelRight,
+                None,
+                -0.5,
+            ),
+            (
+                DistributionKind::GenPareto,
+                DistributionFamily::GenPareto,
+                Some(0.25),
+                0.0,
+            ),
+        ] {
+            let (probabilities, values) = truncated_tail(family, shape, atom);
+            let weights = vec![1.0; values.len()];
+            let fit = profile_truncated_quantile_points(
+                kind,
+                &probabilities,
+                &values,
+                &weights,
+                atom,
+                None,
+                None,
+            )
+            .unwrap();
+            assert!(
+                fit.loc.abs() < 1e-8 && (fit.scale - 1.0).abs() < 1e-8,
+                "{fit:?}"
+            );
+        }
     }
 
     #[test]
