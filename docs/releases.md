@@ -2,6 +2,19 @@
 
 [Documentation index](README.md) · [Project README](../README.md)
 
+## 1.2.0a2
+
+Second prerelease of 1.2.0. Install it the same way as 1.2.0a1. Interfaces and
+formats are unchanged from 1.2.0a1.
+
+- Hurdle tails are fitted by variable projection. For each trial shape and
+  truncation point the scale and location are solved exactly, so a 999-knot
+  GEV hurdle fit takes 5.7 ms instead of 197 ms. On real quantile tables no
+  fit is worse than before, and many fit more closely.
+- Fits under `FitBounds(maximum_value=...)` keep the support at or below the
+  maximum exactly, in the same profile, instead of falling back to a general
+  search.
+
 ## 1.2.0a1
 
 Prerelease of 1.2.0 for fitting large quantile tables. Install it with
@@ -85,7 +98,7 @@ and the [JavaScript guide](javascript.md) for runnable workflows. To upgrade exi
 The package and artifact versions are declared in
 [`release.json`](../python/crc_framework/contracts/api/release.json). The
 framework Python package, Rust workspace, WASM package, and generated JavaScript
-package use `1.2.0-alpha.1` (Python `1.2.0a1`), a prerelease of 1.2.0. Each
+package use `1.2.0-alpha.2` (Python `1.2.0a2`), a prerelease of 1.2.0. Each
 artifact format has its own version in that ledger.
 Changing a package version does not automatically increment every format.
 
@@ -141,9 +154,9 @@ contracts, and WebAssembly package.
 
 | Destination | Version | Release behavior |
 | --- | --- | --- |
-| Rust workspace | `1.2.0-alpha.1` | Versioned source; no crates.io publishing workflow is configured |
-| PyPI `crc-framework` | `1.2.0a1` | `release.yaml` builds wheels and an sdist, attaches assets, and publishes to PyPI |
-| npm `@climateriskcommons/crc-framework` | `1.2.0-alpha.1` (`alpha` dist-tag) | `npm.yaml` publishes the tested generated package |
+| Rust workspace | `1.2.0-alpha.2` | Versioned source; no crates.io publishing workflow is configured |
+| PyPI `crc-framework` | `1.2.0a2` | `release.yaml` builds wheels and an sdist, attaches assets, and publishes to PyPI |
+| npm `@climateriskcommons/crc-framework` | `1.2.0-alpha.2` (`alpha` dist-tag) | `npm.yaml` publishes the tested generated package |
 
 Use `v` plus the exact Cargo version for the tag. Cargo `1.0.0-alpha.1` maps to
 Python `1.0.0a1`; the Python spelling is an output conversion, not another version
