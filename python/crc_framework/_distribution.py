@@ -120,7 +120,8 @@ def _finite(value: float, label: str) -> float:
 
 
 def _real_array(values: Values, label: str) -> FloatArray:
-    if type(values) is list and all(type(item) is float for item in values):
+    # `map(type, ...)` runs in C; a Python-level loop dominated long lists.
+    if type(values) is list and set(map(type, values)) == {float}:
         return numpy.array(values, dtype=numpy.float64)
     if isinstance(values, numpy.ndarray):
         valid = values.dtype.kind in "iuf"
