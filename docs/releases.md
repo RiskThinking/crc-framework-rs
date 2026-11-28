@@ -2,6 +2,14 @@
 
 [Documentation index](README.md) · [Project README](../README.md)
 
+## 1.2.0a4
+
+Fourth prerelease of 1.2.0, with no interface or format changes. Python
+bookkeeping around native quantile fits is lighter: weights are normalized
+with NumPy, fit records reuse the documents of their candidate
+specifications, and lists of floats are type-checked in C. A twelve-candidate
+selection on 999-knot curves runs 12% faster, with identical results.
+
 ## 1.2.0a3
 
 Third prerelease of 1.2.0, with no interface or format changes. Gumbel and
@@ -105,7 +113,7 @@ and the [JavaScript guide](javascript.md) for runnable workflows. To upgrade exi
 The package and artifact versions are declared in
 [`release.json`](../python/crc_framework/contracts/api/release.json). The
 framework Python package, Rust workspace, WASM package, and generated JavaScript
-package use `1.2.0-alpha.3` (Python `1.2.0a3`), a prerelease of 1.2.0. Each
+package use `1.2.0-alpha.4` (Python `1.2.0a4`), a prerelease of 1.2.0. Each
 artifact format has its own version in that ledger.
 Changing a package version does not automatically increment every format.
 
@@ -161,9 +169,9 @@ contracts, and WebAssembly package.
 
 | Destination | Version | Release behavior |
 | --- | --- | --- |
-| Rust workspace | `1.2.0-alpha.3` | Versioned source; no crates.io publishing workflow is configured |
-| PyPI `crc-framework` | `1.2.0a3` | `release.yaml` builds wheels and an sdist, attaches assets, and publishes to PyPI |
-| npm `@climateriskcommons/crc-framework` | `1.2.0-alpha.3` (`alpha` dist-tag) | `npm.yaml` publishes the tested generated package |
+| Rust workspace | `1.2.0-alpha.4` | Versioned source; no crates.io publishing workflow is configured |
+| PyPI `crc-framework` | `1.2.0a4` | `release.yaml` builds wheels and an sdist, attaches assets, and publishes to PyPI |
+| npm `@climateriskcommons/crc-framework` | `1.2.0-alpha.4` (`alpha` dist-tag) | `npm.yaml` publishes the tested generated package |
 
 Use `v` plus the exact Cargo version for the tag. Cargo `1.0.0-alpha.1` maps to
 Python `1.0.0a1`; the Python spelling is an output conversion, not another version
