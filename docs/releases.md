@@ -8,7 +8,7 @@ Fourth prerelease of 1.2.0, with no interface or format changes. Python
 bookkeeping around native quantile fits is lighter: weights are normalized
 with NumPy, fit records reuse the documents of their candidate
 specifications, and lists of floats are type-checked in C. A twelve-candidate
-selection on 999-knot curves runs 12% faster, with identical results.
+selection on real 201-knot curves runs 12% faster, with identical results.
 
 ## 1.2.0a3
 
